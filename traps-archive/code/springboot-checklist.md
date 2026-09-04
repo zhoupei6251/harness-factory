@@ -86,10 +86,10 @@
 
 ## 返修循环（写完必走，最多 2 轮）
 
-自检发现问题 → 修复 → 再审（ecc:java-reviewer），**最多 2 轮**。2 轮后仍有问题 → 提交 reviewer 判定，不静默交付。
+自检发现问题 → 修复 → 再审（`harness-java-reviewer` 或本地 `agents/ecc-java-reviewer.md`；若 ecc 插件已装可走 `spawn ecc:java-reviewer`），**最多 2 轮**。2 轮后仍有问题 → 提交 reviewer 判定，不静默交付。
 
 ```
-写完 → 自检（上面 7 项） → spawn ecc:java-reviewer
+写完 → 自检（上面 7 项） → spawn harness-java-reviewer（或本地 agents/ecc-java-reviewer.md）
   ├── 通过 → 收尾（simplifier/comment-analyzer）
   └── 发现 → 修复 → 再审（第 2 轮）
         ├── 通过 → 收尾

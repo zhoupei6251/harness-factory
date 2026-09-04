@@ -16,7 +16,7 @@
 | mattpocock-skills | claude-plugins-official | 1.2.3 | ★ | tdd / prototype / research / domain-modeling / grilling 等 TypeScript 向技能集 |
 | firecrawl | claude-plugins-official | 1.0.9 | ○ | 网页抓取 / 搜索（MCP 同名服务也在用） |
 | minimax-skills | minimax-skills | 1.0.0 | ○ | MiniMax 官方技能包 |
-| ecc | ecc | 2.0.0 | ○ | 增强命令集（user + project 双 scope 装过） |
+| ecc | ecc | 2.0.0 | ○ | 增强命令集（user + project 双 scope 装过）— **2026-09 降级为可选；本地 `agents/ecc-*.md` 兜底** |
 | andrej-karpathy-skills | karpathy-skills | 1.0.0 | ○ | Karpathy 编码行为准则（先想后写、简单优先、精准修改、目标驱动） |
 
 ## Marketplace 源（6 个）

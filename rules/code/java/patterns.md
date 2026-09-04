@@ -2,7 +2,7 @@
 
 ## 编码标准基准（所有 Java 代码）
 
-每段代码必须同时满足三套标准，`ecc:java-reviewer` 审查按此验收：
+每段代码必须同时满足三套标准，`harness-java-reviewer` 审查按此验收（若 ecc 插件已装可走 `spawn ecc:java-reviewer`，缺失回退到本地 `agents/ecc-java-reviewer.md`）：
 
 - **Alibaba Java Coding Guidelines** — 阿里巴巴 Java 开发手册（命名、常量、集合、并发、异常、日志、安全规约）
 - **Google Java Style** — 4 空格缩进、行宽 120、导入顺序、空白规则

@@ -75,7 +75,7 @@ Harness Foundry 是编排层，底层依赖一个 MCP 服务器 + 四个生态�
 ### 插件依赖：缺了会怎样
 
 - **缺 superpowers**：`Skill(superpowers:brainstorming)`、`systematic-debugging` 等引用失效，设计/调试流程退化
-- **缺 ecc**：写完代码的强制审查链（`spawn ecc:java-reviewer`）无 agent 可派，[路由表](core/intent-routing.md)「写完代码必做」失效
+- **缺 ecc**（可选）：code 审查链降级到本地 `agents/ecc-*.md` 兜底（java/security/database reviewer），功能不减；可选安装 `claude plugin install ecc@ecc` 启用更丰富的专项 reviewer（type-design / silent-failure / pr-test-analyzer 等）
 - **缺 ponytail**：实现阶段的懒惰阶梯（YAGNI / 标准库优先 / 一行优先）不注入，代码域默认退化为 karpathy-guidelines 基线
 - **缺 codebase-memory**：`search_graph` / `trace_path` 等图查询不可用，结构理解退化为逐文件阅读
 - **缺插件不报错**：Claude 会忽略不存在的 skill/agent 引用，静默降级——因此换机器后务必先装插件
@@ -83,7 +83,7 @@ Harness Foundry 是编排层，底层依赖一个 MCP 服务器 + 四个生态�
 ### 分工：各管一段
 
 - **superpowers 管流程**：设计（brainstorming）→ 计划（writing-plans）→ 调试（systematic-debugging）→ 测试（test-driven-development）→ 收尾（finishing-a-development-branch），由 [core/intent-routing.md](core/intent-routing.md) 路由触发
-- **ecc 管专家**：写完代码必做 `ecc:java-reviewer`，按条件触发 security / database / type-design / silent-failure 审查，编译失败派 `ecc:java-build-resolver`（见 [skill-preferences.md](core/orchestration/skill-preferences.md)）
+- **ecc 管专家（可选）**：写完代码可做 `ecc:java-reviewer`，按条件触发 security / database / type-design / silent-failure 审查，编译失败派 `ecc:java-build-resolver`（见 [skill-preferences.md](core/orchestration/skill-preferences.md)）。**缺失时回退**到本地 `agents/ecc-java-reviewer.md` 等副本
 - **ponytail 管极简**：实现阶段注入懒惰阶梯（YAGNI → 复用 → 标准库 → 平台原生 → 已装依赖 → 一行 → 最小实现），压缩不必要代码；`/ponytail-review` 可对 diff 输出删除清单（见 [skill-preferences.md](core/orchestration/skill-preferences.md)）
 - **harness 管编排**：Route 声明 → 路由表 → 阶段门禁 → 审查链，三域（code/novel/news）共享
 
@@ -389,13 +389,13 @@ _layer.yaml:
 | **novel** | leader-novel | novel-writer, novel-planner, novel-reviewer, humanizer, memory-keeper |
 | **news** | leader-news | news-writer, fact-checker, news-editor |
 
-### 专项 Reviewer（ecc 插件 Agent）
+### 专项 Reviewer（ecc 插件 Agent · 可选）
 
-由 ecc 插件提供（`spawn ecc:*`），仅 review 阶段显式调用：
+由 ecc 插件提供（`spawn ecc:*`），仅 review 阶段显式调用；**缺失时回退到本地 `agents/ecc-*.md`**：
 
-- `ecc:java-reviewer` — Java 专项审查（写完代码必做）
-- `ecc:security-reviewer` — 安全审查（新接口/权限/用户输入）
-- `ecc:database-reviewer` — 数据库审查（SQL/DDL/schema 变更）
+- `ecc:java-reviewer` — Java 专项审查（写完代码可做；缺失走 `agents/ecc-java-reviewer.md`）
+- `ecc:security-reviewer` — 安全审查（新接口/权限/用户输入；缺失走 `agents/ecc-security-reviewer.md`）
+- `ecc:database-reviewer` — 数据库审查（SQL/DDL/schema 变更；缺失走 `agents/ecc-database-reviewer.md`）
 
 仅在 review 阶段显式调用，不进入主流程。
 

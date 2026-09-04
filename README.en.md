@@ -117,7 +117,7 @@ Harness Foundry is the orchestration layer; it depends on three plugin ecosystem
 ### Plugin Dependencies: What Breaks If Missing
 
 - **Without superpowers**: `Skill(superpowers:brainstorming)`, `systematic-debugging`, etc. fail silently — design/debug flows degrade
-- **Without ecc**: the mandatory post-code review chain (`spawn ecc:java-reviewer`) in the [routing table](core/intent-routing.md) has no agents to dispatch
+- **Without ecc (optional)**: code review chain falls back to local `agents/ecc-*.md` (java/security/database reviewer); functionality preserved. Optional install `claude plugin install ecc@ecc` for richer specialists (type-design / silent-failure / pr-test-analyzer etc.)
 - **Without ponytail**: the lazy ladder (YAGNI / stdlib-first / one-line-first) is not injected during implementation; the code domain falls back to the karpathy-guidelines baseline
 - **No error when missing**: Claude ignores unknown skill/agent references silently — always install plugins on a new machine
 
@@ -314,13 +314,13 @@ Each Skill may contain optional `_meta.json`:
 | **novel** | leader-novel | novel-writer, novel-planner, novel-reviewer, humanizer, memory-keeper |
 | **news** | leader-news | news-writer, fact-checker, news-editor |
 
-### Specialized Reviewers (ecc plugin agents)
+### Specialized Reviewers (ecc plugin agents · optional)
 
-Provided by the ecc plugin (`spawn ecc:*`), invoked only during the review phase:
+Provided by the ecc plugin (`spawn ecc:*`), invoked only during the review phase; **falls back to local `agents/ecc-*.md`** when missing:
 
-- `ecc:java-reviewer` — Java specialized review (mandatory after writing code)
-- `ecc:security-reviewer` — Security review (new APIs / permissions / user input)
-- `ecc:database-reviewer` — Database review (SQL / DDL / schema changes)
+- `ecc:java-reviewer` — Java specialized review (recommended after writing code; falls back to `agents/ecc-java-reviewer.md`)
+- `ecc:security-reviewer` — Security review (new APIs / permissions / user input; falls back to `agents/ecc-security-reviewer.md`)
+- `ecc:database-reviewer` — Database review (SQL / DDL / schema changes; falls back to `agents/ecc-database-reviewer.md`)
 
 ### Handoff Protocol
 
