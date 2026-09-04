@@ -18,9 +18,10 @@ const RUNTIME_DIR = path.join(FOUNDRY_DIR, '..', '.ai-runtime-artifacts');
 function checkConfigValidity() {
   const files = [
     'core/orchestration/domain-config.yaml',
-    'core/orchestration/config.defaults.yaml',
-    'hooks/guardrails/guardrail-config.json'
+    'core/orchestration/config.defaults.yaml'
   ];
+  // 2026-09 phase-2: hooks/guardrails/guardrail-config.json 已删除，
+  // guardrail 配置 fallback 到 skills/agent-shield/SKILL.md
 
   const results = files.map(f => {
     const fullPath = path.join(FOUNDRY_DIR, f);
@@ -47,7 +48,7 @@ function checkReferenceIntegrity() {
     { name: 'intent-routing.md', path: 'core/intent-routing.md' },
     { name: 'dispatcher-workflow.md', path: 'core/orchestration/dispatcher-workflow.md' },
     { name: 'domain-config.yaml', path: 'core/orchestration/domain-config.yaml' },
-    { name: 'guardrail-config.json', path: 'hooks/guardrails/guardrail-config.json' },
+    // 2026-09 phase-2: guardrail-config.json 已删，参考 skills/agent-shield/SKILL.md
     { name: 'execution-context model', path: 'core/orchestration/execution-context/model.yaml' },
     { name: 'execution-context protocol', path: 'core/orchestration/execution-context/provider-protocol.md' }
   ];

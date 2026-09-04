@@ -40,8 +40,8 @@ check_ref "core/orchestration/execution-context/provider-protocol.md" "execution
 check_ref "core/capabilities/registry.md" "capability 注册表"
 check_ref "core/principles.md" "核心原则"
 
-# hooks 引用
-check_ref "hooks/guardrails/guardrail-config.json" "guardrail 配置 (P0-2)"
+# hooks 引用（2026-09 phase-2 删除 hooks/guardrails/，改走 skills/agent-shield/SKILL.md fallback）
+# check_ref "hooks/guardrails/guardrail-config.json" "guardrail 配置 (P0-2)"
 
 # tracking 引用
 check_ref "core/orchestration/tracking/schema.md" "追踪 schema"

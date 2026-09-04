@@ -58,8 +58,9 @@ done
 
 echo ""
 echo "--- JSON 配置 ---"
-check_json "$FOUNDRY_DIR/hooks/guardrails/guardrail-config.json"
-check_json "$FOUNDRY_DIR/hooks/guardrails/audit-log-schema.json"
+# 2026-09 phase-2: hooks/guardrails/ 已删除——其配置 fallback 到
+# skills/agent-shield/SKILL.md 的"配置 fallback"段
+echo "  [skip] hooks/guardrails/*.json（已废弃，见 skills/agent-shield/SKILL.md fallback 段）"
 
 echo ""
 if [ "$ISSUES" -gt 0 ]; then

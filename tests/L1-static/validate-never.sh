@@ -39,6 +39,8 @@ echo "  可检测规则: $detectable"
 echo "  难以自动检测: $undetectable"
 
 # 检查 guardrail-config.json 是否覆盖了 NEVER 规则
+# 2026-09 phase-2: hooks/guardrails/ 已删除；guardrail 覆盖检查迁移到
+# skills/agent-shield/SKILL.md 的"配置 fallback"段
 GUARDRAIL_CONFIG="$FOUNDRY_DIR/hooks/guardrails/guardrail-config.json"
 if [ -f "$GUARDRAIL_CONFIG" ]; then
     echo ""

@@ -11,6 +11,12 @@ category: workflow
 ---
 # AgentShield
 
+## 配置 fallback（2026-09 phase-2）
+
+- 优先读 `~/.claude/agent-shield/config.json`（用户级）
+- 回退到本 SKILL.md 的"扫描范围"与 rules/ 列表（项目级，替代已删除的 `hooks/guardrails/guardrail-config.json`）
+- 无配置时仅 warning，不抛错——核心规则在 `core/NEVER.md`，本 skill 仅做"额外加固"层
+
 ## 功能概述
 
 AgentShield 是 Harness Foundry 的安全审计系统，用于检测和防御 Agentic AI 环境中的安全威胁。
