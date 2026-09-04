@@ -2,6 +2,8 @@
 
 > 运行时会话记忆文件，由 bootstrap.sh 生成，Stop Hook 更新
 > 不要手动编辑
+>
+> 运行时 schema：见 [`memory/state.schema.json`](memory/state.schema.json)（已停更；保留为契约参考）
 
 ## 当前状态
 

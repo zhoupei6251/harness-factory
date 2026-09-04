@@ -30,28 +30,14 @@
 | anthropic-agent-skills | anthropics/skills | `claude plugin marketplace add anthropics/skills`（marketplace 级技能如 `claude-api` 随注册生效） |
 | karpathy-skills | multica-ai/andrej-karpathy-skills | `claude plugin marketplace add multica-ai/andrej-karpathy-skills` |
 
-## 手动恢复命令（等价于 restore 脚本）
+## 手动恢复命令
 
-```bash
-# 1) 注册 marketplace（claude-plugins-official 内置，跳过）
-claude plugin marketplace add DietrichGebert/ponytail
-claude plugin marketplace add https://github.com/MiniMax-AI/skills.git
-claude plugin marketplace add https://github.com/affaan-m/ECC.git
-claude plugin marketplace add anthropics/skills
-claude plugin marketplace add multica-ai/andrej-karpathy-skills
+完整恢复命令见 [`restore-claude-plugins.sh`](restore-claude-plugins.sh)（一键脚本，单一来源）；下面仅展示市场/插件摘要：
 
-# 2) 安装插件（★ 核心 7 个 + ○ 可选 3 个）
-claude plugin install ponytail@ponytail
-claude plugin install superpowers@claude-plugins-official
-claude plugin install context7@claude-plugins-official
-claude plugin install playwright@claude-plugins-official
-claude plugin install github@claude-plugins-official
-claude plugin install mattpocock-skills@claude-plugins-official
-claude plugin install firecrawl@claude-plugins-official
-claude plugin install minimax-skills@minimax-skills
-claude plugin install ecc@ecc
-claude plugin install andrej-karpathy-skills@karpathy-skills
-```
+| 类别 | 数量 | 说明 |
+|------|------|------|
+| 核心插件（★） | 7 | 必装，缺则流程降级 |
+| 可选插件（○） | 3 | ecc 已降级，缺失走 `agents/ecc-*.md` 兜底 |
 
 ## 备注
 

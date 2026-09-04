@@ -7,7 +7,11 @@
     "dashboard:win": "python scripts/dashboard/dashboard.py",
     "verify": "bash scripts/verify.sh",
     "bootstrap": "bash scripts/bootstrap.sh --target all",
-    "sync": "bash scripts/sync-skills.sh --target all"
+    "sync": "bash scripts/sync-skills.sh --target all",
+    "health": "node scripts/harness-health.js",
+    "instinct": "node scripts/instinct-cli.js",
+    "instinct:test": "node --test scripts/instinct-cli.test.js",
+    "eval": "node scripts/eval/run-skill-eval.js --all"
   },
   "keywords": [
     "claude-code",

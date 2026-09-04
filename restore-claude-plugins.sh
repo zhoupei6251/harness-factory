@@ -2,6 +2,9 @@
 # 一键恢复 Claude Code 插件（Git Bash / macOS / Linux 通用）
 # 用法: bash harness-foundry/restore-claude-plugins.sh
 # 不含任何密钥；MCP 与 settings 恢复见 mcp-servers.md / README.md
+#
+# 2026-09 单一来源：本脚本为 claude-code-plugins.md 配套执行入口
+#（markdown 仅作摘要，不再独立维护命令块）
 set -e
 
 echo "==> 1/2 注册 marketplace（claude-plugins-official 为内置，跳过）"
