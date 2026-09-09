@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["name", "memory_template"],
+  "properties": {
+    "name": { "type": "string", "enum": ["code", "novel", "news"] },
+    "memory_template": { "type": "string", "minLength": 1 },
+    "runtime_dir": { "type": "string" }
+  },
+  "additionalProperties": false
+}

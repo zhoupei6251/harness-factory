@@ -1,28 +1,17 @@
 {
-  "name": "harness-foundry",
-  "version": "1.0.0",
-  "description": "AI coding workflow framework for Claude Code - multi-agent orchestration system",
+  "name": "harness-factory",
+  "version": "0.1.0",
+  "description": "Clean skeleton for shipping harness rules to 4 AI platforms",
+  "private": true,
+  "type": "module",
   "scripts": {
-    "dashboard": "python3 scripts/dashboard/dashboard.py",
-    "dashboard:win": "python scripts/dashboard/dashboard.py",
-    "verify": "bash scripts/verify.sh",
-    "bootstrap": "bash scripts/bootstrap.sh --target all",
-    "sync": "bash scripts/sync-skills.sh --target all",
-    "health": "node scripts/harness-health.js",
-    "instinct": "node scripts/instinct-cli.js",
-    "instinct:test": "node --test scripts/instinct-cli.test.js",
-    "eval": "node scripts/eval/run-skill-eval.js --all"
+    "bootstrap": "tsx scripts/bootstrap.ts",
+    "validate": "tsx tests/validate-schemas.ts",
+    "typecheck": "tsc --noEmit"
   },
-  "keywords": [
-    "claude-code",
-    "harness",
-    "orchestration",
-    "agents",
-    "skills"
-  ],
-  "author": "Harness Foundry",
-  "license": "MIT",
-  "engines": {
-    "node": ">=18"
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.6.0"
   }
 }

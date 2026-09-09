@@ -1,9 +1,0 @@
-# novel-protocol 行为测试上下文
-
-这是一个用于 skill 行为测试的示例写作任务上下文，供 novel-protocol skill 的 eval 测试使用。
-
-## 场景
-
-写「第 12 章」续写任务，需要先走 novel-protocol 的指令路由 → 协议装配 → 知识库绑定 → 因果链预检 → 交付收束。
-
-（实际断言针对 SKILL.md 定义内容，不针对本文件。）

@@ -1,6 +1,12 @@
-# routing.md — Compat Alias
+# routing.md - route table
 
-> 本文件是 `intent-routing.md` 的兼容性别名，用于各 adapter 物理绑定的简短引用。
-> **真相源始终为 `intent-routing.md`**，不要在本文件添加任何独立内容。
+| Route | When | MEMORY template | Runtime dir |
+|-------|------|----------------|-------------|
+| `code` | Software engineering task | `routes/code/MEMORY.md` | `.ai-runtime-artifacts/` |
+| `novel` | Fiction writing task | `routes/novel/MEMORY.md` | `.harness-novel-runtime/` |
+| `news` | News/article task | `routes/news/MEMORY.md` | `.harness-news-runtime/` |
+| small change | < 50 lines, no spec needed | none | none |
 
-请直接阅读 `intent-routing.md`。
+## Default
+
+`code` is the default route. Override with explicit intent at session start.

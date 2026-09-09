@@ -1,5 +1,0 @@
-# Instinct 全局目录（自动生成）
-
-此目录存储跨项目的全局 instinct 文件。
-Session 结束时由 Stop Hook 自动写入。
-不要手动编辑 — 使用 `instinct-cli` 管理。
