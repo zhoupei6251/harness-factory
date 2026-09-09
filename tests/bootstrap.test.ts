@@ -35,19 +35,21 @@ async function cleanup(): Promise<void> {
 
 await cleanup();
 
-// Run bootstrap
-const result = spawnSync("npx", ["tsx", "scripts/bootstrap.ts", "--platform", "all", "--route", "code"], {
+// Run bootstrap via npm (uses package.json scripts/bootstrap which invokes tsx)
+const result = spawnSync("npm", ["run", "bootstrap", "--", "--platform", "all", "--route", "code"], {
   cwd: ROOT,
   encoding: "utf-8",
+  shell: true,
 });
 
 if (result.status !== 0) {
   console.log(`[FAIL] bootstrap exited with code ${result.status}`);
-  console.log(result.stderr);
+  if (result.stdout) console.log(result.stdout);
+  if (result.stderr) console.log(result.stderr);
   fail = 1;
 } else {
   console.log("[ok] bootstrap exited 0");
-  for (const line of result.stdout.trim().split("\n")) {
+  for (const line of (result.stdout || "").trim().split("\n")) {
     console.log(`     ${line}`);
   }
 }
