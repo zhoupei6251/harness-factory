@@ -1,6 +1,6 @@
 {
   "name": "harness-factory",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Clean skeleton for shipping harness rules to 4 AI platforms",
   "private": true,
   "type": "module",
@@ -8,6 +8,7 @@
     "bootstrap": "tsx scripts/bootstrap.ts",
     "validate": "tsx tests/validate-schemas.ts",
     "typecheck": "tsc --noEmit",
+    "index": "python3 tests/build-index.py",
     "test": "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts"
   },
   "devDependencies": {
