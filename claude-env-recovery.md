@@ -27,7 +27,7 @@
 | OS | Windows 11 |
 | Shell | Git Bash |
 | 插件 | 10 个（marketplace 6 个） |
-| 全局 MCP | 10 个（`~/.claude.json`）+ 项目级 1 个（宿主仓库 `.mcp.json`） |
+| 全局 MCP | 11 个（`~/.claude.json`，含 context7 必装）+ 项目级 1 个（宿主仓库 `.mcp.json`） |
 | 用户级 skills | ~140 个（`~/.claude/skills/`） |
 
 ## 与 harness-foundry 自带插件依赖的关系

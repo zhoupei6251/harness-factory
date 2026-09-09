@@ -107,7 +107,7 @@
     "context7": {
       "command": "npx",
       "args": ["-y", "@upstash/context7-mcp@latest"],
-      "description": "Live documentation lookup — use with /docs command and documentation-lookup skill (resolve-library-id, query-docs)."
+      "description": "★必装必用★ Live documentation lookup — use with /docs command and documentation-lookup skill (resolve-library-id, query-docs). 外部库/依赖/模型 API 当前版本用法一律先查；纯搬迁重构不查。"
     },
     "codescene": {
       "command": "npx",

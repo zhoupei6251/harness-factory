@@ -10,6 +10,7 @@
 | 名 | 命令 | 配置要点 |
 |---|---|---|
 | redis | `uvx --from redis-mcp-server@latest redis-mcp-server --url redis://:<REDIS_PASSWORD>@192.168.8.67:6379/0` | 涉及 Redis 一律用它（记忆纪律） |
+| context7 | `npx -y @upstash/context7-mcp` | **必装必用**：外部库/依赖/模型 API 的当前版本用法（resolve-library-id → query-docs），写新依赖、版本敏感行为、凭记忆写库 API 时先查；纯搬迁重构不查 |
 | mysql | `npx -y @benborla29/mcp-server-mysql` | env：`MYSQL_HOST=192.168.8.67`、`MYSQL_PORT=3306`、`MYSQL_USER=root`、`MYSQL_PASS=<DB_PASSWORD>`、`MYSQL_DB=xywh_dev`；只读，涉及库查询用它 |
 | codebase-memory-mcp | `C:/Users/zhoupei/.local/bin/codebase-memory-mcp.exe` | 图谱探索默认入口；需先装 `codebase-memory-mcp` 二进制（.local/bin），换机重装该工具后建索引 |
 | github | `npx -y @modelcontextprotocol/server-github` | env：`GITHUB_PERSONAL_ACCESS_TOKEN=<GITHUB_PAT>` |
