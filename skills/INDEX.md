@@ -1,6 +1,7 @@
 # Skill Index
 
-Auto-generated. Total: 87 skills.
+Auto-generated. Re-run with: npm run index
+Total: 87 skills
 
 | Skill | Description |
 |-------|-------------|
@@ -67,7 +68,7 @@ Auto-generated. Total: 87 skills.
 | piqie-writing | 番茄爆款写作技能（融合版）— 500章+350章两次长篇实战教训。快节奏爆款专项：3章一爽、平台算法适配、新人破零路径。触发场景：写番茄小说、写网文爆款、快节奏章节。 |
 | planning-with-files | Implements Manus-style file-based planning to organize and track progress |
 | playwright | Browser automation via Playwright MCP. Navigate websites, click elements, |
-| project-planner | Triage ideas, problems, and feature requests into the right format: |
+| project-planner | Triage ideas, problems, and feature requests into the right format |
 | prompt-engineering-expert | Advanced expert in prompt engineering, custom instructions design, and |
 | qidian-writing | 起点中文网写作技能 — 慢热品质专项：设定硬、人物真、每章信息增量。基于《黑龙醒》前100章实战 + 起点读者行为分析。触发场景：写起点小说、慢热品质文、群像展开。 |
 | query-knowledge-graph | 查询 codebase-memory-mcp 的知识图谱，获取结构化信息。触发：需要查询项目结构、模块关系、依赖关系。 |
