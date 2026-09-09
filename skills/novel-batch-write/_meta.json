@@ -1,0 +1,10 @@
+{
+  "slug": "novel-batch-write",
+  "category": "novel.batch-write",
+  "domain": "novel",
+  "tags": [
+    "novel",
+    "batch-write"
+  ],
+  "purpose": "批量写作模式，当用户说写到第N章时触发，自动并行/串行写作"
+}

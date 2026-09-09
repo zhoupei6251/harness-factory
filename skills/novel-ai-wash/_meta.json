@@ -1,0 +1,10 @@
+{
+  "slug": "novel-ai-wash",
+  "category": "novel.polish",
+  "domain": "novel",
+  "tags": [
+    "novel",
+    "polish"
+  ],
+  "purpose": "深度文风清洗引擎，四层清洗体系（词级→句式→叙事→人物声音），用于批量深度去AI味"
+}

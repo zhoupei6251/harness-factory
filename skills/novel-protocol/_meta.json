@@ -1,0 +1,12 @@
+{
+  "slug": "novel-protocol",
+  "category": "novel.baseline",
+  "domain": "novel",
+  "tags": [
+    "novel",
+    "protocol",
+    "progressive",
+    "causality"
+  ],
+  "purpose": "渐进式披露路由 + 因果链一致性（入口层，省 76% token）"
+}

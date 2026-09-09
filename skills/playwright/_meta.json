@@ -1,0 +1,9 @@
+{
+  "slug": "playwright",
+  "category": "shared.workflow",
+  "domain": "shared",
+  "tags": [
+    "browser",
+    "automation"
+  ]
+}

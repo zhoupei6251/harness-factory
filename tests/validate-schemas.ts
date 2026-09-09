@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { readFile, readdir } from "node:fs/promises";
+import { readFile, readdir, stat } from "node:fs/promises";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +9,15 @@ const SCHEMAS_DIR = resolve(ROOT, "schemas");
 const SKILLS_DIR = resolve(ROOT, "skills");
 
 let fail = 0;
+
+async function isDir(path: string): Promise<boolean> {
+  try {
+    const s = await stat(path);
+    return s.isDirectory();
+  } catch {
+    return false;
+  }
+}
 
 async function validateSchemas(): Promise<void> {
   let entries: string[] = [];
@@ -38,7 +47,10 @@ async function validateSkills(): Promise<void> {
     return;
   }
   for (const name of entries) {
-    const skillMd = join(SKILLS_DIR, name, "SKILL.md");
+    const fullPath = join(SKILLS_DIR, name);
+    // Skip non-directory entries (e.g., README.md, _layer.yaml, categories.yaml)
+    if (!(await isDir(fullPath))) continue;
+    const skillMd = join(fullPath, "SKILL.md");
     try {
       await readFile(skillMd);
       console.log(`[ok]   skills/${name}/SKILL.md`);
