@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 36 active + 51 archived = 87 skills
+Total: 39 active + 50 archived = 89 skills
 
-## Active (36)
+## Active (39)
 
 | Skill | Description |
 |-------|-------------|
@@ -16,6 +16,7 @@ Total: 36 active + 51 archived = 87 skills
 | architecture-patterns | ## WHAT |
 | brainstorming | You MUST use this before any creative work - creating features, building |
 | code-review | Systematic code review patterns covering security, performance, maintainability, |
+| document-review | Systematic document review with type-specific rules. **Environment preparation** |
 | fact-check | 事实核查 skill，对新闻内容进行多源交叉验证 |
 | find-skills | Helps users discover and install agent skills when they ask questions |
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |
@@ -40,11 +41,13 @@ Total: 36 active + 51 archived = 87 skills
 | self-improving | Self-reflection + Self-criticism + Self-learning + Self-organizing memory. |
 | simplify | Refactor code for clarity, consistency, and maintainability without changing |
 | skill-vetter | Security-first skill vetting for AI agents. Use before installing any |
+| systematic-debugging | Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes |
 | two-stage-review | 两阶段审查：先验证 Spec 合规，再检查代码质量。code 域实现完成后使用。 |
 | understand-project | 理解项目结构和架构，生成知识图谱。触发：接手新项目、需要了解项目全局、询问架构设计。 |
+| verification-before-completion | Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - req |
 | writing-plans | Use when you have a spec or requirements for a multi-step task, before |
 
-## Archived (51)
+## Archived (50)
 
 > Not in active use. Restore via: `git mv skills/archive/<name> skills/<name>`
 
@@ -56,7 +59,6 @@ Total: 36 active + 51 archived = 87 skills
 | archive/ceo-orchestration | CEO 角色主 Skill — 跨域协调入口，调用子 Skill 完成各项职责 |
 | archive/code-insight-stack | 编排 codebase-memory + ripgrep + LSP 三层查询栈，按场景选择最便宜的工具组合。触发：探索陌生代码库、定位修改点、调查 bug、准备 refactor、计划实现、跨文件影 |
 | archive/cursor-orchestration | Cursor 多 subagent 并行编排，等价于 omx ultrawork。在用户已批准 plan 并说「开始实现」后，通过 harness-coder（代码）、harness-implemen |
-| archive/document-review | Systematic document review with type-specific rules. **Environment preparation** |
 | archive/fanqie | 用途与边界 |
 | archive/fanqie-novel-auto-publish | 番茄小说创作发布一条龙技能，整合 AI 创作与番茄发布，支持全自动批量上传、断点续传、错误重试、发布报告生成 |
 | archive/frontend-design | Create distinctive, production-grade frontend interfaces with high design |

@@ -2,29 +2,33 @@
 
 ## Why this exists
 
-`harness-factory` is the lean replacement for `harness-foundry` (1290 files) and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: 346 source files (vs 669 in harness-foundry), TypeScript only, empty placeholders for everything that isn't governance or bootstrap.
+`harness-factory` is the single replacement for `harness-foundry` (retired: 1290 files, too heavy) and `harness-kit` (retired: workflow machinery merged here). Core idea: **one shared canonical set + thin platform shims** — all 4 platforms consume the same `core/` `routes/` `skills/` `artifact-templates/` content; per-platform output is a stub referencing this factory, so there is zero content duplication and zero drift.
 
-## Current state (as of phase-4)
+## Current state (as of phase-6: kit machinery merged)
 
 | Metric | Count |
 |---|---|
-| Source files (excl `.git` + `node_modules`) | 346 |
-| Core governance docs | 8 |
-| Platform adapters | 4 (claude, codex, trae, workbuddy) — all with placeholder rules |
-| Routes | 3 (code, novel, news) — all with MEMORY templates |
-| Skills | 87 (36 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
-| MCP servers | 1 (codebase-memory only; harness-foundry's 15+ bloat config removed) |
-| Capability verticals (in `capabilities/rules/`) | 3 (java, typescript, common) |
+| Core governance docs | 10 (`core/*.md`) + `core/orchestration/` dispatch subsystem |
+| Artifact templates | 16 (`artifact-templates/`) |
+| Platform adapters | 4 (claude, codex, trae, workbuddy) — thin delta rules |
+| Routes | 3 (code, novel, news) — MEMORY templates; news wired to skill chain |
+| Skills | 87 (37 active in `skills/` + 50 archived in `skills/archive/`, restorable) |
+| Project instance files | 3 (`project.profile.md`, `project.git.md`, `project.verification.md`) |
+| Entrypoints | `entrypoints/` (HARNESS-PLATFORM-ENTRY.md, AGENTS.omx.md) |
+| MCP servers | 1 (codebase-memory only) |
+| Capability verticals | 3 (java, typescript, common) |
 | Schemas | 3 |
-| npm scripts | 4 (bootstrap, validate, typecheck, test) |
+| npm scripts | 5 (bootstrap, validate, typecheck, index, test) |
 
-## The 5 layers
+## The layers
 
-1. **Foundation**: `core/` — 8 governance docs. Mandatory, no variation.
-2. **Capabilities**: `capabilities/rules/{java,typescript,common}/` — per-language rules. Other capability verticals (eval, intelligence, memory, etc.) were removed in phase-5 as empty placeholders.
-3. **Platforms**: `platforms/<name>/rules/ENTRY.md` — 4 thin adapters. Per-platform deltas.
-4. **Routes**: `routes/<name>/MEMORY.md` — 3 vertical templates. Per-domain state.
-5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 36 active; 51 unused live in `skills/archive/` (same structure, restore via `git mv`).
+1. **Foundation**: `core/` — governance + routing（业务路线表、任务路由表、阶段门禁、Git 协作）+ runbooks（新功能/缺陷/决策/news 写作/尾盘）+ artifacts/verification 契约。
+2. **Orchestration**: `core/orchestration/` — multi-task dispatch（WU 拆分、DISPATCH-TRACK、leader/coder/reviewer 角色、worktree 隔离、尾盘）。Platform-neutral: Codex 用 omx，Claude 用 claude-orchestration，Trae/WorkBuddy 用平台原生 subagent。
+3. **Capabilities**: `capabilities/rules/{java,typescript,common}/` — per-language rules.
+4. **Platforms**: `platforms/<name>/rules/ENTRY.md` — 4 thin adapters. Per-platform deltas.
+5. **Routes**: `routes/<name>/MEMORY.md` — 3 vertical templates. Per-domain state.
+6. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 37 active; 50 unused live in `skills/archive/`.
+7. **Instance files**: `project.{profile,git,verification}.md` — per-project facts, editable per repo.
 
 ## How a session works
 
@@ -33,35 +37,43 @@ session start
     |
     +-- read ENTRY.md (mandatory)
     +-- read core/NEVER.md (mandatory)
+    +-- read core/routing.md (route 判定 + 阶段门禁, by intent)
     +-- read platform-specific rules (if platform set)
     +-- read route MEMORY.md (if route set)
     +-- read skills/<x>/SKILL.md (on trigger)
     |
     v
-work
+work  (spec -> plan -> implement -> verify, stage gates pause between)
     |
-    +-- on add-skill trigger: skills/add-skill/SKILL.md
-    +-- on add-platform trigger: skills/add-platform/SKILL.md
-    +-- on add-route trigger: skills/add-route/SKILL.md
+    +-- multi-task: core/orchestration/dispatcher-workflow.md (WU + 尾盘)
+    +-- news route: news-generator -> fact-check -> news-polish -> humanizer-zh -> document-review
     |
     v
 session end
 ```
 
-## What was cut (and why)
+## What was cut from foundry (and why)
 
 | Cut | Was in | Ceiling | Upgrade path |
 |---|---|---|---|
-| 315-file Claude adapter mirror | harness-foundry | format drift | `npm run bootstrap` regenerates |
-| 9 novel scripts | harness-foundry | none initially | write 1 when starting a novel |
-| 7 skill-meta scripts | harness-foundry | manual frontmatter | 1 script when 3+ skill editors needed |
-| 4 test layers (L1/L2/L3-eval/L3-intelligence) | harness-foundry | platform drift | 1 layer per platform when added |
+| 315-file Claude adapter mirror | harness-foundry | format drift | shim stubs regenerate via `npm run bootstrap` |
 | 694 md files | harness-foundry | doc bloat | write on demand |
-| bash + python | harness-foundry | dual toolchain | TS only |
-| 23 top-level dirs | harness-foundry | navigation cost | 10 top-level items |
-| 15+ unused MCP servers | harness-foundry's mcp-servers.json | none (placeholders never filled) | add when actually used |
-| 5 harness-foundry leftover files in skills/ | `_layer.yaml`, `categories.yaml`, `INDEX.md`, `README.md` | none (auto-gen script gone) | replace with new `skills/INDEX.md` (phase-5) |
-| 9 empty capability placeholders | design intent | none (YAGNI) | recreate when first content lands |
+| bash + python build toolchain | harness-foundry | dual toolchain | TS only (small operational `.sh` helpers kept in `scripts/`) |
+| 23 top-level dirs | harness-foundry | navigation cost | ~14 top-level items |
+| 15+ unused MCP servers | harness-foundry's mcp-servers.json | none | add when actually used |
+
+## What was merged from kit (phase-6)
+
+- `core/routing.md`（阶段门禁/组合指令/小改动判定，平台列泛化为 4 平台）
+- `core/artifacts.md`、`core/verification.md`、`core/harness.md`
+- `core/runbooks.md`（新功能/缺陷/决策/Git/迁移 + factory 维护流程合并）
+- `core/orchestration/`（dispatcher-workflow、agents 角色、tracking、skill-preferences）
+- `artifact-templates/`（16 个产物契约模板）
+- `entrypoints/`、`init/`（onboarding 话术、实例模板）、`docs/superpowers/specs/`（尾盘/worktree 权威 spec）
+- `project.profile.md` / `project.git.md` / `project.verification.md` 实例位
+- skills: `verification-before-completion`、`systematic-debugging`（自 `~/.agents/skills` 收编）；`document-review` 解档
+
+Target: `harness-kit/` and `harness-foundry/` are empty / deletable.
 
 ## How to add things
 
@@ -72,22 +84,13 @@ session end
 
 ## Bootstrap contract
 
-`scripts/bootstrap.ts` projects canonical content to per-platform format:
+`scripts/bootstrap.ts` projects the canonical set to per-platform format:
 
-| Canonical | Per-platform |
-|-----------|--------------|
-| `core/ENTRY.md` (or `platforms/<plat>/rules/ENTRY.md` if exists) | `<platform>/rules/ENTRY.md` |
-| `ENTRY.md` | `<platform>/rules/ROOT.md` |
-| `routes/<route>/MEMORY.md` | `./MEMORY.md` (project root) |
-| `<route>` runtime dirs | `<route-specific>/` (e.g., `.ai-runtime-artifacts/`) |
+| Canonical | Per-platform (shim mode, default) | Per-platform (copy mode) |
+|-----------|-----------------------------------|--------------------------|
+| `core/ENTRY.md` (or `platforms/<plat>/rules/ENTRY.md` if exists) | stub referencing the source of truth | full copy |
+| `ENTRY.md` | stub referencing factory root entry | full copy |
+| `routes/<route>/MEMORY.md` | seed only if absent (never clobbers) | overwrite |
+| `<route>` runtime dirs | created under `--target` | same |
 
 If `platforms/<plat>/rules/ENTRY.md` exists, it wins over canonical. This is how platform-specific deltas work.
-
-## Migration from harness-foundry (done in phase-3)
-
-- mcp-config (codebase-memory only, others were bloat)
-- references/traps.md
-- capabilities/rules/{java,typescript,common}/*.md (12 files)
-- skills/ — full 88-skill set migrated (some may be unused; trim as needed)
-
-Target: harness-foundry is empty / deletable.

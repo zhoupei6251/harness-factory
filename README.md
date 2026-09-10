@@ -1,12 +1,10 @@
 # Harness Factory
 
-Clean skeleton for shipping harness rules to 4 AI platforms (Claude / Codex / Trae / WorkBuddy) across 3 routes (code / novel / news).
+Single source of truth for harness rules across 4 AI platforms (Claude / Codex / Trae / WorkBuddy) and 3 routes (code / novel / news). Replaces `harness-foundry` (retired: too heavy) and `harness-kit` (retired: machinery merged here).
 
-## Why
+## Core idea: one shared set + thin platform shims
 
-`harness-foundry` (1290 files) was too heavy. `harness-kit` (skeleton only) lacked platform adapters. `harness-factory` is the middle ground: ~30 source files, TypeScript only, empty placeholders for everything that isn't governance or bootstrap.
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for the design rationale.
+All platforms consume the **same canonical content** (`core/`, `routes/`, `skills/`, `artifact-templates/`). Per-platform output is a thin stub that references the shared files — no content duplication, no drift. Platform-specific deltas live in `platforms/<plat>/rules/ENTRY.md` and override the canonical entry.
 
 ## Quick start (5 minutes)
 
@@ -14,31 +12,34 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the design rationale.
 npm install
 npm run typecheck   # tsc --noEmit
 npm run validate    # check schemas + skills
-npm run bootstrap -- --platform all --route code
+npm run bootstrap -- --platform all --route code --target <your project root>
 ```
 
-This projects `core/ENTRY.md` and `platforms/<plat>/rules/ENTRY.md` to `.claude/`, `.codex/`, `.trae/`, `.codebuddy/`, creates runtime dirs, and writes `./MEMORY.md` from the route template.
+Shim mode (default) writes thin stubs into `<target>/.claude/`, `.codex/`, `.trae/`, `.codebuddy/` referencing this factory, creates runtime dirs, and seeds `MEMORY.md` from the route template (never clobbers an existing one). Use `--mode copy` for the legacy full-copy behavior.
 
 ## Layout
 
 ```
 harness-factory/
 ├── ENTRY.md                  # single entry point
-├── LICENSE
-├── README.md
 ├── ARCHITECTURE.md           # design rationale
-├── package.json
-├── tsconfig.json
-├── core/                     # 8 governance docs (always loaded)
-├── capabilities/             # 10 empty verticals (fill on demand)
-├── platforms/                # 4 adapters with per-platform rules
-├── routes/                   # 3 route templates
-├── skills/                   # active skills (in use) + skills/archive/ (restorable on demand)
+├── project.profile.md        # project instance: identity, stack, module map
+├── project.git.md            # project instance: git deltas vs org baseline
+├── project.verification.md   # project instance: verification commands
+├── core/                     # governance: routing (阶段门禁/路由表), runbooks,
+│   ├── ...                   # artifacts/verification contracts, orchestration/
+│   └── orchestration/        # multi-task dispatch: WU, DISPATCH-TRACK, roles
+├── artifact-templates/       # spec/plan/decision/collective-test/code-review overlays
+├── capabilities/rules/       # per-language rules (java, typescript, common)
+├── platforms/                # 4 thin adapters with per-platform rules
+├── routes/                   # 3 route templates (code / novel / news)
+├── skills/                   # active skills + skills/archive/ (restorable)
+├── entrypoints/              # HARNESS-PLATFORM-ENTRY.md, AGENTS.omx.md
+├── init/                     # onboarding prompts + instance templates
+├── docs/superpowers/specs/   # authoritative workflow specs (尾盘, worktree isolation…)
 ├── schemas/                  # 3 JSON schemas
-├── scripts/bootstrap.ts      # projects canonical to platform format
-└── tests/
-    ├── validate-schemas.ts
-    └── bootstrap.test.ts
+├── scripts/                  # bootstrap.ts + operational shell helpers
+└── tests/                    # validate-schemas, build-index, bootstrap smoke
 ```
 
 ## How to add things
@@ -46,18 +47,19 @@ harness-factory/
 | Want to add | Read |
 |---|---|
 | A skill | `skills/add-skill/SKILL.md` |
+| A platform (Cursor, Copilot, etc.) | `skills/add-platform/SKILL.md` |
+| A route (podcast, video, etc.) | `skills/add-route/SKILL.md` |
+| A capability doc | Just write `capabilities/<name>/SKILL.md` |
 
 Skills are split into two tiers:
 
 - **`skills/`** — active, in use (code workflow, codebase tools, news/writing, meta).
 - **`skills/archive/`** — not in use, kept restorable. Enable one: `git mv skills/archive/<name> skills/<name> && npm run index`.
-| A platform (Cursor, Copilot, etc.) | `skills/add-platform/SKILL.md` |
-| A route (podcast, video, etc.) | `skills/add-route/SKILL.md` |
-| A capability doc | Just write `capabilities/<name>/SKILL.md` |
 
 ## npm scripts
 
-- `npm run bootstrap -- --platform X --route Y` — project canonical to platform format
-- `npm run validate` — schema + skill check
+- `npm run bootstrap -- --platform X --route Y [--mode shim|copy] [--target dir]` — project canonical to platform format
+- `npm run validate` — schema + skill check (active + archive)
 - `npm run typecheck` — TypeScript type check
+- `npm run index` — regenerate `skills/INDEX.md` (Active + Archived sections)
 - `npm test` — runs both validate and bootstrap smoke test
