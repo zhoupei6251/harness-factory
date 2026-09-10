@@ -33,7 +33,7 @@ harness-factory/
 ├── capabilities/             # 10 empty verticals (fill on demand)
 ├── platforms/                # 4 adapters with per-platform rules
 ├── routes/                   # 3 route templates
-├── skills/                   # add-skill, add-platform, add-route
+├── skills/                   # active skills (in use) + skills/archive/ (restorable on demand)
 ├── schemas/                  # 3 JSON schemas
 ├── scripts/bootstrap.ts      # projects canonical to platform format
 └── tests/
@@ -46,6 +46,11 @@ harness-factory/
 | Want to add | Read |
 |---|---|
 | A skill | `skills/add-skill/SKILL.md` |
+
+Skills are split into two tiers:
+
+- **`skills/`** — active, in use (code workflow, codebase tools, news/writing, meta).
+- **`skills/archive/`** — not in use, kept restorable. Enable one: `git mv skills/archive/<name> skills/<name> && npm run index`.
 | A platform (Cursor, Copilot, etc.) | `skills/add-platform/SKILL.md` |
 | A route (podcast, video, etc.) | `skills/add-route/SKILL.md` |
 | A capability doc | Just write `capabilities/<name>/SKILL.md` |

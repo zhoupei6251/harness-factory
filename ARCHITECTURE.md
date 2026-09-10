@@ -12,7 +12,7 @@
 | Core governance docs | 8 |
 | Platform adapters | 4 (claude, codex, trae, workbuddy) — all with placeholder rules |
 | Routes | 3 (code, novel, news) — all with MEMORY templates |
-| Skills | 91 (88 migrated from harness-foundry + 3 meta: add-skill, add-platform, add-route) |
+| Skills | 87 (36 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
 | MCP servers | 1 (codebase-memory only; harness-foundry's 15+ bloat config removed) |
 | Capability verticals (in `capabilities/rules/`) | 3 (java, typescript, common) |
 | Schemas | 3 |
@@ -24,7 +24,7 @@
 2. **Capabilities**: `capabilities/rules/{java,typescript,common}/` — per-language rules. Other capability verticals (eval, intelligence, memory, etc.) were removed in phase-5 as empty placeholders.
 3. **Platforms**: `platforms/<name>/rules/ENTRY.md` — 4 thin adapters. Per-platform deltas.
 4. **Routes**: `routes/<name>/MEMORY.md` — 3 vertical templates. Per-domain state.
-5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 88 from harness-foundry + 3 meta.
+5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 36 active; 51 unused live in `skills/archive/` (same structure, restore via `git mv`).
 
 ## How a session works
 

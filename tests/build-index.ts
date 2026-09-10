@@ -4,7 +4,7 @@
  *
  * Usage: tsx tests/build-index.ts  (or  npm run index)
  */
-import { readdir, readFile, writeFile } from "node:fs/promises";
+import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { resolve, dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -33,30 +33,42 @@ async function getDescription(skillMd: string): Promise<string> {
   return "";
 }
 
-async function main(): Promise<number> {
+async function collectRows(dir: string, prefix: string): Promise<Array<[string, string]>> {
   let entries: string[] = [];
   try {
-    entries = await readdir(SKILLS_DIR);
+    entries = await readdir(dir);
   } catch {
-    console.log(`no skills/ dir at ${SKILLS_DIR}`);
-    return 1;
+    return [];
   }
-  const skillDirs = entries
-    .filter((e) => e !== "INDEX.md")
-    .sort();
   const rows: Array<[string, string]> = [];
-  for (const s of skillDirs) {
-    const sm = join(SKILLS_DIR, s, "SKILL.md");
+  for (const s of entries.sort()) {
+    // skip the archive subdir (collected separately) and non-dir entries like INDEX.md
+    if (s === "archive") continue;
+    if (!(await stat(join(dir, s)).then((st) => st.isDirectory()).catch(() => false))) continue;
+    const sm = join(dir, s, "SKILL.md");
     const desc = (await getDescription(sm).catch(() => "(missing SKILL.md)")) || "(missing SKILL.md)";
-    rows.push([s, desc]);
+    rows.push([prefix + s, desc]);
   }
-  let out = `# Skill Index\n\nAuto-generated. Re-run with: npm run index\nTotal: ${rows.length} skills\n\n| Skill | Description |\n|-------|-------------|\n`;
-  for (const [s, d] of rows) {
+  return rows;
+}
+
+async function main(): Promise<number> {
+  const active = await collectRows(SKILLS_DIR, "");
+  const archived = await collectRows(join(SKILLS_DIR, "archive"), "archive/");
+  const rows = [...active, ...archived];
+  let out = `# Skill Index\n\nAuto-generated. Re-run with: npm run index\nTotal: ${active.length} active + ${archived.length} archived = ${rows.length} skills\n\n`;
+  out += `## Active (${active.length})\n\n| Skill | Description |\n|-------|-------------|\n`;
+  for (const [s, d] of active) {
+    const dSafe = d.replace(/\|/g, "\\|").slice(0, 100);
+    out += `| ${s} | ${dSafe} |\n`;
+  }
+  out += `\n## Archived (${archived.length})\n\n> Not in active use. Restore via: \`git mv skills/archive/<name> skills/<name>\`\n\n| Skill | Description |\n|-------|-------------|\n`;
+  for (const [s, d] of archived) {
     const dSafe = d.replace(/\|/g, "\\|").slice(0, 100);
     out += `| ${s} | ${dSafe} |\n`;
   }
   await writeFile(INDEX, out, "utf-8");
-  console.log(`wrote ${INDEX} (${rows.length} skills)`);
+  console.log(`wrote ${INDEX} (${active.length} active, ${archived.length} archived)`);
   return 0;
 }
 

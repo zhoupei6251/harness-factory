@@ -39,6 +39,8 @@ async function validateSchemas(): Promise<void> {
   }
 }
 
+const ARCHIVE_DIR = join(SKILLS_DIR, "archive");
+
 async function validateSkills(): Promise<void> {
   let entries: string[] = [];
   try {
@@ -50,6 +52,8 @@ async function validateSkills(): Promise<void> {
     const fullPath = join(SKILLS_DIR, name);
     // Skip non-directory entries (e.g., README.md, _layer.yaml, categories.yaml)
     if (!(await isDir(fullPath))) continue;
+    // skills/archive/ is validated separately below
+    if (fullPath === ARCHIVE_DIR) continue;
     const skillMd = join(fullPath, "SKILL.md");
     try {
       await readFile(skillMd);
@@ -61,8 +65,31 @@ async function validateSkills(): Promise<void> {
   }
 }
 
+// Archived skills must stay valid too (restorable via: mv skills/archive/<name> skills/<name>)
+async function validateArchiveSkills(): Promise<void> {
+  let entries: string[] = [];
+  try {
+    entries = await readdir(ARCHIVE_DIR);
+  } catch {
+    return; // no archive dir yet
+  }
+  for (const name of entries) {
+    const fullPath = join(ARCHIVE_DIR, name);
+    if (!(await isDir(fullPath))) continue;
+    const skillMd = join(fullPath, "SKILL.md");
+    try {
+      await readFile(skillMd);
+      console.log(`[ok]   skills/archive/${name}/SKILL.md`);
+    } catch {
+      console.log(`[FAIL] skills/archive/${name}/: missing SKILL.md`);
+      fail = 1;
+    }
+  }
+}
+
 await validateSchemas();
 await validateSkills();
+await validateArchiveSkills();
 
 if (fail === 0) {
   console.log("");
