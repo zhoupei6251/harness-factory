@@ -13,12 +13,12 @@
 ### 任务前（与 `AGENTS.md` 覆盖层对齐）
 
 1. `harness-factory/core/harness.md`
-2. `harness-factory/project.profile.md`
+2. `harness-factory/project/profile.md`
 3. `harness-factory/context-map.md`
-4. `harness-factory/project.git.md`（Git 任务或用户要求提交 / 开 MR 时）
+4. `harness-factory/project/git.md`（Git 任务或用户要求提交 / 开 MR 时）
 5. `harness-factory/core/routing.md`（路由、阶段门禁、小改动判定）
 6. `harness-factory/core/artifacts.md`
-7. `harness-factory/project.verification.md`
+7. `harness-factory/project/verification.md`
 8. `harness-factory/core/verification.md`
 9. 任务匹配时：`harness-factory/core/runbooks.md`
 

@@ -32,7 +32,7 @@ Cursor 平台的 **omx ultrawork 语义等价** skill。代码类 WU 委派 `har
 
 1. `harness-foundry/core/orchestration/dispatcher-workflow.md` — **唯一完整步骤**
 2. `harness-foundry/core/orchestration/tracking/schema.md` — **Leader** 写 plan/tracking；子 Agent 返回 `wu_status`
-3. 已批准 plan + `harness-foundry/artifact-templates/project.verification.md`
+3. 已批准 plan + `harness-foundry/artifact-templates/project/verification.md`
 
 ---
 
@@ -42,7 +42,7 @@ Cursor 平台的 **omx ultrawork 语义等价** skill。代码类 WU 委派 `har
 
 派发子 Agent 时须含 **「本 WU Skills」**（推荐 `auto`）、`agent_role`、`wu_type`。偏好表：`harness-foundry/core/orchestration/skill-preferences.zh.md`。代码 WU → `harness-coder`；测试 WU → `harness-test-engineer`。
 
-**GROUP 全部 WU 返回后：** 进入 **尾盘**（先集体测试 → 再集体审查 → Leader 落盘两产物 → 更新 execution-log）。见 `dispatcher-workflow.md` § 步骤 3 与 `docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md`。
+**GROUP 全部 WU 返回后：** 进入 **尾盘**（先集体测试 → 再集体审查 → Leader 落盘两产物 → 更新 execution-log）。见 `dispatcher-workflow.md` § 步骤 3 与 `core/specs/2026-05-28-batch-closeout-review-and-collective-test.md`。
 
 ---
 

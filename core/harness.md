@@ -1,6 +1,6 @@
 # Harness Engineering
 
-本文件描述可迁移 Agent Harness 的通用架构。它不包含具体项目业务背景；项目业务画像放在 `harness-factory/project.profile.md`。
+本文件描述可迁移 Agent Harness 的通用架构。它不包含具体项目业务背景；项目业务画像放在 `harness-factory/project/profile.md`。
 
 ## 三层架构
 
@@ -18,10 +18,10 @@
 
 由 `harness-factory/` 管理：
 
-- `project.profile.md`：当前项目画像，迁移到新项目后必须重新生成。
+- `project/profile.md`：当前项目画像，迁移到新项目后必须重新生成。
 - `context-map.md`：目录、模块和关键入口地图，初始化后由 AI 生成。
-- `project.verification.md`：当前项目验证命令，初始化后由 AI 生成。
-- `project.git.md`：相对组织 `git-xywh` skill 的 Git 协作差异（MR 平台、commitlint、AI 是否可 push 等）；组织通用流程不复制进仓库。
+- `project/verification.md`：当前项目验证命令，初始化后由 AI 生成。
+- `project/git.md`：相对组织 `git-xywh` skill 的 Git 协作差异（MR 平台、commitlint、AI 是否可 push 等）；组织通用流程不复制进仓库。
 - `core/routing.md`：任务路由。
 - `core/artifacts.md`：过程产物规范。
 - `core/verification.md`：通用验证门禁。
@@ -48,11 +48,11 @@
 ## 新项目初始化顺序
 
 1. 将 `harness-factory/` 放入新项目。
-2. 对 AI 发送 **`harness-factory/init/onboarding-handoff.txt`** 全文（或 `bash harness-factory/scripts/harness-init.sh` 输出同一段话术）；详版见 **`harness-factory/init/bootstrap.prompt.md`**。
+2. 对 AI 发送 **`harness-factory/project/onboarding/onboarding-handoff.txt`** 全文（或 `bash harness-factory/scripts/harness-init.sh` 输出同一段话术）；详版见 **`harness-factory/project/onboarding/bootstrap.prompt.md`**。
 3. AI 生成或更新：
-   - `harness-factory/project.profile.md`
-   - `harness-factory/init/templates/context-map.md`
-   - `harness-factory/project.verification.md`
-   - `harness-factory/project.git.md`
-4. AI 用 `project.profile.md` 摘要替换 `CLAUDE.md`、`GEMINI.md` 与 `harness-factory/entrypoints/HARNESS-PLATFORM-ENTRY.md` 中的 `{{PROJECT_BACKGROUND}}`。
-5. 人 review `project.profile.md` 与 `project.git.md` 中的推断项和待确认项。
+   - `harness-factory/project/profile.md`
+   - `harness-factory/project/templates/context-map.md`
+   - `harness-factory/project/verification.md`
+   - `harness-factory/project/git.md`
+4. AI 用 `project/profile.md` 摘要替换 `CLAUDE.md`、`GEMINI.md` 与 `harness-factory/entrypoints/HARNESS-PLATFORM-ENTRY.md` 中的 `{{PROJECT_BACKGROUND}}`。
+5. 人 review `project/profile.md` 与 `project/git.md` 中的推断项和待确认项。

@@ -6,8 +6,8 @@ skills:
 skills_evidence:
   - adapters/cursor/.cursor/skills/verification-before-completion/SKILL.md
 source:
-  - harness-factory/project.verification.md
-  - harness-factory/docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md
+  - harness-factory/project/verification.md
+  - harness-factory/core/specs/2026-05-28-batch-closeout-review-and-collective-test.md
 created_at: <YYYY-MM-DD>
 batch_id: GROUP-1
 worktree_id: 

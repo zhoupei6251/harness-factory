@@ -32,21 +32,21 @@ kit_path() {
 required_kit_files=(
   "README.md"
   "core/harness.md"
-  "project.profile.md"
+  "project/profile.md"
   "context-map.md"
-  "project.verification.md"
-  "project.git.md"
+  "project/verification.md"
+  "project/git.md"
   "core/routing.md"
   "core/artifacts.md"
   "core/verification.md"
   "core/runbooks.md"
-  "init/bootstrap.prompt.md"
-  "init/onboarding-handoff.txt"
-  "init/project-profiler.prompt.md"
-  "init/templates/project.profile.md"
-  "init/templates/context-map.md"
-  "init/templates/project.verification.md"
-  "init/templates/project.git.md"
+  "project/onboarding/bootstrap.prompt.md"
+  "project/onboarding/onboarding-handoff.txt"
+  "project/onboarding/project-profiler.prompt.md"
+  "project/templates/profile.md"
+  "project/templates/context-map.md"
+  "project/templates/verification.md"
+  "project/templates/git.md"
   "artifact-templates/spec.md"
   "artifact-templates/plan.md"
   "artifact-templates/spec.harness-overlay.md"
@@ -302,7 +302,7 @@ if [[ -d ".ai-runtime-artifacts/execution-logs" ]]; then
       missing+=("code-review 链接")
     fi
     if [[ ${#missing[@]} -gt 0 ]]; then
-      echo "warn: $elog — Cursor 编排 execution-log 建议含尾盘产物引用（${missing[*]}）。见 docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md" >&2
+      echo "warn: $elog — Cursor 编排 execution-log 建议含尾盘产物引用（${missing[*]}）。见 core/specs/2026-05-28-batch-closeout-review-and-collective-test.md" >&2
       closeout_warn=1
     fi
     if printf '%s' "$content" | rg -qi '批次交付完成|本 GROUP.*完成|GROUP 交付完成'; then

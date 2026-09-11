@@ -14,7 +14,7 @@
   - **Trae / WorkBuddy**：平台原生 subagent/Agent 工具 + `core/orchestration/dispatcher-workflow.md`（WU 拆分、DISPATCH-TRACK、尾盘规则平台通用）
 - 小改动和单文件机械修改由当前助手直接处理。
 - 项目级 skill 优先于通用 skill。
-- **Git 协作**：组织级分支、提交、MR、热修、合流默认 invoke **`git-xywh`** skill；本项目差异与 AI 约束见 `project.git.md`（不将 skill 全文复制进仓库）。
+- **Git 协作**：组织级分支、提交、MR、热修、合流默认 invoke **`git-xywh`** skill；本项目差异与 AI 约束见 `project/git.md`（不将 skill 全文复制进仓库）。
 
 ## 业务路线（code / novel / news）
 
@@ -51,8 +51,8 @@
 | 信息调研 / 网页搜索 / 截图取证 | `agent-browser` / `playwright` skill | `.ai-runtime-artifacts/research/` |
 | 文章 / 新闻 / 知识沉淀 | `news-generator` → `fact-check` → `news-polish` → `humanizer-zh`（news 路线）；`document-review`（审查） | 用户指定位置或 `.harness-news-runtime/articles/` |
 | 小改动 / 单文件机械修改 | 直接处理 | 无需产物 |
-| 建分支 / 提交 / rebase / 开 MR·PR | `git-xywh` + `project.git.md` | 无（或 MR 链接） |
-| 热修 / 提测线 / 合流 / 打标签 | `git-xywh` + `project.git.md` | 无 |
+| 建分支 / 提交 / rebase / 开 MR·PR | `git-xywh` + `project/git.md` | 无（或 MR 链接） |
+| 热修 / 提测线 / 合流 / 打标签 | `git-xywh` + `project/git.md` | 无 |
 | Harness 脚手架变更提交 | `git-xywh`（类型 `chore`，范围 `harness-factory`） | 与业务 commit 分离 |
 | 文档审查 | `document-review` | `.ai-runtime-artifacts/reviews/` |
 
@@ -62,16 +62,16 @@
 
 | 判定（路由表 / 用户任务） | 再读（按序） |
 | --- | --- |
-| 小改动 / 单文件机械修改 | 无（可选：`project.profile.md` 若需项目上下文） |
-| 需求澄清 / 方案设计 | **①** Load `brainstorming`（Read `skills/brainstorming/SKILL.md`）→ **②** `core/artifacts.md` → **③** 澄清起步后，涉及模块时再读 `project.profile.md`、`init/templates/context-map.md`。**禁止**未 Load skill 前用 profile/扫代码代替 brainstorming；**禁止**用 `artifact-templates/spec.md` 当正文模板（契约见 `spec.harness-overlay.md`）。 |
+| 小改动 / 单文件机械修改 | 无（可选：`project/profile.md` 若需项目上下文） |
+| 需求澄清 / 方案设计 | **①** Load `brainstorming`（Read `skills/brainstorming/SKILL.md`）→ **②** `core/artifacts.md` → **③** 澄清起步后，涉及模块时再读 `project/profile.md`、`project/templates/context-map.md`。**禁止**未 Load skill 前用 profile/扫代码代替 brainstorming；**禁止**用 `artifact-templates/spec.md` 当正文模板（契约见 `spec.harness-overlay.md`）。 |
 | 实施计划 | **①** Load `writing-plans` → **②** `core/artifacts.md` → **③** `artifact-templates/plan.harness-overlay.md`（FM + Next）；并行时 **④** 另写同 stem `*-dispatch.md`（`dispatch.harness-overlay.md`） |
 | 多 task 编码 / 并行实现 | `core/orchestration/dispatcher-workflow.md`；「开始实现」后先 WORKTREE-INIT（Git 沙箱）；派发 WU 时 `core/orchestration/skill-preferences.zh.md`；Codex 另见 `entrypoints/AGENTS.omx.md` |
-| 验证 / 跑命令 | **①** Load `verification-before-completion` → **②** `project.verification.md`、`core/verification.md` |
+| 验证 / 跑命令 | **①** Load `verification-before-completion` → **②** `project/verification.md`、`core/verification.md` |
 | 代码审查（尾盘/批次） | **①** Load `requesting-code-review` → **②** `artifact-templates/code-review.md`；可委派独立 reviewer（Leader 落盘） |
-| **GROUP 收尾 / 批次交付 / 「收尾」「提测前检查」** | **①** `verification-before-completion` → `project.verification.md` → `artifact-templates/collective-test.md` **②** `requesting-code-review` → `artifact-templates/code-review.md` **③** `core/orchestration/dispatcher-workflow.md` § 步骤 3 **④** `docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md` |
-| 缺陷调查 | **①** Load `systematic-debugging` → **②** `project.profile.md` |
+| **GROUP 收尾 / 批次交付 / 「收尾」「提测前检查」** | **①** `verification-before-completion` → `project/verification.md` → `artifact-templates/collective-test.md` **②** `requesting-code-review` → `artifact-templates/code-review.md` **③** `core/orchestration/dispatcher-workflow.md` § 步骤 3 **④** `core/specs/2026-05-28-batch-closeout-review-and-collective-test.md` |
+| 缺陷调查 | **①** Load `systematic-debugging` → **②** `project/profile.md` |
 | 信息调研 / 网页搜索 | Load `agent-browser` / `playwright` skill；编排角色见 `core/orchestration/agents/web-investigator.md` |
-| Git（提交 / 分支 / MR 等） | **`git-xywh` skill** + `project.git.md` + `core/runbooks.md` § Git 协作 |
+| Git（提交 / 分支 / MR 等） | **`git-xywh` skill** + `project/git.md` + `core/runbooks.md` § Git 协作 |
 | 架构决策 | `core/artifacts.md` + `artifact-templates/decision.md` |
 | runbook 明示任务 | `core/runbooks.md` 对应节 |
 | 文档审查 | **①** Load `document-review` → **②** 根据文档类型加载对应规则 |
@@ -107,24 +107,24 @@
 
 **暂停时回复须包含：** 产物路径、摘要、以及 artifact 模板 `## Next` 中的选项。
 
-**实现阶段（多 task 编排）：** 用户说「开始实现」后先 **WORKTREE-INIT**（Git 沙箱，主 checkout 不写业务代码），再按 `wu_type` 委派；子 Agent cwd = `worktree_path`。详见 `core/orchestration/dispatcher-workflow.md` §0、`docs/superpowers/specs/2026-05-29-git-worktree-isolation-design.md`。
+**实现阶段（多 task 编排）：** 用户说「开始实现」后先 **WORKTREE-INIT**（Git 沙箱，主 checkout 不写业务代码），再按 `wu_type` 委派；子 Agent cwd = `worktree_path`。详见 `core/orchestration/dispatcher-workflow.md` §0、`core/specs/2026-05-29-git-worktree-isolation-design.md`。
 
-**交付完成：** 本 GROUP / 批次全部 WU 返回后，**默认进入尾盘**（集体测试 → 集体审查 → Leader 落盘两产物 → 更新 execution-log）。**完成** ≠ 末个 WU 返回；须满足 `docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md` §4（小改动除外）。
+**交付完成：** 本 GROUP / 批次全部 WU 返回后，**默认进入尾盘**（集体测试 → 集体审查 → Leader 落盘两产物 → 更新 execution-log）。**完成** ≠ 末个 WU 返回；须满足 `core/specs/2026-05-28-batch-closeout-review-and-collective-test.md` §4（小改动除外）。
 
 ## Git 协作
 
 | 规则 | 说明 |
 | --- | --- |
 | 组织规范来源 | **`git-xywh` skill**（三主干、五类临时分支、Angular 提交、MR 流程） |
-| 项目差异来源 | **`project.git.md`**（MR 平台、commitlint、是否允许 AI push、Harness 独立 commit 等） |
+| 项目差异来源 | **`project/git.md`**（MR 平台、commitlint、是否允许 AI push、Harness 独立 commit 等） |
 | 谁执行 Git | **Leader / 主 Agent**；coder / implementer 等子 Agent 默认不 commit/push |
 | 与默认 route 关系 | Git 任务在对应阶段**叠加** `git-xywh`（例如实现完成后的提交不替代 `verification-before-completion`） |
-| skill 未安装 | 说明缺失，按 `project.git.md` 与仓库已有配置（`.husky`、`commitlint`、CI）执行；运行 `bash scripts/install-ai-skills.sh` 检查路径 |
-| **如何 invoke** | 有 Skill 工具 → 加载 **`git-xywh`**；否则 Read 本机 skill 文件（见 `project.git.md` § 如何调用）。步骤见 `core/runbooks.md` § Git 协作 |
+| skill 未安装 | 说明缺失，按 `project/git.md` 与仓库已有配置（`.husky`、`commitlint`、CI）执行；运行 `bash scripts/install-ai-skills.sh` 检查路径 |
+| **如何 invoke** | 有 Skill 工具 → 加载 **`git-xywh`**；否则 Read 本机 skill 文件（见 `project/git.md` § 如何调用）。步骤见 `core/runbooks.md` § Git 协作 |
 
-**Harness 声明示例：** `「Harness：git-xywh + project.git.md」`（用户仅说「提交代码」时）
+**Harness 声明示例：** `「Harness：git-xywh + project/git.md」`（用户仅说「提交代码」时）
 
-**注意：** 路由表中的 `git-xywh` 指**必须先加载该 skill 正文**再执行 git，不是仅阅读 `project.git.md` 或 `routing.md` 即够。
+**注意：** 路由表中的 `git-xywh` 指**必须先加载该 skill 正文**再执行 git，不是仅阅读 `project/git.md` 或 `routing.md` 即够。
 
 ## 阶段指定 skill 必用
 

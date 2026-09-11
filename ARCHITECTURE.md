@@ -13,7 +13,7 @@
 | Platform adapters | 4 (claude, codex, trae, workbuddy) — thin delta rules |
 | Routes | 3 (code, novel, news) — MEMORY templates; news wired to skill chain |
 | Skills | 87 (37 active in `skills/` + 50 archived in `skills/archive/`, restorable) |
-| Project instance files | 3 (`project.profile.md`, `project.git.md`, `project.verification.md`) |
+| Project instance files | 3 (`project/profile.md`, `project/git.md`, `project/verification.md`) |
 | Entrypoints | `entrypoints/` (HARNESS-PLATFORM-ENTRY.md, AGENTS.omx.md) |
 | MCP servers | 1 (codebase-memory only) |
 | Capability verticals | 3 (java, typescript, common) |
@@ -28,7 +28,18 @@
 4. **Platforms**: `platforms/<name>/rules/ENTRY.md` — 4 thin adapters. Per-platform deltas.
 5. **Routes**: `routes/<name>/MEMORY.md` — 3 vertical templates. Per-domain state.
 6. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 37 active; 50 unused live in `skills/archive/`.
-7. **Instance files**: `project.{profile,git,verification}.md` — per-project facts, editable per repo.
+7. **Project instance layer**: `project/` — `profile.md` / `git.md` / `verification.md`（per-project facts）+ `templates/`（new-repo 空模板）+ `onboarding/`（AI bootstrap 话术）。
+
+## Directory map (one glance)
+
+| Path | 身份 | 改不改 |
+| --- | --- | --- |
+| `core/`（含 specs/、orchestration/、traps.md） | 引擎：规则/流程/编排 | 原则上不改，跨项目共享 |
+| `project/` | 项目实例 | **每个仓库要改的就是这里** |
+| `artifact-templates/` `capabilities/` `routes/` `skills/` `schemas/` | 引擎资产 | 按需扩展 |
+| `platforms/` `entrypoints/` | 平台适配 | 加新平台时才动 |
+| `scripts/` `tests/` `mcp-config/` | 工具链 | 改机制时才动 |
+| `ENTRY.md` `README.md` `ARCHITECTURE.md` | 门面 | 随结构演进 |
 
 ## How a session works
 
@@ -69,8 +80,8 @@ session end
 - `core/runbooks.md`（新功能/缺陷/决策/Git/迁移 + factory 维护流程合并）
 - `core/orchestration/`（dispatcher-workflow、agents 角色、tracking、skill-preferences）
 - `artifact-templates/`（16 个产物契约模板）
-- `entrypoints/`、`init/`（onboarding 话术、实例模板）、`docs/superpowers/specs/`（尾盘/worktree 权威 spec）
-- `project.profile.md` / `project.git.md` / `project.verification.md` 实例位
+- `entrypoints/`（平台入口模板）、`project/onboarding/`（onboarding 话术）、`project/templates/`（实例模板）、`core/specs/`（尾盘/worktree 权威 spec）
+- `project/profile.md` / `project/git.md` / `project/verification.md` 实例位
 - skills: `verification-before-completion`、`systematic-debugging`（自 `~/.agents/skills` 收编）；`document-review` 解档
 
 Target: `harness-kit/` and `harness-foundry/` are empty / deletable.

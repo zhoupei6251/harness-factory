@@ -5,16 +5,16 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KIT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
 # 与 harness-check.sh 相同：source = kit 根；deployed = 目标项目根含 harness-factory/
-if [[ -f "$KIT_ROOT/init/onboarding-handoff.txt" ]]; then
+if [[ -f "$KIT_ROOT/project/onboarding/onboarding-handoff.txt" ]]; then
   ROOT_DIR="$KIT_ROOT"
-  HANDOFF_FILE="$KIT_ROOT/init/onboarding-handoff.txt"
-  PROMPT_FILE="$KIT_ROOT/init/project-profiler.prompt.md"
-elif [[ -f "$KIT_ROOT/harness-factory/init/onboarding-handoff.txt" ]]; then
+  HANDOFF_FILE="$KIT_ROOT/project/onboarding/onboarding-handoff.txt"
+  PROMPT_FILE="$KIT_ROOT/project/onboarding/project-profiler.prompt.md"
+elif [[ -f "$KIT_ROOT/harness-factory/project/onboarding/onboarding-handoff.txt" ]]; then
   ROOT_DIR="$KIT_ROOT"
-  HANDOFF_FILE="$KIT_ROOT/harness-factory/init/onboarding-handoff.txt"
-  PROMPT_FILE="$KIT_ROOT/harness-factory/init/project-profiler.prompt.md"
+  HANDOFF_FILE="$KIT_ROOT/harness-factory/project/onboarding/onboarding-handoff.txt"
+  PROMPT_FILE="$KIT_ROOT/harness-factory/project/onboarding/project-profiler.prompt.md"
 else
-  echo "cannot detect harness-factory layout (missing init/onboarding-handoff.txt)" >&2
+  echo "cannot detect harness-factory layout (missing project/onboarding/onboarding-handoff.txt)" >&2
   exit 1
 fi
 

@@ -29,7 +29,7 @@
 
 ## 架构决策
 
-1. 读取 `project.profile.md` 和相关代码。
+1. 读取 `project/profile.md` 和相关代码。
 2. 必要时用 architect / critic / planner 组合做对比。
 3. 决策写入 `.ai-runtime-artifacts/decisions/`。
 4. 决策必须包含接受方案、拒绝方案、约束和风险。
@@ -46,15 +46,15 @@
 
 **权威：** `core/routing.md` § Git 协作（路由表、invoke 规则、谁执行 Git）。
 
-**Leader 顺序（不可跳过 skill 正文）：** 声明 `「Harness：git-xywh + project.git.md」` → invoke/Read **`git-xywh`** → Read **`project.git.md`** → 按 skill 执行。本机 skill 路径：`bash scripts/install-ai-skills.sh`。仅改 `harness-factory/` 时用 `chore(harness-factory):` 且正文中文。
+**Leader 顺序（不可跳过 skill 正文）：** 声明 `「Harness：git-xywh + project/git.md」` → invoke/Read **`git-xywh`** → Read **`project/git.md`** → 按 skill 执行。本机 skill 路径：`bash scripts/install-ai-skills.sh`。仅改 `harness-factory/` 时用 `chore(harness-factory):` 且正文中文。
 
 **叠加：** 开 PR / 看 CI 可叠加 `.agents/skills/github`（`gh`），不替代 `git-xywh`。
 
 ## Harness 迁移到新项目
 
 1. 将 `harness-factory/` 放入新项目。
-2. 对 AI 发送 **`init/onboarding-handoff.txt`** 全文（或运行 `bash scripts/harness-init.sh` 输出同一段话术）；详版见 **`init/bootstrap.prompt.md`**。
-3. 人 review `project.profile.md` 与 `project.git.md` 中的推断项和待确认项。
+2. 对 AI 发送 **`project/onboarding/onboarding-handoff.txt`** 全文（或运行 `bash scripts/harness-init.sh` 输出同一段话术）；详版见 **`project/onboarding/bootstrap.prompt.md`**。
+3. 人 review `project/profile.md` 与 `project/git.md` 中的推断项和待确认项。
 
 ## Bootstrap（新项目 / 新平台）
 
@@ -85,14 +85,14 @@
 
 **适用：** 多 task 编排的 GROUP 收尾或单批次交付（非 routing「小改动」）。
 
-**权威：** `docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md` §4；步骤 `core/orchestration/dispatcher-workflow.md` § 步骤 3。
+**权威：** `core/specs/2026-05-28-batch-closeout-review-and-collective-test.md` §4；步骤 `core/orchestration/dispatcher-workflow.md` § 步骤 3。
 
 | 步骤 | Leader 动作 | 产物 |
 | --- | --- | --- |
-| A 集体测试 | Load `verification-before-completion`；按 `project.verification.md` 跑本批次命令；plan 要 E2E 时先完成 Test Engineer WU | Write `verifications/YYYY-MM-DD-<topic>-collective-test.md`（`collective-test.md`） |
+| A 集体测试 | Load `verification-before-completion`；按 `project/verification.md` 跑本批次命令；plan 要 E2E 时先完成 Test Engineer WU | Write `verifications/YYYY-MM-DD-<topic>-collective-test.md`（`collective-test.md`） |
 | B 集体审查 | Load `requesting-code-review`；委派独立 **reviewer**（与所有实现实例不同）；Reviewer 只返回 | Write `reviews/YYYY-MM-DD-<topic>-code-review.md`（`code-review.md`） |
 | C 关闭 | 更新 execution-log § 尾盘门禁；测试 PASS 且审查 APPROVE（或合法 SKIPPED）后方可声称批次完成 | execution-log |
 
 **禁止：** 仅以 Coder `code_review: PASS` 替代 B；未 Write A+B 产物即在 execution-log 写「批次完成」。
 
-**可跳过集体审查：** 仅当满足 `docs/superpowers/specs/2026-05-26-coder-role-design.md` § 小 WU 跳过 Reviewer 全条件 → `verdict: SKIPPED` 写入 code-review 产物。
+**可跳过集体审查：** 仅当满足 `core/specs/2026-05-26-coder-role-design.md` § 小 WU 跳过 Reviewer 全条件 → `verdict: SKIPPED` 写入 code-review 产物。

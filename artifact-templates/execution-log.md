@@ -35,7 +35,7 @@ worktree:
 | 集体测试 | `verifications/YYYY-MM-DD-<topic>-collective-test.md` | PASS / FAIL |
 | 集体审查 | `reviews/YYYY-MM-DD-<topic>-code-review.md` | APPROVE / BLOCK / SKIPPED |
 
-**批次完成条件：** 上表两项均已落盘且结论合格；未满足不得写「本 GROUP / 本批次交付完成」。细则见 `docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md`。
+**批次完成条件：** 上表两项均已落盘且结论合格；未满足不得写「本 GROUP / 本批次交付完成」。细则见 `core/specs/2026-05-28-batch-closeout-review-and-collective-test.md`。
 
 ## 测试摘要
 

@@ -1,7 +1,7 @@
 <!-- 自主性指令 — 请勿删除 -->
 你是一个自主编码代理。在**实现阶段**（用户已批准 spec/plan 并说「开始实现」或等价指令后）无需逐步征求许可，将任务执行至完成。
 **Harness 阶段门禁优先：** 写入 spec / plan / decision 到 `.ai-runtime-artifacts/` 后须暂停，等用户审查并明确继续；此规则高于本段的 auto-continue。详见 `harness-factory/core/routing.md` § 阶段门禁 与 `.cursor/rules/cursor-subagent-routing.mdc`。
-**Harness 尾盘优先（Cursor）：** 「完成」指本 GROUP / 批次已通过**集体测试**与**集体审查**并落盘（`collective-test` + `code-review`），而非末个 WU 返回即可停。见 `harness-factory/docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md`。
+**Harness 尾盘优先（Cursor）：** 「完成」指本 GROUP / 批次已通过**集体测试**与**集体审查**并落盘（`collective-test` + `code-review`），而非末个 WU 返回即可停。见 `harness-factory/core/specs/2026-05-28-batch-closeout-review-and-collective-test.md`。
 若受阻，尝试替代方案。仅在真正歧义或具有破坏性时才提问。
 并行子任务：Codex 用原生子代理；Cursor 用 `.cursor/agents/harness-*` subagent（见 `harness-factory/adapters/cursor/`）。
 <!-- 自主性指令结束 -->
@@ -16,10 +16,10 @@
 2. **按 routing 判定追加**（见 `routing.md` § 按判定加载；**先 stage skill，再 artifacts 契约**）：
    - 设计 / spec → Load **`brainstorming`** → `artifacts.md`（勿用 `artifact-templates/spec.md` 作正文）
    - 计划 → Load **`writing-plans`** → `artifacts.md` + `plan.harness-overlay.md`；并行时 `dispatch.harness-overlay.md`
-   - 验证 → Load **`verification-before-completion`** → `project.verification.md`、`core/verification.md`
+   - 验证 → Load **`verification-before-completion`** → `project/verification.md`、`core/verification.md`
    - 编排产物（execution-log、track 等）→ `artifact-templates/` 对应文件
-   - 改代码前 → `project.profile.md`、`context-map.md`（涉及模块时）
-   - Git → **`git-xywh` skill** + `project.git.md`
+   - 改代码前 → `project/profile.md`、`context-map.md`（涉及模块时）
+   - Git → **`git-xywh` skill** + `project/git.md`
    - runbook 任务 → `core/runbooks.md` 对应节
 3. **架构总览（可选）**：`core/harness.md`
 
@@ -57,9 +57,9 @@
 | 验证 / 集体测试 | `superpowers:verification-before-completion` | 同左 |
 | 尾盘（批次收尾） | `verification-before-completion` → `requesting-code-review` | 同左 → `collective-test` + `code-review` 产物 |
 | 信息调研 / 网页搜索 | `harness-web-investigator` | `harness-web-investigator` |
-| Git（提交 / 分支 / MR） | `git-xywh` + `project.git.md` | 同左 |
+| Git（提交 / 分支 / MR） | `git-xywh` + `project/git.md` | 同左 |
 
-涉及提交、分支、MR 时由 **Leader** invoke `git-xywh`；子 Agent 默认不 commit。组织规范在 skill，项目差异在 `project.git.md`。
+涉及提交、分支、MR 时由 **Leader** invoke `git-xywh`；子 Agent 默认不 commit。组织规范在 skill，项目差异在 `project/git.md`。
 
 ## 可选：Cursor Hooks
 

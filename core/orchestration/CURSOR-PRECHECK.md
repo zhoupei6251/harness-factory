@@ -11,7 +11,7 @@
 | 3 | Skill 可用 | `.agents/skills/cursor-orchestration/SKILL.md` 存在；偏好文档 `orchestration/skill-preferences.zh.md` 可读 |
 | 4 | 产物目录 | `.ai-runtime-artifacts/execution-logs/` 存在 |
 | 5 | Git 安全 | 在 feature 分支工作；main 受保护 |
-| 6 | 验证命令 | `harness-factory/project.verification.md` 可读 |
+| 6 | 验证命令 | `harness-factory/project/verification.md` 可读 |
 
 ## 建议但非必须
 

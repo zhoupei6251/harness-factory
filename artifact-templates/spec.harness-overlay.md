@@ -15,7 +15,7 @@ created_at: <YYYY-MM-DD>
 
 > **正文：** 按已 Load 的 **brainstorming** skill 撰写（含方案对比、设计节、Spec 自检等）。
 > **禁止**用 `artifact-templates/spec.md` 历史短提纲替代 skill 流程。
-> **路径：** `.ai-runtime-artifacts/specs/YYYY-MM-DD-<topic>-spec.md`（覆盖 skill 默认 `docs/superpowers/specs/`）。
+> **路径：** `.ai-runtime-artifacts/specs/YYYY-MM-DD-<topic>-spec.md`（覆盖 skill 默认 `core/specs/`）。
 
 ## Next
 

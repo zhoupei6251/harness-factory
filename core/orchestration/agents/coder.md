@@ -84,7 +84,7 @@ Worker 启动时上下文仅包含：
 
 - `self_check: PASS | FAIL`
 - `open_items: 无 | <Critical/Important 列表>`
-- `skip_reviewer_eligible: yes | no`（见 spec `docs/superpowers/specs/2026-05-26-coder-role-design.md` § 小 WU 跳过 Reviewer；Leader 复核）
+- `skip_reviewer_eligible: yes | no`（见 spec `core/specs/2026-05-26-coder-role-design.md` § 小 WU 跳过 Reviewer；Leader 复核）
 
 **`self_check: FAIL`** → 不得向 Leader 返回「完成」；须写阻塞项与建议下一步。
 
@@ -146,7 +146,7 @@ feature
 ## 上下文资料
 - Spec：...
 - Plan：...
-- 项目验证：harness-factory/project.verification.md
+- 项目验证：harness-factory/project/verification.md
 
 ## 工程化要求
 日志、错误处理、单测、自测（plan 豁免须在返回中说明）

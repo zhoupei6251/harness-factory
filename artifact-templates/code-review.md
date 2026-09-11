@@ -9,7 +9,7 @@ skills_evidence:
   - .agents/skills/cursor-orchestration/SKILL.md
 source:
   - .ai-runtime-artifacts/plans/<YYYY-MM-DD>-<topic>-plan.md
-  - harness-factory/docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md
+  - harness-factory/core/specs/2026-05-28-batch-closeout-review-and-collective-test.md
 created_at: <YYYY-MM-DD>
 batch_id: GROUP-1
 worktree_id: 
@@ -63,7 +63,7 @@ verdict: APPROVE
 
 **verdict:** APPROVE | BLOCK | SKIPPED
 
-（若 SKIPPED：写明 `docs/superpowers/specs/2026-05-26-coder-role-design.md` § 小 WU 跳过 Reviewer 全条件 + 各 WU `skip_reviewer_eligible`）
+（若 SKIPPED：写明 `core/specs/2026-05-26-coder-role-design.md` § 小 WU 跳过 Reviewer 全条件 + 各 WU `skip_reviewer_eligible`）
 
 ## Next
 

@@ -22,25 +22,31 @@ Shim mode (default) writes thin stubs into `<target>/.claude/`, `.codex/`, `.tra
 ```
 harness-factory/
 ├── ENTRY.md                  # single entry point
-├── ARCHITECTURE.md           # design rationale
-├── project.profile.md        # project instance: identity, stack, module map
-├── project.git.md            # project instance: git deltas vs org baseline
-├── project.verification.md   # project instance: verification commands
-├── core/                     # governance: routing (阶段门禁/路由表), runbooks,
-│   ├── ...                   # artifacts/verification contracts, orchestration/
-│   └── orchestration/        # multi-task dispatch: WU, DISPATCH-TRACK, roles
+├── ARCHITECTURE.md           # design rationale + directory map
+├── core/                     # ENGINE — don't edit per-project
+│   ├── *.md                  #   routing(阶段门禁/路由表) / runbooks / artifacts /
+│   │                         #   verification / NEVER / principles / traps ...
+│   ├── specs/                #   authoritative workflow specs (尾盘, worktree isolation)
+│   └── orchestration/        #   multi-task dispatch: WU, DISPATCH-TRACK, roles
+├── project/                  # PROJECT INSTANCE — edit these per repo ★
+│   ├── profile.md            #   identity, stack, module map
+│   ├── git.md                #   git deltas vs org baseline
+│   ├── verification.md       #   verification commands
+│   ├── templates/            #   blank templates (profile/git/verification/context-map)
+│   └── onboarding/           #   bootstrap prompts for AI
 ├── artifact-templates/       # spec/plan/decision/collective-test/code-review overlays
 ├── capabilities/rules/       # per-language rules (java, typescript, common)
 ├── platforms/                # 4 thin adapters with per-platform rules
+├── entrypoints/              # per-platform entry templates (CLAUDE.md, AGENTS.omx.md...)
 ├── routes/                   # 3 route templates (code / novel / news)
 ├── skills/                   # active skills + skills/archive/ (restorable)
-├── entrypoints/              # HARNESS-PLATFORM-ENTRY.md, AGENTS.omx.md
-├── init/                     # onboarding prompts + instance templates
-├── docs/superpowers/specs/   # authoritative workflow specs (尾盘, worktree isolation…)
 ├── schemas/                  # 3 JSON schemas
 ├── scripts/                  # bootstrap.ts + operational shell helpers
-└── tests/                    # validate-schemas, build-index, bootstrap smoke
+├── tests/                    # validate-schemas, build-index, bootstrap smoke
+└── mcp-config/               # codebase-memory MCP config
 ```
+
+Reading order: `ENTRY.md` → `core/routing.md` → per-intent docs. Per-project edits belong to `project/` only.
 
 ## How to add things
 

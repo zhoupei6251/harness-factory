@@ -11,12 +11,12 @@
 2. **按 routing 判定追加**（见 `routing.md` § 按判定加载；勿在会话开始预读 dispatcher / skill-preferences）：
    - 设计 / spec → **`brainstorming` skill** → `core/artifacts.md`
    - 计划 → **`writing-plans` skill** → `artifacts.md` + `artifact-templates/plan.harness-overlay.md`；并行时 `dispatch.harness-overlay.md`
-   - 验证 / 跑命令 → **`verification-before-completion`** → `project.verification.md`
+   - 验证 / 跑命令 → **`verification-before-completion`** → `project/verification.md`
    - **尾盘 / GROUP 收尾** → 先 **`verification-before-completion`**（集体测试，模板 `collective-test.md`）→ 再 **`requesting-code-review`**（集体审查，模板 `code-review.md`）→ `dispatcher-workflow.md` §3
    - Cursor 委派细则 → `.cursor/rules/cursor-subagent-routing.mdc`
-   - 改代码前 → `project.profile.md`、`context-map.md`（设计阶段须在 brainstorming 澄清**之后**再读）
+   - 改代码前 → `project/profile.md`、`context-map.md`（设计阶段须在 brainstorming 澄清**之后**再读）
    - 编排产物 → `artifact-templates/`（execution-log、track、handoff 等，非 spec/plan 正文）
-   - Git → **`git-xywh` skill** + `project.git.md`
+   - Git → **`git-xywh` skill** + `project/git.md`
    - 多 task 已实现 → `cursor-orchestration` skill → `orchestration/dispatcher-workflow.md`
    - 派发 WU（`wu_skills: auto`）→ `orchestration/skill-preferences.zh.md`
 
@@ -44,7 +44,7 @@
 ## Git
 
 - 组织规范：**`git-xywh` skill**（须 invoke）
-- 项目差异：`project.git.md`
+- 项目差异：`project/git.md`
 - **Leader** 执行 commit / push / MR
 
 ## 强制声明
@@ -59,6 +59,6 @@
 
 统一写入 `.ai-runtime-artifacts/`（见 `core/artifacts.md`）。
 
-**交付完成（Cursor）：** 本 GROUP / 批次 WU 全部返回后，须完成尾盘集体测试 + 集体审查并落盘（见 `docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md`）。**完成** ≠ 末个 WU 返回；高于 AGENTS.md「执行至完成」的狭义理解。
+**交付完成（Cursor）：** 本 GROUP / 批次 WU 全部返回后，须完成尾盘集体测试 + 集体审查并落盘（见 `core/specs/2026-05-28-batch-closeout-review-and-collective-test.md`）。**完成** ≠ 末个 WU 返回；高于 AGENTS.md「执行至完成」的狭义理解。
 
 Cursor 规则 `ai-entry.mdc` 会在会话中加载；本文件供深读与人工审计。

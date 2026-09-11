@@ -31,7 +31,7 @@ superpowers:brainstorming → [门禁：用户确认 spec]
 - 用户任务
 - `harness-factory/core/routing.md` 判定结果
 - `.ai-runtime-artifacts/specs/` 或 `plans/` 中已批准产物
-- `harness-factory/project.verification.md`
+- `harness-factory/project/verification.md`
 
 ## 输出
 
@@ -50,7 +50,7 @@ superpowers:brainstorming → [门禁：用户确认 spec]
 1. **路由**：首句 `「Harness：…」`；本阶段 route skill 先 Load、次行 `Skills:`；多 task 走 `cursor-orchestration`
 2. **需求与设计**：先 Load 阶段 skill，再按 skill 流程写产物（`skills` 非空）；写入后**暂停**等用户确认
 3. **拆分**：从 plan 提取 WU，写执行图（GROUP / 依赖 / 文件所有权 / `wu_type` / `wu_skills`）
-3b. **WORKTREE-INIT**（「开始实现」后）：创建/复用 Git worktree；见 `dispatcher-workflow.md` §0、`docs/superpowers/specs/2026-05-29-git-worktree-isolation-design.md`
+3b. **WORKTREE-INIT**（「开始实现」后）：创建/复用 Git worktree；见 `dispatcher-workflow.md` §0、`core/specs/2026-05-29-git-worktree-isolation-design.md`
 4. **派发**（按 `wu_type`）：
    - 代码类 → `harness-coder`（`feature` / `bugfix` / `refactor` / `ui` / `review-fix`）
    - 轻量 → `harness-implementer`（`docs` / `chore` / `config`）
@@ -59,7 +59,7 @@ superpowers:brainstorming → [门禁：用户确认 spec]
    - 并行 ≤5；plan 可写 `wu_skills: auto`，**派发前** Leader 解析并抄 SKILL 路径；无 `### Skills 使用` 不整合；prompt 见各 `agents/*.md`
 5. **单 WU**：验证返回 → 更新 plan / tracking（子 Agent 不改 plan）
 6. **GROUP 尾盘**（`dispatcher-workflow.md` § 步骤 3；spec `2026-05-28-batch-closeout-review-and-collective-test.md`）：
-   - **A 集体测试**：在 `worktree_path` 跑 `project.verification.md` → Write `*-collective-test.md`
+   - **A 集体测试**：在 `worktree_path` 跑 `project/verification.md` → Write `*-collective-test.md`
    - **B 集体审查**：委派 `harness-reviewer` → 将返回 Write `*-code-review.md`
    - **C** 更新 execution-log § 尾盘门禁；`APPROVE`/`SKIPPED` + 测试 PASS 后方可声称批次完成
 7. **追踪**：`DISPATCH-TRACK-*.md`
@@ -92,4 +92,4 @@ superpowers:brainstorming → [门禁：用户确认 spec]
 
 ## 工作流索引
 
-详见 `../dispatcher-workflow.md`、`../tracking/schema.md`、`docs/superpowers/specs/2026-05-26-coder-role-design.md` § 提示词规范。
+详见 `../dispatcher-workflow.md`、`../tracking/schema.md`、`core/specs/2026-05-26-coder-role-design.md` § 提示词规范。

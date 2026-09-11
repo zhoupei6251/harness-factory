@@ -18,9 +18,9 @@
 
 | File | Read when |
 |------|-----------|
-| `../project.profile.md` | 改代码前：项目身份、技术栈、模块边界 |
-| `../project.git.md` | Git 任务：本项目相对组织规范的差异 |
-| `../project.verification.md` | 验证阶段：本项目的验证命令清单 |
+| `../project/profile.md` | 改代码前：项目身份、技术栈、模块边界 |
+| `../project/git.md` | Git 任务：本项目相对组织规范的差异 |
+| `../project/verification.md` | 验证阶段：本项目的验证命令清单 |
 
 ## Loading strategy
 
@@ -29,6 +29,6 @@ Do not read all docs every session. Read by intent:
 - Design task: `principles.md` + `routing.md`
 - Plan task: `artifacts.md` + `routing.md` § 阶段门禁
 - Bug fix: `NEVER.md` + `runbooks.md`
-- Verification: `verification.md` + `../project.verification.md`
+- Verification: `verification.md` + `../project/verification.md`
 - News / writing: `../routes/news/MEMORY.md` + `runbooks.md` § news 路线
 - New project: skim all once

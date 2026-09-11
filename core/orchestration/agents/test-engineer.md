@@ -14,7 +14,7 @@
 - Leader 分配的 WU（`wu_type: test | e2e`）
 - 允许修改的测试路径列表
 - spec/plan 中 done criteria
-- `harness-factory/project.verification.md`
+- `harness-factory/project/verification.md`
 
 ## 输出
 

@@ -22,11 +22,11 @@
 ## 步骤 0：Git worktree 沙箱
 
 **时机：** 用户「开始实现」后、GROUP-1 派发前（routing「小改动」可跳过）。  
-**权威：** `docs/superpowers/specs/2026-05-29-git-worktree-isolation-design.md` §5.4。
+**权威：** `core/specs/2026-05-29-git-worktree-isolation-design.md` §5.4。
 
 1. `*-dispatch.md` → `dispatch_stem` → `worktree_id` = `wt-{stem}`
 2. `worktree_path` = `<repo-parent>/.harness-worktrees/<repo-basename>/{worktree_id}/`
-3. `「Harness：git-xywh + project.git.md」` → `git worktree add -b harness/{worktree_id} <worktree_path> <base>`
+3. `「Harness：git-xywh + project/git.md」` → `git worktree add -b harness/{worktree_id} <worktree_path> <base>`
 4. 已存在且 HANDOFF/tracking 一致 → 复用
 5. tracking 记 `WORKTREE-INIT`；更新 HANDOFF § Git 沙箱
 
@@ -85,7 +85,7 @@ GROUP-2（依赖 GROUP-1）:
 7. **子 Agent 不改 plan**；Leader 验证后写 plan / tracking（`runtime/plan-progress-sync.md`）
 8. **工作目录：** `<worktree_path>`（仅在此改代码与跑单测；禁改主 checkout、禁 commit/push）
 
-Coder 派发 prompt 模板：`docs/superpowers/specs/2026-05-26-coder-role-design.md` § 提示词规范，或 `agents/coder.md` § Task Prompt 前缀。
+Coder 派发 prompt 模板：`core/specs/2026-05-26-coder-role-design.md` § 提示词规范，或 `agents/coder.md` § Task Prompt 前缀。
 
 ### Leader 为 WU 选配 Skills
 
@@ -99,11 +99,11 @@ Coder 派发 prompt 模板：`docs/superpowers/specs/2026-05-26-coder-role-desig
 
 **单 WU 返回后：** 验证返回字段 → plan / tracking 由 Leader 更新（`plan-progress-sync.md`）。**不在此写批次完成态。**
 
-**GROUP 收尾（先测后审，Leader 落盘）：** 细则 `docs/superpowers/specs/2026-05-28-batch-closeout-review-and-collective-test.md` §4。
+**GROUP 收尾（先测后审，Leader 落盘）：** 细则 `core/specs/2026-05-28-batch-closeout-review-and-collective-test.md` §4。
 
 1. 收集 WU 结果；处理冲突
 2. **步骤 A — 集体测试**
-   - Leader Load `verification-before-completion` + `project.verification.md`
+   - Leader Load `verification-before-completion` + `project/verification.md`
    - 命令 **cwd = worktree_path**；按本批次 diff 跑最小验证集；plan 要集成/E2E 时先完成 `harness-test-engineer` WU
    - **Write** `.ai-runtime-artifacts/verifications/YYYY-MM-DD-<topic>-collective-test.md`（模板 `artifact-templates/collective-test.md`）
    - 任一必跑项 **FAIL** → STOP，开 bugfix WU；**不得**进入步骤 B
@@ -111,7 +111,7 @@ Coder 派发 prompt 模板：`docs/superpowers/specs/2026-05-26-coder-role-desig
    - Leader Load `requesting-code-review`；委派 **`harness-reviewer`**（与所有 Coder/Implementer **不同实例**；禁无约束 `generalPurpose`）
    - Reviewer **只返回**（readonly，不 Write）；`code_review: PASS` **不替代**本步
    - Leader 将返回 **Write** `.ai-runtime-artifacts/reviews/YYYY-MM-DD-<topic>-code-review.md`（模板 `artifact-templates/code-review.md`）
-   - 可跳过条件：`docs/superpowers/specs/2026-05-26-coder-role-design.md` § 小 WU 跳过 Reviewer → `verdict: SKIPPED` + 依据写入 review 产物
+   - 可跳过条件：`core/specs/2026-05-26-coder-role-design.md` § 小 WU 跳过 Reviewer → `verdict: SKIPPED` + 依据写入 review 产物
 4. **步骤 C — 批次关闭**
    - 更新 execution-log § 尾盘门禁（链接上述两产物路径）
    - `BLOCK` → `review-fix` WU → 回到步骤 A（至少重跑受影响验证）

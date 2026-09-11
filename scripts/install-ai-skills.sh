@@ -108,7 +108,7 @@ Organization skill git-xywh is missing. Install per team docs (slug: git-xywh), 
   ~/.cursor/skills/git-xywh/SKILL.md
   ~/.agents/skills/git-xywh/SKILL.md
 
-Until installed, Git tasks must still read harness-factory/project.git.md and follow repo hooks/CI;
+Until installed, Git tasks must still read harness-factory/project/git.md and follow repo hooks/CI;
 Harness routing expects Leader to invoke git-xywh before commit / branch / MR.
 MSG
   if [[ "${STRICT_ORG_SKILLS:-0}" == "1" ]]; then
