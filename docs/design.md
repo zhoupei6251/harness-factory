@@ -111,11 +111,12 @@ harness-factory/
 │   │              novel-mechanical-scorer novel-simplify novel-safe-revision
 │   └── news/      news-generator news-polish fact-check
 ├── engine/                          [T] 全 markdown；一页纸输入源 ≤225 行（§11）
-│   ├── START.md                     一页纸母版：R1–R8（R7=记忆边界令）+ 收尾自检   65 ✓
+│   ├── START.md                     一页纸母版：R1–R8（R7=记忆边界令）+ 收尾自检 + agent 索引  69 ✓
 │   ├── gates.md                     S/M/L 唯一定义 + 三个 4 行可抽取块              60 ✓
 │   ├── routes/code.md               四件套（§8）                                      ≤60
 │   ├── routes/novel.md                                                                     ≤60
 │   ├── routes/news.md                                                                      ≤60
+│   ├── agents/explorer.md implementer.md reviewer.md  角色+禁用工具，各 ≤15（§8.1）
 │   ├── contracts/spec.md plan.md verification.md closeout.md   仅 L 档展开，4 × ≤40       ≤160
 │   ├── runbooks/onboarding.md         人工两步 checklist（Trae UI 开关）+ 新仓接入话术      ≤35
 │   ├── runbooks/update.md             pull → 报每个 workspace 的 pin 差异 → 选择性重渲染    ≤25
@@ -135,7 +136,8 @@ harness-factory/
     └── 各自 .bak/
 ```
 
-引擎侧 tracked 文件总量目标：**engine 14 + compiler ~20 + skills ≤100 + tests ~8 + 根 6 ≈ 148**，对照 v1 的 316（其中 skills 占 316 里的绝大多数）。
+引擎侧 tracked 文件总量目标：**engine 20 + compiler ~20 + skills ≤100 + tests ~8 + 根 6 ≈ 154**，对照 v1 的 316（其中 skills 占 316 里的绝大多数）。
+（engine 20 = START 1 + gates 1 + routes 3 + agents 3 + contracts 4 + runbooks 4 + platforms 4）
 
 ### 5.2 全貌：业务项目侧（`aigc_platfrom_back/`）
 
@@ -148,6 +150,7 @@ aigc_platfrom_back/
 ├── CLAUDE.md                   [tracked]   改 3 行：harness 节 → @.claude/rules/HARNESS.md
 ├── .claude/rules/HARNESS.md    [excluded]  渲染产物
 ├── .claude/skills/             [excluded]  sync-skills 拷贝
+├── .claude/agents/             [excluded]  三份 agent，格式由 compiler 生成（§8.1）
 ├── .claude/settings.json       [半产物]    只追加 harness 的 hooks 段
 ├── .codex/hooks.json           [excluded]  渲染产物
 ├── .codebuddy/                 [excluded]  rules + skills + settings
@@ -160,7 +163,7 @@ novel / news 目录同构，只是通常非 git 仓 → 无 `info/exclude` 可�
 
 | v1 | 文件数 | 归宿 |
 |---|---|---|
-| `core/`（含 specs/、orchestration/、traps.md） | 34 | → `engine/{START,gates,routes,contracts,runbooks}`。**砍 specs/ 与 orchestration/ 两个独立层**：orchestration 收薄为 `runbooks/multi-task.md`（v1 的 dispatcher-workflow 183 行是「入口链过长」的主要成因），specs/ 的尾盘/worktree 并入 contracts |
+| `core/`（含 specs/、orchestration/、traps.md） | 34 | → `engine/{START,gates,routes,contracts,runbooks}`。**砍 specs/ 与 orchestration/ 两个独立层**：orchestration 收薄为 `runbooks/multi-task.md`（v1 的 dispatcher-workflow 183 行是「入口链过长」的主要成因），其中的 leader/coder/reviewer **角色定义升为 `engine/agents/`**（§8.1），specs/ 的尾盘/worktree 并入 contracts |
 | `routes/{code,novel,news}/MEMORY.md` | 3 | 拆成两半：**规则** → `engine/routes/<line>.md`（唯一真内容），**实例** → `.workspaces/<proj>/`。空模板从此不住共享区 |
 | `skills/`（39 active + 50 archive） | 316 | → `.agents/skills/` ≤100，搬运时逐个改写为平台中立。**archive 整层删除**——git 历史就是归档，第二份副本正是 v1 的 18 份 vendored 分化之源 |
 | `platforms/*/rules/ENTRY.md`（4 份占位骨架） | 4 | 拆为 `engine/platforms/*.md`（方言正文）+ `compiler/platforms/*.ts`（清单生成）。占位骨架里那句 "Trae hook support is limited" 由 §10 的真矩阵取代 |
@@ -194,8 +197,9 @@ START.md 母版骨架（**母版实测 65 行**；渲染产物构成如下）：
 | 项目事实摘要 | ≤10 | `.workspaces/<proj>/facts/profile.md` |
 | 技能索引（名称 + 一行触发词，≤15 条） | ≤15 | route 档案 skills 段 |
 | 收尾自检 | 4 | `engine/START.md` |
-| 段落标题与空行（8 段 × 2） | 16 | render |
-| **合计** | **≈73 / ≤120** | 余量 47 行 |
+| 可用 agent 一行（细节仅 L 档展开，§8.1） | 1 | `engine/agents/` |
+| 段落标题与空行（9 段 × 2） | 18 | render |
+| **合计** | **≈76 / ≤120** | 余量 44 行 |
 
 预算成立的两个前提，写进 `lint.ts`：`gates.md` 每个 `<!-- gate:X -->` 块**恰好 4 行**（已实测 4/4/4），
 `routes/<line>.md` 的 pipeline 段 ≤6 行、skills 段 ≤15 条。超了不是渲染截断，是 CI 红。
@@ -231,6 +235,27 @@ START.md 母版骨架（**母版实测 65 行**；渲染产物构成如下）：
 **news** —— 日常成稿 S；一旦「要发出去 / 投出去」强制 L。管线不变量：引语、数据、时间线逐条多源核对，`flagged` 项禁止发布。技能链：`news-generator → fact-check → news-polish → humanizer-zh → document-review`。
 
 **novel** —— 见 §9。
+
+### 8.1 agent 不是技能
+
+| | 技能（`.agents/skills/`） | agent（`engine/agents/`） |
+|---|---|---|
+| 是什么 | **怎么用**某能力的正文 | **由谁来跑**的执行者定义 |
+| 上下文 | 加载进当前上下文，同一个人格继续 | 独立上下文窗口、受限工具集、可换模型 |
+| 是否跨工具收敛 | **是**（agentskills.io），一份四家吃 | **否**，各家格式互不相认 |
+| 因此身份 | 源（canonical，直接共享） | **编译产物**（canonical 是薄的角色描述，四份格式由 `compiler/platforms/*.ts` 生成，§2b 的第二个实例） |
+
+判据：**agent 存在的唯一理由是权限隔离。** 只换提示词不收紧工具集的 agent = 一段没必要的独立上下文，应该写成技能。`subagent-driven-development`、`dispatching-parallel-agents` 留在 `shared/` 技能里——它们是「怎么用 agent」，本身不是 agent。
+
+只留三个，每个以「禁止什么」定义：
+
+| agent | 工具集 | 为何不能降级成技能 |
+|---|---|---|
+| `explorer` | 只读（Read/Grep/Glob），**禁写** | 摸底阶段烧掉主上下文；且它物理上写不了，不必靠 R2 自律 |
+| `implementer` | 可写 + 必跑验证 | 执行与编排分离：plan 交下去，回来的只有 diff 与证据 |
+| `reviewer` | 只读，**物理禁写** | 挑刺的人改不了代码才是真 reviewer——这是机制，提示词给不了 |
+
+canonical 定义放 `engine/agents/`（不放 `.agents/agents/`：那是凭空发明规范里没有的子目录，且 `.agents/` 这个名字已足够让人误以为它装 agent）。每份 ≤15 行。一页纸只多一行「可用 agent：explorer / implementer / reviewer」，细节仅 L 档从 `runbooks/multi-task.md` 展开——120 行预算不受影响。
 
 ## 9. novel 线（v2.1 新增细化）
 
@@ -292,9 +317,10 @@ START.md 母版骨架（**母版实测 65 行**；渲染产物构成如下）：
 超了即失败，写进 `compiler/lint.ts`：
 
 - 渲染产物 ≤120 行；`gates.md` 每个 `<!-- gate:X -->` 块恰好 4 行；`routes/*.md` ≤60 行（pipeline 段 ≤6、skills 段 ≤15）
-- **一页纸输入源**（`START.md` + `gates.md` + 单个 `routes/<line>.md`）总量 ≤225 行 —— 实测 65 + 60 + ≤60 = ≤185
+- **一页纸输入源**（`START.md` + `gates.md` + 单个 `routes/<line>.md`）总量 ≤225 行 —— 实测 69 + 60 + ≤60 = ≤189
   （`contracts/` `runbooks/` `platforms/` 不计：前两者只在 L 档或人读时展开，方言每家 ≤25）
 - `.agents/skills/` 技能总数 ≤100，**且每个被 ≥1 条 route 引用**（未被引用 = 失败）
+- `engine/agents/*.md` 每份 ≤15 行，且**必须显式声明被禁的工具类别**；未声明 = 失败——不声明即默认全给，agent 就退化成换皮的技能（§8.1 判据）
 - 一页纸每路线技能引用 ≤15
 - `engine/` 与 `skills/` 中出现具体项目名、绝对路径、技术栈细节 = 失败（项目事实只准住 `.workspaces/`）
 - 产物可复现：重渲染 diff 必须为空
@@ -371,6 +397,8 @@ v2 §10 全量继承，另加本轮 7 条：
 | 机器本地项目注册表 + `--pull-all` | 为 N 次 pull 设计，而 N 次 pull 是上一条否决制造出来的问题。引擎单实例后不存在它 |
 | 产物提交进项目仓（`track` 开关） | 无共享对象。要用了自己 clone、自管 workspace |
 | `.workspaces/` 自己 `git init` | 用户明确「不提交」。误删风险改由 hook 的 `.bak/` 快照兜底——机制兜底优先于人守规矩 |
+| canonical agent 放 `.agents/agents/` | 该目录受 agentskills.io 规范管辖，只定义 `skills/`；凭空发明子目录 = 假装存在一个不存在的规范 |
+| 第四个 agent（tester / planner / leader…） | 权限隔离是 agent 的唯一理由，三个已覆盖只读摸底 / 可写执行 / 只读挑刺。再加先回答「为什么不写成技能」 |
 
 ## 18. 遗留开放问题（不阻塞 Step 0/1）
 

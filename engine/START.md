@@ -57,6 +57,10 @@ render 按 `{{gate}}` 从 `engine/gates.md` 取四行（动笔前 / 干活中 / 
 
 {{route.skills}}
 
+## 可用 agent
+
+{{agents.list}}——多 task 派发的规矩见 `runbooks/multi-task.md`（仅 L 档展开）。
+
 ## 收尾自检
 
 1. 本档要求的证据落了吗？未落 → 不得称完成。
