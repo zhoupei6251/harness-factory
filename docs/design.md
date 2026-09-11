@@ -2,8 +2,8 @@
 
 - 日期：2026-09-11
 - 状态：**设计完成，待实施**（未开始写实现）
-- 前身：harness-foundry（退役）/ harness-kit（退役）/ harness-factory v1（原地推翻）/ **v2 设计文档**（`../../../docs/plans/2026-09-11-harness-factory-v2-design.md`）
-- v2.1 = v2 全部结构决策 **+ 8 处修订**（7 处因新查证的事实，1 处因用户新决定）。v2 的 §10「已否决方案」**全量继承**，不重开。
+- 前身：harness-foundry（退役）/ harness-kit（退役）/ harness-factory v1（原地推翻）/ **v2 设计文档**（`../../docs/plans/2026-09-11-harness-factory-v2-design.md`，已标 superseded）
+- v2.1 = v2 全部结构决策 **+ 9 处修订**（7 处因新查证的事实，2 处因用户决定）。v2 的 §10「已否决方案」**全量继承**，不重开。
 
 ## 0. 修订记录（相对 v2）
 
@@ -13,10 +13,11 @@
 | 2 | hook 把 `skills/` 拷到各平台原生目录 | **`.agents/skills/` 为唯一技能仓**（agentskills.io 规范）：Trae、Codex 直读，Claude、CodeBuddy 拷贝 | Trae 官方文档有 `Enable .agents Skills Directory` 开关 |
 | 3 | 「codex 无技能机制 → 一页纸仅带名称索引」 | **更正：Codex 有 skills 系统 + 12 个生命周期 hook 事件**，codex 方言因此与 claude 同构，索引降级为兜底 | openai/codex `docs/agents_md.md`、developers.openai.com/codex/hooks |
 | 4 | 唯一自动入口 = `hook-session-start.ts` | **一份 hook 实现 + 四份清单**，三个入口：`session-start` / `post-tool-use` / `stop` | 三家事件词表与输出契约同源（§10 矩阵） |
-| 5 | 状态只有 `.harness/MEMORY.md`（≤100 行） | novel 线状态**外移为 `.harness/novel/` 五文件事实库**，MEMORY 只留两行 | 长篇状态是上千行结构化数据，塞进 100 行预算必然失效 |
+| 5 | novel 状态只有 `MEMORY.md`（≤100 行） | novel 线状态**外移为 workspace 的 `novel/` 五文件事实库**，MEMORY 只留两行 | 长篇状态是上千行结构化数据，塞进 100 行预算必然失效 |
 | 6 | 工具链未定 | **Node 26.8.2 + TypeScript 7.0.2，零构建、零运行时依赖**（不用 tsx / esbuild / ts-node） | 本机实测通过（§13） |
-| 7 | 技能「只收 ~15 个」 | **候选池 ≤100 且每个被 ≥1 条 route 引用（lint 执法）；一页纸每路线引用 ≤15** | 调和用户「≤100 全养料改写」与 v2 少技能原则 |
-| 8 | Trae/WorkBuddy 技能落点「Step 3 到真平台验证」 | 落点**当场定稿**；Trae hook 能力证据矛盾 → **按无 hook 下界设计** | docs.trae.ai/ide/skills 已给出 `.trae/skills/` 与 `.agents/skills/`；hook 证据冲突（§10 脚注） |
+| 7 | 技能「只收 ~15 个」 | **候选池 ≤100 且每个被 ≥1 条 route 引用（lint 执法）；一页纸每路线引用 ≤15** | 调和用户「≤100 全养料」与 v2 少技能原则 |
+| 8 | Trae/WorkBuddy 技能落点「Step 3 到真平台验证」 | 落点**当场定稿**；Trae hook 能力证据矛盾 → **按无 hook 下界设计** | docs.trae.ai/ide/skills 给出 `.trae/skills/` 与 `.agents/skills/`；hook 证据冲突（§10） |
+| 9 | 分发 = 每项目 `git clone` 到 `harness/`，项目数据住项目根 `.harness/` | **引擎单实例（就住本仓，无 clone）+ 数据集中在 `harness-factory/.workspaces/<proj>/`（gitignored）+ 产物分散渲染到各项目根（全忽略）** | 用户决定；且「每项目 clone」是给不存在的共享需求设计的 |
 
 ## 1. 目标与定位
 
@@ -24,30 +25,40 @@
 
 v1 的五个死因作为反面约束：入口链过长；同一规则多处重复；引擎与资产混住；分发模型悬而未决；项目实例住在共享仓内导致副本就地分化。
 
+**定位补充**：这套东西是**个人工具，不是团队产物**。不做共享、不做「同事开箱可用」；要用的人自己 clone 到自己机器，他的 `.workspaces/` 是他的。所有跨项目可见性因此出局。
+
 ## 2. 世界观
 
 **engine 是程序，workspace 是数据，平台文件是编译产物。**
 
 程序无状态、不许含项目事实；数据跟着工作区走；产物由编译器生成、不许手改。
 
-v2.1 补两条不变量：
+三条不变量：
 
 - **(a) 内容放在别的工具已经会主动去找的位置。** 不做「canonical + 投影 stub」（v1 之死因），而用两个跨工具收敛规范：规则用根 `AGENTS.md`，技能用 `.agents/skills/`。
 - **(b) 平台差异只允许出现在 `compiler/platforms/*.ts`。** 全仓不允许存在第二份 markdown 副本。
+- **(c) 共享内容一份，私有数据集中。** `.workspaces/` 是被 git 排除的运行时状态，与仓库的关系等同 `.git/`——它不是 v1 的「共享内容就地分化」（那是 18 份 vendored 技能各写各的），因为它装的从来就不该是共享内容。
 
-## 3. 分发模型：每项目 clone 一份（继承 v2 §3，未改）
+## 3. 分发模型：单实例 + 集中数据 + 分散产物
 
-- 上游 GitHub 仓 `harness-factory`（写规则、发 tag），机器上不留中央安装。
-- 每个工作区根下 `git clone` 到 `harness/`，业务仓 `.gitignore` 该目录。
-- **升级 = `cd harness && git pull --ff-only`**，下次 SessionStart hook 检测 HEAD 变化自动重编译并报 diff。
-- 项目数据**不进 clone**（嵌套 git 目录父仓跟踪不了）：住项目根 `.harness/`，由项目自己的仓正常跟踪。
-- 未 clone 的人（同事、云端 agent）开箱可用：产物自包含且提交在项目仓里；只有改规则才需要 clone。
+```
+引擎    harness-factory/                      本机唯一一份；升级 = 在这里 git pull
+数据    harness-factory/.workspaces/<proj>/   集中、gitignored、不建 git
+产物    <每个项目根>/AGENTS.md 等              分散（下条墙所致）、全走 .git/info/exclude
+```
+
+- **无 clone-per-project**。v2 的「每项目 clone 到 `harness/`」是给团队/多机分发写的，本场景只有 1–3 个 workspace，那份膨胀与 N 次 pull 都不必存在。
+- **一条挪不动的墙**：平台从各自项目树向上发现文件（Codex/Trae 找项目根 `AGENTS.md`，Claude 找项目根 `CLAUDE.md` + `.claude/`），所以**产物必须落在每个项目根**，不可集中存放。数据集中、产物分散是这个模型唯一 unavoidable 的两段式。
+- **产物一律不提交**：写进项目的 `.git/info/exclude`（100% 本地，连一行 tracked 的 `.gitignore` 改动都不留，业务仓零污染）。产物是纯派生物，源在 `.workspaces/`。
+- **引擎定位**：产物头部写死 engine 绝对路径 + 渲染所用 commit。hook 从项目内读自己根下的产物即拿到一切，无需任何全局注册表。
+- **版本错开靠 pin，不靠多份 clone**：pin = `.workspaces/<proj>/state.json` 记录的「渲染时引擎 commit」。语义是随**编译产物**进入项目的，引擎只是编译器——小说写到第 40 章时不重渲染，该项目的 `AGENTS.md` 就还停在旧 commit 的语义上。SessionStart 只提示「停在 X，要不要跟」，**绝不自动跟**。
+- **数据不建 git，靠快照兜底**：PostToolUse hook 在写 `.workspaces/<proj>/**` 任何事实文件前，把旧版复制到 `.workspaces/<proj>/.bak/<名>.<时间戳>`，只留最近 20 份。伏笔表被覆盖不再不可恢复，且用户不需要记得提交任何东西。
 
 ## 4. 中央仓结构
 
 ```
 harness-factory/
-├── README.md                  给人：三层模型 + 5 分钟上手 + clone 接入
+├── README.md                  给人：三层模型 + 5 分钟上手
 ├── .agents/skills/            ★ 技能唯一仓（Agent Skills 规范），Trae/Codex 直读
 │   ├── code/  novel/  news/  shared/
 ├── engine/                    ── 编译唯一输入，全 markdown，AI 读的规则源 ──
@@ -58,56 +69,58 @@ harness-factory/
 │   ├── runbooks/              onboarding.md / update.md / multi-task.md / maintenance.md
 │   └── platforms/             claude.md / codex.md / trae.md / workbuddy.md（平台方言）
 ├── compiler/                  ── TS，实现细节，不供人读 ──
-│   ├── render.ts              纯函数：engine + route + 方言 + .harness 事实 → 产物
+│   ├── render.ts              纯函数：engine + route + 方言 + workspace 事实 → 产物
 │   ├── sync-skills.ts         .agents/skills/ → claude/codebuddy 技能目录（幂等拷贝）
 │   ├── lint.ts                CI 闸门（硬数字见 §11）
-│   ├── hx.ts                  逃生口（npm run harness），不是命令系统
+│   ├── hx.ts                  逃生口（npm run harness）：onboard / render / audit
 │   ├── platforms/*.ts         四份薄清单生成器，每家 ~40 行，唯一的差异存放处
 │   ├── hooks/                 session-start.ts / post-tool-use.ts / stop.ts（§10）
 │   └── verify/                code/ + novel/ 确定性校验（零依赖，不调 LLM）
+├── .workspaces/               [本仓 .gitignore] 每项目私有数据，见 §5
 ├── tests/                     golden render / lint 自测 / hook 契约 / sync 幂等 smoke
 └── docs/design.md             本文档
 ```
 
 `engine`（给 AI 读的规则）与 `skills`（按需加载的正文）的区别是**目录级身份**——前者编译进一页纸，后者只被索引——不是仓库级。单仓，不分第二仓（v2 §10 已否决，继承）。
 
-## 5. 工作区侧目录
+## 5. workspace 侧目录
 
 ```
-<workspace>/
-├── harness/                    [clone，被本项目 gitignore]
-├── .harness/                   [项目资产，被项目仓跟踪]
-│   ├── config.md               ★ 唯一常手写：路线、启用平台、门禁档覆盖
-│   ├── MEMORY.md               工作状态记忆 ≤100 行（novel 见 §9）
-│   ├── state.json              机器管：编译所用 commit、产物清单+hash、last_error
-│   ├── facts/profile.md        项目事实卡：技术栈、模块边界、验证命令
-│   └── novel/                  novel 线状态库（§9）
-├── AGENTS.md                   [产物] 根目录，Codex/Trae 原生零转换
-├── .claude/rules/HARNESS.md    [产物] claude 一页纸（项目 CLAUDE.md 用一行 @ 引它）
-├── .codebuddy/rules/HARNESS/RULE.mdc  [产物] workbuddy
-├── .claude/skills/  .codebuddy/skills/   [产物] sync-skills 拷贝
-└── .claude/settings.json  .codex/hooks.json  .codebuddy/settings.json  [半产物]
-                             harness 只维护自己的 hooks 段，merge 不覆盖别人的
+harness-factory/.workspaces/<proj>/     [数据源，gitignored]
+├── config.md            ★ 唯一常手写：项目根绝对路径、路线、启用平台、门禁档覆盖
+├── MEMORY.md            工作状态记忆 ≤100 行（novel 见 §9）
+├── state.json           机器管：渲染所用引擎 commit、产物清单+hash、last_error
+├── facts/profile.md     项目事实卡：技术栈、模块边界、验证命令
+├── novel/               novel 线状态库（§9）
+└── .bak/                hook 快照，最近 20 份
+
+<项目根>/                                [产物，全进 .git/info/exclude]
+├── AGENTS.md                            Codex/Trae 原生零转换
+├── .claude/rules/HARNESS.md             claude 一页纸（项目 CLAUDE.md 用一行 @ 引它）
+├── .codebuddy/rules/HARNESS/RULE.mdc    workbuddy
+├── .claude/skills/  .codebuddy/skills/  sync-skills 拷贝
+└── .claude/settings.json  .codex/hooks.json  .codebuddy/settings.json
+                             [半产物] harness 只维护自己的 hooks 段，merge 不覆盖别人的
 ```
 
-写作/新闻目录通常不是 git 仓：onboarding 时建议 `git init`，让 `.harness/` 与产物有版本备份。
+`<proj>` 目录名 = 项目根 `basename`。项目搬家 = 改 `config.md` 里的路径 + 重渲染，`.workspaces/` 下的目录名可 `git mv` 式手改（本仓不跟踪它）。
 
 ## 6. 一页纸启动契约
 
 每平台产物是**自包含**一页纸，硬预算 **≤120 行**，超预算 = CI 失败。**多跳加载只允许发生在 L 档**（那时才读 `contracts/`）；S/M 全程一页纸内闭环。hop count 是一等指标，约束由最弱平台（Trae，无 hook）决定。
 
-产物头打 `GENERATED BY harness — DO NOT EDIT`；harness 只拥有自己生成的文件，不吞项目自有文档。
+产物头打 `GENERATED BY harness — DO NOT EDIT` + engine 绝对路径 + 渲染 commit；harness 只拥有自己生成的文件，不吞项目自有文档。
 
 START.md 母版骨架（实测约 70 行正文 + 生成头）：
 
 | 段 | 行数 | 来源 |
 |---|---|---|
-| 身份：当前路线 / 当前档 / 工作区名 | 4 | `.harness/config.md` |
+| 身份：当前路线 / 当前档 / 项目名 | 4 | `config.md` |
 | R1–R8 行为规则 | 8 | `engine/START.md` |
 | 门禁声明格式（开工第一句 `Harness: S\|M\|L`） | 3 | `engine/gates.md` |
 | 当前档的 动笔前 / 干活中 / 交付时 要求 | 8 | `engine/gates.md` |
 | **本路线管线不变量**（不随档升降） | 6 | `engine/routes/<line>.md` |
-| 项目事实摘要 | ≤10 | `.harness/facts/profile.md` |
+| 项目事实摘要 | ≤10 | `facts/profile.md` |
 | 技能索引（名称 + 一行触发词，≤15 条） | ≤15 | route 档案的 `skills:` |
 | 记忆边界令 | 3 | `engine/START.md` |
 | 证据总则一句 | 1 | `engine/START.md` |
@@ -118,7 +131,7 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 |---|---|---|---|
 | 动笔前 | 无 | 一段话方案，**等确认** | spec 落盘→停→plan 落盘→停 |
 | 干活中 | 直接改 | 直接改 | 按 plan；多 task 走 `runbooks/multi-task.md` |
-| 交付时 | 口头证据（动了什么/跑了什么/结果） | 证据追加 `.harness/` 日志 | `closeout.md` 落盘；未落盘禁称「批次完成」 |
+| 交付时 | 口头证据（动了什么/跑了什么/结果） | 证据追加 workspace 日志 | `closeout.md` 落盘；未落盘禁称「批次完成」 |
 
 开工第一句声明 `Harness: S｜M｜L`。用户可显式改档；**agent 禁止悄悄降档**；升档随时。
 
@@ -133,7 +146,7 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 
 1. **默认档 + 强制升档触发** —— 进一页纸
 2. **路线管线** —— 无论 S/M/L 都必须跑完，标明「不随档升降」
-3. **状态契约** —— `.harness/<line>/` 下必须存在哪些事实文件
+3. **状态契约** —— `.workspaces/<proj>/` 下必须存在哪些事实文件
 4. **技能引用清单** —— 一页纸只带名称 + 一行触发，正文按需加载
 
 **code** —— 默认 M。工作区签名 = 存在 `pom.xml` / `package.json` / `go.mod`。强制升 L：跨模块改动、多 task 派发。管线不变量：改前必读、改后必跑验证、无证据不称完成。
@@ -151,7 +164,7 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 **二、状态不是备忘，是数据库。**
 
 ```
-.harness/novel/
+.workspaces/<proj>/novel/
 ├── book.md          书名·题材·目标字数·正文目录指针·本书不可违的三条硬设定   ≤40 行
 ├── chapters.md      章节索引表：n | 标题 | 一句话 | 字数 | 状态              机器可解析
 ├── characters.md    人物卡：存亡 | 弧光阶段 | 末次出场章 | 称谓与别名表
@@ -159,7 +172,7 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 └── voice.md         人称与时态 | 节奏样本 | 禁用套路句清单
 ```
 
-正文路径由 `book.md` 声明（默认 `manuscript/`），因有人按卷分目录、有人按章平铺。
+正文路径由 `book.md` 声明（默认项目根 `manuscript/`），因有人按卷分目录、有人按章平铺。
 `MEMORY.md` 在 novel 线下只准留两行：**当前章号 + 本章意图**，其余越界 = lint 失败。
 
 **三、一致性归机检，文笔才归 LLM。** 死人开口、伏笔烂尾、章节缺号、字数塌陷——四类全部可确定性检查。用 LLM 审稿抓一致性是 v1 的错（贵、漏、判得不一致）。`compiler/verify/novel/`：
@@ -183,8 +196,8 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 
 | 我们的动作 | Claude Code | Codex | WorkBuddy(CodeBuddy) | Trae |
 |---|---|---|---|---|
-| 会话起：HEAD 变化→重编译 + 注入上下文 | `SessionStart` matcher `startup\|resume\|compact` | 同 | 同 | **无 hook**（手动 `npm run harness`） |
-| 写文件后：跑 verify | `PostToolUse` matcher `Write\|Edit\|MultiEdit` | `PostToolUse` matcher `Write\|Edit\|apply_patch` | `PostToolUse` matcher `Write\|Edit` | 无 |
+| 会话起：引擎有新 commit→提示 + 注入上下文 | `SessionStart` matcher `startup\|resume\|compact` | 同 | 同 | **无 hook**（手动 `npm run harness`） |
+| 写文件后：快照 + 跑 verify | `PostToolUse` matcher `Write\|Edit\|MultiEdit` | `PostToolUse` matcher `Write\|Edit\|apply_patch` | `PostToolUse` matcher `Write\|Edit` | 无 |
 | 收尾前：无证据不许停 | `Stop` | `Stop` | `Stop` | 无 |
 
 实现层三个入口，共享一个决策模块：`compiler/hooks/session-start.ts`、`post-tool-use.ts`、`stop.ts`。
@@ -204,15 +217,15 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 - `START.md` 渲染产物 ≤120 行；`routes/*.md` ≤60 行；`engine/` 正文总量 ≤400 行
 - `.agents/skills/` 技能总数 ≤100，**且每个被 ≥1 条 route 引用**（未被引用 = 失败）
 - 一页纸每路线技能引用 ≤15
-- `engine/` 与 `skills/` 中出现具体项目名、绝对路径、技术栈细节 = 失败（项目事实只准住 `.harness/`）
-- 产物可复现：重编译 diff 必须为空
-- novel 线下 `.harness/MEMORY.md` 除「当前章号 + 本章意图」外不得有额外条目
+- `engine/` 与 `skills/` 中出现具体项目名、绝对路径、技术栈细节 = 失败（项目事实只准住 `.workspaces/`）
+- 产物可复现：重渲染 diff 必须为空
+- novel 线下 `MEMORY.md` 除「当前章号 + 本章意图」外不得有额外条目
 
-## 12. 防漂移三道防线（继承 v2 §8）
+## 12. 防漂移三道防线
 
-1. **上游只读，git 执法**：engine/skills/compiler 就地改 → `git status` 脏 → hook 警告「升级即丢，请挪进 `.harness/` 或回传上游」。（v1 死于共享内容就地分化，此为其结构性解法。）
+1. **上游只读，git 执法**：`engine/` `skills/` `compiler/` 就地改 → `git status` 脏 → hook 警告「这是共享内容，就地改会在下次 pull 时打架」。若确属改进 → 提交并 push 上游；若确属项目特化 → 挪进 `.workspaces/<proj>/`。（v1 死于共享内容就地分化，此为其结构性解法。）
 2. **lint 静态执法**：§11 全部数字。
-3. **版本 pin 到工作区**：pin = 各 clone 的 commit，升级逐仓独立，殃及池鱼不可能。
+3. **pin 到 workspace**：`.workspaces/<proj>/state.json` 记渲染 commit；不重渲染 = 语义不变；SessionStart 只报不跟（§3）。
 
 记忆边界令（写进 `START.md`）：**「状态进 MEMORY，事实进 profile，教训进平台记忆——三不许越界」**。平台原生记忆（如 Claude auto-memory）只准记「与用户的协作经验」，禁止记工作状态。
 
@@ -234,10 +247,11 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 **总原则：工具链坏了不能连带工作坏了。** 四家平台的会话都不该因 harness 报错而卡住。
 
 - hook 内任何异常 → `exit 0` + 一行 `systemMessage`。永不抛出、永不阻塞。
-- 探测不到 Node 或版本 < 26.8 → 静默退出，把原因写 `.harness/state.json.last_error`，下次 SessionStart 报告**一次**（不重复刷屏）。
-- 产物被手改（hash 不匹配）→ 警告并**保留用户改动不覆盖**，提示「挪进 `.harness/` 或回传上游」。
-- 无 hook 平台（Trae）→ 一页纸自包含 + 收尾前要求人跑 `npm run harness`；novel 机检在 `closeout` 阶段由 AI 主动执行。
-- `harness/` clone 不存在 → 所有 hook 首行 `[ -d harness ] || exit 0`；同事与云端 agent 靠项目仓里已提交的产物开箱可用。
+- 探测不到 Node 或版本 < 26.8 → 静默退出，把原因写 `state.json.last_error`，下次 SessionStart 报告**一次**（不重复刷屏）。
+- 产物被手改（hash 不匹配）→ 警告并**保留用户改动不覆盖**，提示「这是派生物，改源请改 `.workspaces/`」。
+- `.workspaces/<proj>/` 不存在而项目根有产物 → 判定为 workspace 丢失或项目搬家：**拒绝覆盖渲染**，只报错等人确认（此为唯一不允许自动决策的分支，因为方向不明）。
+- 无 hook 平台（Trae）→ 一页纸自包含 + 收尾前要求人跑 `npm run harness`；novel 机检在 `closeout` 阶段由 AI 主动执行；快照因此不存在，novel 状态改动靠 `.bak/` 之外的手动备份。
+- 项目根不在 `config.md` 登记过 → hook 首行找不到 workspace 即 `exit 0`，未 onboarding 的仓完全无感。
 
 ## 15. 测试策略
 
@@ -247,7 +261,8 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 | 行数预算 | §11 硬数字 | 渲染产物 ≤120 行；route ≤60 行 |
 | lint 自测 | 闸门真的会拦 | 喂故意超预算 / 带项目名的样本，断言失败 |
 | hook 契约 | 四家事件语义 | 对每家清单里每个事件名喂固定 stdin JSON，断言 exit code 与 stdout 形状符合该平台规则（重点：Codex `Stop` 必须 JSON） |
-| sync 幂等 | 拷贝不制造漂移 | 临时 fixture 工作区跑两次 sync，第二次 diff 必须为空 |
+| sync 幂等 | 拷贝不制造漂移 | 临时 fixture workspace 跑两次 sync，第二次 diff 必须为空 |
+| 快照 | 兜底真的兜住 | 改 `foreshadowing.md` 后 `.bak/` 有旧版；写第 21 次后第 1 份已被回收 |
 | verify 金样例 | novel 机检有效 | 预置「死人出场」「伏笔超期」「章节缺号」样本，断言各自命中 |
 
 ## 16. 落地路线
@@ -256,13 +271,13 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 
 - **Step 0 · 内核**（首周 6 个文件）：`engine/START.md`、`engine/gates.md`、`engine/routes/code.md`、`engine/platforms/codex.md`、`compiler/render.ts`、`compiler/hooks/session-start.ts`。
   **先在 Codex 上跑通而不是 Claude**——Codex 是零转换平台（根 `AGENTS.md` 原生读），能最干净地证明「一页纸 + 原生直读」成立；Claude 有插件系统兜底，反而掩盖接线缺陷。
-- **Step 1 · 单项目接通**：在 `aigc_platfrom_back` clone + 编译 + hook 全链路跑通（novel/news 档案先占位不启用）。接通即改业务仓：`CLAUDE.md` harness 节改引产物、删 `.claude/HARNESS-RULES.md`（其内容即产物）、清理 `harness-factory|foundry|kit` 旧引用、`.gitignore` 加 `harness/`。
+- **Step 1 · 单项目接通**：建 `.workspaces/aigc_platfrom_back/`（config + facts + state）→ 渲染进 `aigc_platfrom_back/` 根 → 写其 `.git/info/exclude` → 两个 hook 全链路跑通（novel/news 档案先占位不启用）。同批改业务仓**唯一一处 tracked 文件**：`CLAUDE.md` harness 节改引产物，并清理 `harness-factory|foundry|kit` 旧引用与 `.claude/HARNESS-RULES.md`。
 - **Step 2 · 旧账退役**：foundry 本地删 + GitHub archive；kit（被业务仓 tracked）走业务仓提交删除；v1 技能按 §9/§8 引用清单逐个搬运（**搬时修剪并改写为平台中立**，不原文 vendor）。
-- **Step 3 · 铺面**：novel 线（`.harness/novel/` 五文件 + 三个机检脚本 + 11 技能）、news 线（5 技能链）、`platforms/trae.md` 与 `workbuddy.md` 定稿、写作库与新闻目录各跑一次 onboarding。
+- **Step 3 · 铺面**：novel 线（`novel/` 五文件 + 三个机检脚本 + 11 技能 + 快照）、news 线（5 技能链）、`platforms/trae.md` 与 `workbuddy.md` 定稿、写作库与新闻目录各跑一次 onboarding。
 
 ## 17. 已否决方案（防未来反复）
 
-v2 §10 全量继承，另加本轮 5 条：
+v2 §10 全量继承，另加本轮 7 条：
 
 | 否决项 | 理由 |
 |---|---|
@@ -270,12 +285,16 @@ v2 §10 全量继承，另加本轮 5 条：
 | 四家各写一份 hook 逻辑 | 事件词表已证实同源，分写 = 制造 v1 式漂移 |
 | 按 Trae 可能有 hook 来设计门禁 | 证据矛盾。按下界设计，证实后只升级不重构 |
 | ≤100 技能原文 vendor | 会重新长成 v1 的 316 文件。改为「候选池 ≤100 + 每个被引用 + 改写为平台中立」 |
-| 用 `.harness/MEMORY.md` 装小说状态 | 上千行结构化事实塞进 100 行预算必然失效 |
+| 用 `MEMORY.md` 装小说状态 | 上千行结构化事实塞进 100 行预算必然失效 |
 | 用 LLM 审稿抓小说连续性 | 可确定性检查的东西不该交给不确定、且每次都判得不一样的东西 |
+| 每项目 `git clone` 引擎到 `harness/` | 本场景 1–3 个 workspace，clone 是 1 份引擎 × N 份膨胀 + N 次 pull，且「版本隔离」这个卖点用 `state.json` 的 pin 就能拿到 |
+| 机器本地项目注册表 + `--pull-all` | 为 N 次 pull 设计，而 N 次 pull 是上一条否决制造出来的问题。引擎单实例后不存在它 |
+| 产物提交进项目仓（`track` 开关） | 无共享对象。要用了自己 clone、自管 workspace |
+| `.workspaces/` 自己 `git init` | 用户明确「不提交」。误删风险改由 hook 的 `.bak/` 快照兜底——机制兜底优先于人守规矩 |
 
 ## 18. 遗留开放问题（不阻塞 Step 0/1）
 
-- `.harness/MEMORY.md` 与 Claude auto-memory 的读写竞态细节：先按边界令执行，跑一个批次再收。
-- 多机（公司/家用不同机器）clone 与 pull 的同步习惯：v1 未暴露，暂不设计。
+- `MEMORY.md` 与 Claude auto-memory 的读写竞态细节：先按边界令执行，跑一个批次再收。
 - Codex skills 系统的实际发现路径（`.agents/skills/` 直读 or 需 `config.toml` 声明）：Step 0 在真 Codex 上验，若需声明则 `compiler/platforms/codex.ts` 加一行清单。
 - Trae `Include AGENTS.md in context` 与 `.agents` 开关是**用户级 UI 开关**，无法由文件写入完成：onboarding runbook 里列为人工两步 checklist。
+- 快照保留 20 份这个数是拍的：跑一段真实小说工作后按 `.bak/` 命中率调。
