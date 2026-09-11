@@ -105,6 +105,92 @@ harness-factory/.workspaces/<proj>/     [数据源，gitignored]
 
 `<proj>` 目录名 = 项目根 `basename`。项目搬家 = 改 `config.md` 里的路径 + 重渲染，`.workspaces/` 下的目录名可 `git mv` 式手改（本仓不跟踪它）。
 
+### 5.1 全貌：引擎侧
+
+Step 3 结束时的完整形态。`[T]` = 本仓 tracked，`[I]` = gitignored：
+
+```
+harness-factory/
+├── README.md                        [T] ≤80 行   三层模型 + 5 分钟上手 + 否决清单指路
+├── package.json tsconfig.json       [T]          §13；无构建步骤
+├── .gitignore                       [T]          新增 .workspaces/
+├── .agents/skills/                  [T] ≤100 个技能目录，每个 SKILL.md ≤150 行
+│   ├── shared/    verification-before-completion systematic-debugging brainstorming
+│   │              writing-plans executing-plans code-review requesting-code-review
+│   │              receiving-code-review subagent-driven-development dispatching-parallel-agents
+│   │              using-git-worktrees finishing-a-development-branch doc-review humanizer-zh
+│   ├── code/      tdd domain-modeling codebase-design prototype diagnosing-bugs
+│   │              resolving-merge-conflicts improve-codebase-architecture lang-java lang-ts
+│   ├── novel/     writing-novel novel-protocol novel-36-beats novel-contexts
+│   │              novel-foreshadowing-dag novel-voice-profile novel-guardian novel-evaluator
+│   │              novel-mechanical-scorer novel-simplify novel-safe-revision
+│   └── news/      news-generator news-polish fact-check
+├── engine/                          [T] 全 markdown，正文总量 ≤400 行
+│   ├── START.md                     一页纸母版：R1–R8 + 记忆边界令 + 证据总则      ≤90
+│   ├── gates.md                     S/M/L 定义、声明格式、升降档规则                    ≤45
+│   ├── routes/code.md               四件套（§8）                                      ≤60
+│   ├── routes/novel.md                                                                     ≤60
+│   ├── routes/news.md                                                                      ≤60
+│   ├── contracts/spec.md plan.md verification.md closeout.md   仅 L 档展开，4 × ≤40       ≤160
+│   ├── runbooks/onboarding.md         人工两步 checklist（Trae UI 开关）+ 新仓接入话术      ≤35
+│   ├── runbooks/update.md             pull → 报每个 workspace 的 pin 差异 → 选择性重渲染    ≤25
+│   ├── runbooks/multi-task.md         WU 拆分 / 角色 / worktree（自 v1 orchestration 收薄） ≤45
+│   ├── runbooks/maintenance.md        加技能/加路线/加平台三条路径                          ≤30
+│   └── platforms/claude.md codex.md trae.md workbuddy.md   方言，每家 ≤25
+├── compiler/                        [T] TS，唯一允许存在平台差异的地方
+│   ├── hx.ts render.ts lint.ts sync-skills.ts
+│   ├── platforms/{claude,codex,trae,workbuddy}.ts   清单生成器，每家 ~40 行
+│   ├── hooks/{session-start,post-tool-use,stop}.ts  + 共享 decision 模块
+│   └── verify/code/*.ts  verify/novel/{check-index,check-continuity,check-voice}.ts
+├── tests/                           [T] §15 六层，fixtures 住 tests/fixtures/
+├── docs/design.md                   [T] 本文档（唯一设计事实源）
+└── .workspaces/                     [I] 私有数据，见 §5；本仓永不跟踪
+    ├── aigc_platfrom_back/
+    ├── <novel 项目>/  <news 项目>/
+    └── 各自 .bak/
+```
+
+引擎侧 tracked 文件总量目标：**engine 14 + compiler ~20 + skills ≤100 + tests ~8 + 根 6 ≈ 148**，对照 v1 的 316（其中 skills 占 316 里的绝大多数）。
+
+### 5.2 全貌：业务项目侧（`aigc_platfrom_back/`）
+
+**全部经 `.git/info/exclude` 隐藏，业务仓 0 个 tracked 文件因 harness 而新增**；唯一一处 tracked 改动是 `CLAUDE.md` 的 harness 节改引产物。
+
+```
+aigc_platfrom_back/
+├── harness-factory/            [excluded]  引擎。当前是 untracked(??)，Step 1 起进 exclude
+├── AGENTS.md                   [excluded]  渲染产物，Codex/Trae 读
+├── CLAUDE.md                   [tracked]   改 3 行：harness 节 → @.claude/rules/HARNESS.md
+├── .claude/rules/HARNESS.md    [excluded]  渲染产物
+├── .claude/skills/             [excluded]  sync-skills 拷贝
+├── .claude/settings.json       [半产物]    只追加 harness 的 hooks 段
+├── .codex/hooks.json           [excluded]  渲染产物
+├── .codebuddy/                 [excluded]  rules + skills + settings
+└── (harness-foundry/ harness-kit/ 已删；.claude/HARNESS-RULES.md 删)
+```
+
+novel / news 目录同构，只是通常非 git 仓 → 无 `info/exclude` 可用，产物裸放在目录里（本就不提交）。
+
+### 5.3 v1 → v2 退役映射
+
+| v1 | 文件数 | 归宿 |
+|---|---|---|
+| `core/`（含 specs/、orchestration/、traps.md） | 34 | → `engine/{START,gates,routes,contracts,runbooks}`。**砍 specs/ 与 orchestration/ 两个独立层**：orchestration 收薄为 `runbooks/multi-task.md`（v1 的 dispatcher-workflow 183 行是「入口链过长」的主要成因），specs/ 的尾盘/worktree 并入 contracts |
+| `routes/{code,novel,news}/MEMORY.md` | 3 | 拆成两半：**规则** → `engine/routes/<line>.md`（唯一真内容），**实例** → `.workspaces/<proj>/`。空模板从此不住共享区 |
+| `skills/`（39 active + 50 archive） | 316 | → `.agents/skills/` ≤100，搬运时逐个改写为平台中立。**archive 整层删除**——git 历史就是归档，第二份副本正是 v1 的 18 份 vendored 分化之源 |
+| `platforms/*/rules/ENTRY.md`（4 份占位骨架） | 4 | 拆为 `engine/platforms/*.md`（方言正文）+ `compiler/platforms/*.ts`（清单生成）。占位骨架里那句 "Trae hook support is limited" 由 §10 的真矩阵取代 |
+| `capabilities/rules/{java,typescript,common}` | 12 | 语言无关的 → `engine/routes/code.md`；**语言细节 → `.agents/skills/code/lang-{java,ts}/`**。按需加载正文不配占一页纸预算 |
+| `artifact-templates/` | 16 | → `engine/contracts/` 4 个。其余 12 个是 L 档产物模板且 v1 期间从未被用过 |
+| `project/{profile,git,verification}.md` + templates + onboarding | 10 | → `.workspaces/<proj>/{config.md,facts/profile.md}` + `engine/runbooks/onboarding.md`。**★ v1 最大结构错误：项目实例住在共享仓内** |
+| `entrypoints/` | 6 | 删。职责由 `compiler/platforms/*.ts` 生成产物承担 |
+| `schemas/` | 3 | 删。v2 无 JSON schema 需求——产物是 markdown，lint 查行数与关键词即可 |
+| `scripts/bootstrap.ts` 等 | 7 | → `compiler/`。**bootstrap 之死是核心**：投影 stub 的模型整体否决（§2a） |
+| `mcp-config/` | 1 | 删。MCP 配置属个人机器，不属规则仓 |
+| `ENTRY.md` `ARCHITECTURE.md` | 2 | ENTRY → `engine/START.md`；ARCHITECTURE 并入本文档（一份事实源） |
+| `README.md` `package.json` `tsconfig.json` `.gitignore` | 4 | 原地重写/替换 |
+
+teardown 形式：`main` 上一个 `chore(v1): teardown` 提交删掉 251 个 md，映射表在此留档，实施时按 §16 Step 2 逐目录搬运。
+
 ## 6. 一页纸启动契约
 
 每平台产物是**自包含**一页纸，硬预算 **≤120 行**，超预算 = CI 失败。**多跳加载只允许发生在 L 档**（那时才读 `contracts/`）；S/M 全程一页纸内闭环。hop count 是一等指标，约束由最弱平台（Trae，无 hook）决定。
@@ -272,6 +358,7 @@ START.md 母版骨架（实测约 70 行正文 + 生成头）：
 - **Step 0 · 内核**（首周 6 个文件）：`engine/START.md`、`engine/gates.md`、`engine/routes/code.md`、`engine/platforms/codex.md`、`compiler/render.ts`、`compiler/hooks/session-start.ts`。
   **先在 Codex 上跑通而不是 Claude**——Codex 是零转换平台（根 `AGENTS.md` 原生读），能最干净地证明「一页纸 + 原生直读」成立；Claude 有插件系统兜底，反而掩盖接线缺陷。
 - **Step 1 · 单项目接通**：建 `.workspaces/aigc_platfrom_back/`（config + facts + state）→ 渲染进 `aigc_platfrom_back/` 根 → 写其 `.git/info/exclude` → 两个 hook 全链路跑通（novel/news 档案先占位不启用）。同批改业务仓**唯一一处 tracked 文件**：`CLAUDE.md` harness 节改引产物，并清理 `harness-factory|foundry|kit` 旧引用与 `.claude/HARNESS-RULES.md`。
+  **实测前置**：父仓当前未 ignore `harness-factory/`（`git status` 显示 `??`，0 tracked 文件），316 个文件常年挂在业务仓 status 里，一次 `git add .` 即被吞为 gitlink。Step 1 第一件事是把 `harness-factory/` 写进父仓 `.git/info/exclude`。
 - **Step 2 · 旧账退役**：foundry 本地删 + GitHub archive；kit（被业务仓 tracked）走业务仓提交删除；v1 技能按 §9/§8 引用清单逐个搬运（**搬时修剪并改写为平台中立**，不原文 vendor）。
 - **Step 3 · 铺面**：novel 线（`novel/` 五文件 + 三个机检脚本 + 11 技能 + 快照）、news 线（5 技能链）、`platforms/trae.md` 与 `workbuddy.md` 定稿、写作库与新闻目录各跑一次 onboarding。
 
