@@ -1,19 +1,18 @@
 {
   "name": "harness-factory",
-  "version": "0.3.0",
-  "description": "Clean skeleton for shipping harness rules to 4 AI platforms",
+  "version": "2.1.0",
+  "description": "Harness v2.1: one rules source, four AI platforms, three work routes (code / novel / news). Single install; per-project artifacts rendered; per-project state in .workspaces/. See docs/design.md.",
   "private": true,
   "type": "module",
   "scripts": {
-    "bootstrap": "tsx scripts/bootstrap.ts",
-    "validate": "tsx tests/validate-schemas.ts",
-    "typecheck": "tsc --noEmit",
-    "index": "tsx tests/build-index.ts",
-    "test": "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts"
+    "harness": "node --experimental-strip-types compiler/render.ts",
+    "check":   "node --experimental-strip-types compiler/lint.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
-    "tsx": "^4.19.0",
-    "typescript": "^5.6.0"
+    "typescript": "^7.0.2"
+  },
+  "engines": {
+    "node": ">=26.8.2"
   }
 }

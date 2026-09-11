@@ -1,7 +1,0 @@
-{
-  "name": "add-skill",
-  "description": "Add a new skill to harness-factory. Walks through SKILL.md + _meta.json creation, schema validation, and bootstrap sync.",
-  "tags": ["Runbook"],
-  "triggers": ["add skill", "new skill", "create skill", "add a skill"],
-  "version": "0.1.0"
-}

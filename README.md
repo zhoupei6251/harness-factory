@@ -1,71 +1,54 @@
-# Harness Factory
+# harness-factory
 
-Single source of truth for harness rules across 4 AI platforms (Claude / Codex / Trae / WorkBuddy) and 3 routes (code / novel / news). Replaces `harness-foundry` (retired: too heavy) and `harness-kit` (retired: machinery merged here).
+让 Claude / Codex / Trae / WorkBuddy 四个 AI 平台，在 **代码 / 长篇小说 / 新闻** 三条路线上按同一套流程纪律工作。完整设计见 [`docs/design.md`](docs/design.md)（唯一事实源）；本文件是入口地图。
 
-## Core idea: one shared set + thin platform shims
+## 三本账（§5.4）
 
-All platforms consume the **same canonical content** (`core/`, `routes/`, `skills/`, `artifact-templates/`). Per-platform output is a thin stub that references the shared files — no content duplication, no drift. Platform-specific deltas live in `platforms/<plat>/rules/ENTRY.md` and override the canonical entry.
+任何文件先问：会不会被下次任务当事实读。**会** → `harness-factory/.workspaces/<proj>/`；**不会** → 项目根 `.ai-runtime-artifacts/`；是**程序** → 在这里。
 
-## Quick start (5 minutes)
-
-```bash
-npm install
-npm run typecheck   # tsc --noEmit
-npm run validate    # check schemas + skills
-npm run bootstrap -- --platform all --route code --target <your project root>
-```
-
-Shim mode (default) writes thin stubs into `<target>/.claude/`, `.codex/`, `.trae/`, `.codebuddy/` referencing this factory, creates runtime dirs, and seeds `MEMORY.md` from the route template (never clobbers an existing one). Use `--mode copy` for the legacy full-copy behavior.
-
-## Layout
+## 顶层目录
 
 ```
 harness-factory/
-├── ENTRY.md                  # single entry point
-├── ARCHITECTURE.md           # design rationale + directory map
-├── core/                     # ENGINE — don't edit per-project
-│   ├── *.md                  #   routing(阶段门禁/路由表) / runbooks / artifacts /
-│   │                         #   verification / NEVER / principles / traps ...
-│   ├── specs/                #   authoritative workflow specs (尾盘, worktree isolation)
-│   └── orchestration/        #   multi-task dispatch: WU, DISPATCH-TRACK, roles
-├── project/                  # PROJECT INSTANCE — edit these per repo ★
-│   ├── profile.md            #   identity, stack, module map
-│   ├── git.md                #   git deltas vs org baseline
-│   ├── verification.md       #   verification commands
-│   ├── templates/            #   blank templates (profile/git/verification/context-map)
-│   └── onboarding/           #   bootstrap prompts for AI
-├── artifact-templates/       # spec/plan/decision/collective-test/code-review overlays
-├── capabilities/rules/       # per-language rules (java, typescript, common)
-├── platforms/                # 4 thin adapters with per-platform rules
-├── entrypoints/              # per-platform entry templates (CLAUDE.md, AGENTS.omx.md...)
-├── routes/                   # 3 route templates (code / novel / news)
-├── skills/                   # active skills + skills/archive/ (restorable)
-├── schemas/                  # 3 JSON schemas
-├── scripts/                  # bootstrap.ts + operational shell helpers
-├── tests/                    # validate-schemas, build-index, bootstrap smoke
-└── mcp-config/               # codebase-memory MCP config
+├── README.md            本文件
+├── LICENSE
+├── package.json tsconfig.json   scripts: harness / check；零运行时依赖（§13）
+├── .gitignore .gitattributes
+│
+├── engine/              17 个文件，规则源。AI 读的唯一正文
+│                        ├── START.md  gates.md  routes/  contracts/  runbooks/  platforms/
+├── agents/              10 个文件，组织图（§8.2，名单见 agents/README.md）
+│                        ├── README.md  leader.md  8 × 职员
+├── .agents/skills/      ≤100 个技能：「怎么做」，跨工具收敛
+│                        ├── shared/  code/  novel/  news/
+│                        路径以 agentskills.io 规范为准，**不可挪动**——
+│                        Trae / Codex 通过 `.agents/skills/` 直读
+├── compiler/            TS，唯一允许存在平台差异的地方（§2b）
+│                        ├── render.ts lint.ts sync-skills.ts evals-runner.ts
+│                        ├── platforms/  hooks/  verify/
+├── tests/               单元 + golden render（§15）
+├── evals/               ≤12 case：行为评测（§15）
+│                        ├── README.md  coding/ writing/ news/
+├── docs/design.md       唯一设计事实源（约 28 KB / 14 节）
+└── .workspaces/         每项目一个子目录，gitignored 状态
+                         ├── aigc_platfrom_back/  <novel>/  <news>/
 ```
 
-Reading order: `ENTRY.md` → `core/routing.md` → per-intent docs. Per-project edits belong to `project/` only.
+`engine/` 与 `.agents/skills/` 不合并：前者是**编译输入**（薄），后者是**正文库**（厚）；
+硬并导致一页纸要么太长要么引用太多。
+`agents/` 与 `.agents/skills/` 不同名：技能跨工具收敛（一份四家吃），agent 各家格式互不相认（这里只是薄薄的母版，渲染成四份平台产物）——**可共享性相反**。
 
-## How to add things
+## 5 分钟上手
 
-| Want to add | Read |
-|---|---|
-| A skill | `skills/add-skill/SKILL.md` |
-| A platform (Cursor, Copilot, etc.) | `skills/add-platform/SKILL.md` |
-| A route (podcast, video, etc.) | `skills/add-route/SKILL.md` |
-| A capability doc | Just write `capabilities/<name>/SKILL.md` |
+```bash
+npm install                              # devDeps 仅 typescript + @types/node
+npm run harness                          # 渲染（产物落进各项目根，见 §3）
+npm run check                            # lint（CI 闸门）
+```
 
-Skills are split into two tiers:
+Step 0 之前只有 `engine/START.md` `engine/gates.md` `engine/routes/code.md` `engine/platforms/codex.md` 是真文件；
+其余目录先建骨架是 §16 的顺序原则（**先证引擎、后退旧账、最后铺面**）。
 
-- **`skills/`** — active, in use (code workflow, codebase tools, news/writing, meta).
-- **`skills/archive/`** — not in use, kept restorable. Enable one: `git mv skills/archive/<name> skills/<name> && npm run index`.
+## 已否决
 
-## npm scripts
-
-- `npm run bootstrap -- --platform X --route Y [--mode shim|copy] [--target dir]` — project canonical to platform format
-- `npm run validate` — schema + skill check (active + archive)
-- `npm run typecheck` — TypeScript type check
-- `npm run index` — regenerate `skills/INDEX.md` (Active + Archived sections)
-- `npm test` — runs both validate and bootstrap smoke test
+`docs/design.md` §17 全表 15 条，包括：四平台 hook 分写、Trae 按可能有 hook 来设计、产物提交进项目仓、`<100 技能原文 vendor`、bootstrap 投影 stub。新决策冲突先查 §17。
