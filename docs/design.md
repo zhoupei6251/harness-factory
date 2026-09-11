@@ -3,7 +3,7 @@
 - 日期：2026-09-11
 - 状态：**设计完成，待实施**（未开始写实现）
 - 前身：harness-foundry（退役）/ harness-kit（退役）/ harness-factory v1（原地推翻）/ **v2 设计文档**（`../../docs/plans/2026-09-11-harness-factory-v2-design.md`，已标 superseded）
-- v2.1 = v2 全部结构决策 **+ 9 处修订**（7 处因新查证的事实，2 处因用户决定）。v2 的 §10「已否决方案」**全量继承**，不重开。
+- v2.1 = v2 全部结构决策 **+ 10 处修订**（8 处因新查证的事实，2 处因用户决定）。v2 的 §10「已否决方案」**全量继承**，不重开。
 
 ## 0. 修订记录（相对 v2）
 
@@ -18,6 +18,7 @@
 | 7 | 技能「只收 ~15 个」 | **候选池 ≤100 且每个被 ≥1 条 route 引用（lint 执法）；一页纸每路线引用 ≤15** | 调和用户「≤100 全养料」与 v2 少技能原则 |
 | 8 | Trae/WorkBuddy 技能落点「Step 3 到真平台验证」 | 落点**当场定稿**；Trae hook 能力证据矛盾 → **按无 hook 下界设计** | docs.trae.ai/ide/skills 给出 `.trae/skills/` 与 `.agents/skills/`；hook 证据冲突（§10） |
 | 9 | 分发 = 每项目 `git clone` 到 `harness/`，项目数据住项目根 `.harness/` | **引擎单实例（就住本仓，无 clone）+ 数据集中在 `harness-factory/.workspaces/<proj>/`（gitignored）+ 产物分散渲染到各项目根（全忽略）** | 用户决定；且「每项目 clone」是给不存在的共享需求设计的 |
+| 10 | 无 agent 层（v2 §4 的 engine/ 里没有 `agents/`） | **两层组织模型**：CEO = 用户、director = 主线程 agent、职员 = 三个 subagent（§8.1 §8.2） | 查证：subagent 一律拿不到 `AskUserQuestion` → 持门禁权者不能是 subagent；`Agent(type)` 白名单仅对主线程 agent 生效；嵌套默认三层 |
 
 ## 1. 目标与定位
 
@@ -111,11 +112,12 @@ harness-factory/
 │   │              novel-mechanical-scorer novel-simplify novel-safe-revision
 │   └── news/      news-generator news-polish fact-check
 ├── engine/                          [T] 全 markdown；一页纸输入源 ≤225 行（§11）
-│   ├── START.md                     一页纸母版：R1–R8（R7=记忆边界令）+ 收尾自检 + agent 索引  69 ✓
+│   ├── START.md                     一页纸母版：R1–R8（R7=记忆边界令）+ 收尾自检 + agent 索引  70 ✓
 │   ├── gates.md                     S/M/L 唯一定义 + 三个 4 行可抽取块              60 ✓
 │   ├── routes/code.md               四件套（§8）                                      ≤60
 │   ├── routes/novel.md                                                                     ≤60
 │   ├── routes/news.md                                                                      ≤60
+│   ├── agents/director.md             主线程编排者：有 Agent 无写权限（§8.2）           ≤15
 │   ├── agents/explorer.md implementer.md reviewer.md  角色+禁用工具，各 ≤15（§8.1）
 │   ├── contracts/spec.md plan.md verification.md closeout.md   仅 L 档展开，4 × ≤40       ≤160
 │   ├── runbooks/onboarding.md         人工两步 checklist（Trae UI 开关）+ 新仓接入话术      ≤35
@@ -136,8 +138,8 @@ harness-factory/
     └── 各自 .bak/
 ```
 
-引擎侧 tracked 文件总量目标：**engine 20 + compiler ~20 + skills ≤100 + tests ~8 + 根 6 ≈ 154**，对照 v1 的 316（其中 skills 占 316 里的绝大多数）。
-（engine 20 = START 1 + gates 1 + routes 3 + agents 3 + contracts 4 + runbooks 4 + platforms 4）
+引擎侧 tracked 文件总量目标：**engine 21 + compiler ~20 + skills ≤100 + tests ~8 + 根 6 ≈ 155**，对照 v1 的 316（其中 skills 占 316 里的绝大多数）。
+（engine 21 = START 1 + gates 1 + routes 3 + agents 4 + contracts 4 + runbooks 4 + platforms 4）
 
 ### 5.2 全貌：业务项目侧（`aigc_platfrom_back/`）
 
@@ -150,7 +152,8 @@ aigc_platfrom_back/
 ├── CLAUDE.md                   [tracked]   改 3 行：harness 节 → @.claude/rules/HARNESS.md
 ├── .claude/rules/HARNESS.md    [excluded]  渲染产物
 ├── .claude/skills/             [excluded]  sync-skills 拷贝
-├── .claude/agents/             [excluded]  三份 agent，格式由 compiler 生成（§8.1）
+├── .claude/agents/             [excluded]  explorer/implementer/reviewer 三份 subagent + director 一份主线程角色（§8.1 §8.2），格式由 compiler 生成
+├── .claude/commands/           [excluded]  Step 3：/harness-status、/harness-mode（§10.1）
 ├── .claude/settings.json       [半产物]    只追加 harness 的 hooks 段
 ├── .codex/hooks.json           [excluded]  渲染产物
 ├── .codebuddy/                 [excluded]  rules + skills + settings
@@ -163,7 +166,7 @@ novel / news 目录同构，只是通常非 git 仓 → 无 `info/exclude` 可�
 
 | v1 | 文件数 | 归宿 |
 |---|---|---|
-| `core/`（含 specs/、orchestration/、traps.md） | 34 | → `engine/{START,gates,routes,contracts,runbooks}`。**砍 specs/ 与 orchestration/ 两个独立层**：orchestration 收薄为 `runbooks/multi-task.md`（v1 的 dispatcher-workflow 183 行是「入口链过长」的主要成因），其中的 leader/coder/reviewer **角色定义升为 `engine/agents/`**（§8.1），specs/ 的尾盘/worktree 并入 contracts |
+| `core/`（含 specs/、orchestration/、traps.md） | 34 | → `engine/{START,gates,routes,contracts,runbooks}`。**砍 specs/ 与 orchestration/ 两个独立层**：orchestration 收薄为 `runbooks/multi-task.md`（v1 的 dispatcher-workflow 183 行是「入口链过长」的主要成因）。其中七份角色定义按 §8.2 归位：**leader → director**（换层：从 subagent 改为主线程角色）；**coder + implementer → implementer**（两份合一，v1 的重复即角色膨胀实证）；**reviewer 留**；**debugger / test-engineer → 技能**（`systematic-debugging` / `tdd` 已在候选池，二者无独立权限形状）；**web-investigator → explorer**（同一能力，只是范围大）；specs/ 的尾盘/worktree 并入 contracts |
 | `routes/{code,novel,news}/MEMORY.md` | 3 | 拆成两半：**规则** → `engine/routes/<line>.md`（唯一真内容），**实例** → `.workspaces/<proj>/`。空模板从此不住共享区 |
 | `skills/`（39 active + 50 archive） | 316 | → `.agents/skills/` ≤100，搬运时逐个改写为平台中立。**archive 整层删除**——git 历史就是归档，第二份副本正是 v1 的 18 份 vendored 分化之源 |
 | `platforms/*/rules/ENTRY.md`（4 份占位骨架） | 4 | 拆为 `engine/platforms/*.md`（方言正文）+ `compiler/platforms/*.ts`（清单生成）。占位骨架里那句 "Trae hook support is limited" 由 §10 的真矩阵取代 |
@@ -185,7 +188,7 @@ teardown 形式：`main` 上一个 `chore(v1): teardown` 提交删掉 251 个 md
 
 产物头打 `GENERATED BY harness — DO NOT EDIT` + engine 绝对路径 + 渲染 commit；harness 只拥有自己生成的文件，不吞项目自有文档。
 
-START.md 母版骨架（**母版实测 65 行**；渲染产物构成如下）：
+START.md 母版骨架（**行数一律以 `wc -l` 为准**，`lint.ts` 亦按此执法；渲染产物构成如下）：
 
 | 段 | 行数 | 来源 |
 |---|---|---|
@@ -197,9 +200,9 @@ START.md 母版骨架（**母版实测 65 行**；渲染产物构成如下）：
 | 项目事实摘要 | ≤10 | `.workspaces/<proj>/facts/profile.md` |
 | 技能索引（名称 + 一行触发词，≤15 条） | ≤15 | route 档案 skills 段 |
 | 收尾自检 | 4 | `engine/START.md` |
-| 可用 agent 一行（细节仅 L 档展开，§8.1） | 1 | `engine/agents/` |
+| 可用 agent 两行（名单 + CEO/director 分层；细节仅 L 档展开，§8.1 §8.2） | 2 | `engine/agents/` |
 | 段落标题与空行（9 段 × 2） | 18 | render |
-| **合计** | **≈76 / ≤120** | 余量 44 行 |
+| **合计** | **≈77 / ≤120** | 余量 43 行 |
 
 预算成立的两个前提，写进 `lint.ts`：`gates.md` 每个 `<!-- gate:X -->` 块**恰好 4 行**（已实测 4/4/4），
 `routes/<line>.md` 的 pipeline 段 ≤6 行、skills 段 ≤15 条。超了不是渲染截断，是 CI 红。
@@ -247,7 +250,7 @@ START.md 母版骨架（**母版实测 65 行**；渲染产物构成如下）：
 
 判据：**agent 存在的唯一理由是权限隔离。** 只换提示词不收紧工具集的 agent = 一段没必要的独立上下文，应该写成技能。`subagent-driven-development`、`dispatching-parallel-agents` 留在 `shared/` 技能里——它们是「怎么用 agent」，本身不是 agent。
 
-只留三个，每个以「禁止什么」定义：
+「权限隔离」隔离的是**能力**，不是**话题**。这条判据顺带否掉「一件事一个 agent」的写法：v1 的 `core/orchestration/agents/` 有七份角色文件共 838 行（leader / coder / implementer / reviewer / debugger / test-engineer / web-investigator），其中 `coder.md`(205) 与 `implementer.md`(121) 是同一件事的两份定义——**角色膨胀在 v1 已经漂移过一次**。v2.1 按能力划，只留三个「职员」agent，每个以「禁止什么」定义：
 
 | agent | 工具集 | 为何不能降级成技能 |
 |---|---|---|
@@ -255,7 +258,32 @@ START.md 母版骨架（**母版实测 65 行**；渲染产物构成如下）：
 | `implementer` | 可写 + 必跑验证 | 执行与编排分离：plan 交下去，回来的只有 diff 与证据 |
 | `reviewer` | 只读，**物理禁写** | 挑刺的人改不了代码才是真 reviewer——这是机制，提示词给不了 |
 
-canonical 定义放 `engine/agents/`（不放 `.agents/agents/`：那是凭空发明规范里没有的子目录，且 `.agents/` 这个名字已足够让人误以为它装 agent）。每份 ≤15 行。一页纸只多一行「可用 agent：explorer / implementer / reviewer」，细节仅 L 档从 `runbooks/multi-task.md` 展开——120 行预算不受影响。
+canonical 定义放 `engine/agents/`（不放 `.agents/agents/`：那是凭空发明规范里没有的子目录，且 `.agents/` 这个名字已足够让人误以为它装 agent）。每份 ≤15 行。一页纸的 agent 段共两行——一行名单（四个）、一行分层（§8.2），细节仅 L 档从 `runbooks/multi-task.md` 展开，预算实测 ≈77/≤120（§6）。
+
+### 8.2 组织分层：CEO 不是 agent，director 是，职员是
+
+「CEO / leader / 职员」是**委派拓扑**（谁 spawn 谁、谁向谁汇报、谁拥有哪个文件）；上面三个是**职能**（对文件能做什么）。两根正交的轴，不能混成一张名单。展开成两层结构，每层由一条**已查证的机制事实**定位：
+
+| 层 | 是谁 | 为什么在这一层 |
+|---|---|---|
+| **CEO** | **用户本人** | v1 `leader.md` 写的职责是「对甲方汇报」——甲方不是 agent。拍板权不可下放，因为下面两条 |
+| **director** | `engine/agents/director.md` → 渲染成**主线程 agent**（Claude：`--agent` / `agent` 设置），**不是**被 spawn 的 subagent | ① 它要问用户要确认，而 **`AskUserQuestion` 对所有 subagent 一律移除，无论 `tools` 怎么写**（官方原文），所以持有门禁权的角色不可能做成 subagent；② 只有主线程 agent 才支持 `tools: Agent(director, explorer, implementer, reviewer)` 白名单语法（官方：subagent 定义里的类型列表被忽略）；③ 权限隔离成立且唯一：**它有 `Agent`，没有 `Write`/`Edit`** |
+| **职员** | `explorer` / `implementer` / `reviewer`（§8.1） | 各自隔离一种能力：禁写 / 必跑验证 / 物理禁写 |
+
+**director 的价值不是「多一个人格」，是把 v1 的一句自律变成物理约束**：v1 `dispatcher-workflow.md` 写「**禁止** Leader 在主线程直接修改业务代码」——靠提示词守；v2.1 给 director 的工具集里没有 `Write`/`Edit`，它想顺手改也改不了。这正是 §8.1 判据要的样子，也是它不违反 §17「第四个 agent」那条否决的理由：那条否的是**第四种职能**（tester/planner），而 director 是**另一种权限形状**。
+
+**为什么不做成三层组织图（CEO+leader+staff 都是 agent）**——三条已查证的代价：
+
+1. 子 agent 只回一段摘要（原文：*Only the top-level subagent's summary returns to you*）。多套一层 = 主会话离证据远一层，而 R3「没有证据不得声称完成」要求主会话能贴出原始输出。**层级每深一层，证据的保真度掉一次。**
+2. 官方明确列出不该委派的场景：「任务需要频繁来回」「多阶段共享上下文——planning、implementation、testing」。L 档批次恰好两者都是。
+3. 委派链上每个环节都问不了用户，于是 spec/plan 的「等确认」要经两段传话回到用户面前。**门禁的确认通道会变长且不可靠。**
+
+**降级与方言**：`--agent` 主线程切换是 Claude Code 的机制。Codex / Trae / WorkBuddy 是否有等价物 = §18 待验。按下界设计：**没有主线程 agent 切换的平台不渲染 director**，其规矩退化为 `runbooks/multi-task.md` 的文本纪律（能派发就派发，不能就顺序执行），结构不变（§2b）。director 是**第四个 agent，也是最后一个**：再加先回答「它隔离了哪种能力」。
+
+两条落地细节，避免实现时踩歧义：
+
+- **同一个目录，不同的调用路径**。`director.md` 与三个职员一起渲染进 `.claude/agents/`——差别不在文件位置，在于它由 `--agent director` / `agent` 设置**选为主线程角色**，而不是被 `Agent` 工具 spawn。渲染器要在文件头注释里写明这一点，否则下一个读引擎的人会以为漏配了 spawn 关系。
+- **director 身份只在 L 档生效**。S/M 档主会话就是干活的人（S 档定义即「直接改」）。所以这条规矩写在 `gates.md` 的 L 块「干活中」行里（该行同时写明**不亲自改业务文件**），不写进 R1–R8——写进 R 表等于要求 S 档也先派发再改一个错别字。
 
 ## 9. novel 线（v2.1 新增细化）
 
@@ -312,15 +340,25 @@ canonical 定义放 `engine/agents/`（不放 `.agents/agents/`：那是凭空�
 - CodeBuddy 另有 `PostToolUseFailure` / `StopFailure` 与 `type: prompt|agent|http` 四种 hook；v2.1 只用 `command`，不用 prompt-hook（它在门禁里引入 LLM 不确定性，与「机制兜底」矛盾）。
 - Trae 侧走**产物自包含 + 无 hook 降级**（§6 hop 预算、§14 降级）。Trae hook 能力证据矛盾（第三方 issue 称支持同协议，社区文档称 2025-12 仍无）——不赌，按下界设计；日后证实只需把降级升级为拦截，结构不变。
 
+### 10.1 从 ponytail 借的两件（它没有组织图，但有两件我们没有的机制）
+
+ponytail 是「模式 + hook + benchmark」型 harness，**grep 全文无 CEO/leader/staff 概念**（`ceo|orchestrat|dispatcher|leader|crew|worker|staff` 只命中 4 个非角色文件），所以 §8.2 的组织模型不来自它。可借的是它的机制形状：
+
+1. **档位声明要可观测，不靠自律**（借它 `hooks/ponytail-mode-tracker.js` + statusline 的形状）。现状：`开工第一句必须声明 Harness: X` 是一句提示词，没有东西在检查。改法：`UserPromptSubmit`（三家共有）扫首轮是否出现声明 → 未出现则 `additionalContext` 补一句「未声明档」并记入 `state.json`；statusline 显示当前档。**门禁的第一道执法从「AI 自觉」变成「有人看着」**——与 §17 里 `.bak/` 兜底是同一条原则（机制优先于规则密度）。
+2. **薄 slash command 作为用户侧入口**（借它 `commands/ponytail*.toml` 逐平台一份的形状）。本设计「无命令化」否的是**用户要记 CLI**，但把「接入 harness」「切 director」留给自由文本，等于把可靠性押在 AI 认得出话术上。补一类产物：`/harness-status`（当前档 + pin + 产物是否脏）与 `/harness-mode`（切档 / 切 director），每家 ≤10 行，由 `compiler/platforms/*.ts` 生成。**排 Step 3**：Step 0/1 只验证渲染链路，不引入新的产物类别。
+
+不借的：12 平台镜像目录（平台数是预算，§17）、A/B benchmark 台架（§17）、它的 markdown 正文风格（与本仓中文规则文风不合）。
+
 ## 11. lint 硬数字（构建闸门）
 
 超了即失败，写进 `compiler/lint.ts`：
 
 - 渲染产物 ≤120 行；`gates.md` 每个 `<!-- gate:X -->` 块恰好 4 行；`routes/*.md` ≤60 行（pipeline 段 ≤6、skills 段 ≤15）
-- **一页纸输入源**（`START.md` + `gates.md` + 单个 `routes/<line>.md`）总量 ≤225 行 —— 实测 69 + 60 + ≤60 = ≤189
+- **一页纸输入源**（`START.md` + `gates.md` + 单个 `routes/<line>.md`）总量 ≤225 行 —— 实测 70 + 60 + ≤60 = ≤190
   （`contracts/` `runbooks/` `platforms/` 不计：前两者只在 L 档或人读时展开，方言每家 ≤25）
 - `.agents/skills/` 技能总数 ≤100，**且每个被 ≥1 条 route 引用**（未被引用 = 失败）
-- `engine/agents/*.md` 每份 ≤15 行，且**必须显式声明被禁的工具类别**；未声明 = 失败——不声明即默认全给，agent 就退化成换皮的技能（§8.1 判据）
+- `engine/agents/*.md` 每份 ≤15 行（**共 4 份，硬上限 4**，第五份要先进 §17 讨论），且**必须显式声明被禁的工具类别**；未声明 = 失败——不声明即默认全给，agent 就退化成换皮的技能（§8.1 判据）
+- `director.md` 必须同时声明「拥有 `Agent`」与「禁用 `Write`/`Edit`」两项（§8.2 的权限形状就是它存在的全部理由；缺任一项 = 失败）
 - 一页纸每路线技能引用 ≤15
 - `engine/` 与 `skills/` 中出现具体项目名、绝对路径、技术栈细节 = 失败（项目事实只准住 `.workspaces/`）
 - 产物可复现：重渲染 diff 必须为空
@@ -379,11 +417,11 @@ canonical 定义放 `engine/agents/`（不放 `.agents/agents/`：那是凭空�
 - **Step 1 · 单项目接通**：建 `.workspaces/aigc_platfrom_back/`（config + facts + state）→ 渲染进 `aigc_platfrom_back/` 根 → 写其 `.git/info/exclude` → 两个 hook 全链路跑通（novel/news 档案先占位不启用）。同批改业务仓**唯一一处 tracked 文件**：`CLAUDE.md` harness 节改引产物，并清理 `harness-factory|foundry|kit` 旧引用与 `.claude/HARNESS-RULES.md`。
   **实测前置**：父仓当前未 ignore `harness-factory/`（`git status` 显示 `??`，0 tracked 文件），316 个文件常年挂在业务仓 status 里，一次 `git add .` 即被吞为 gitlink。Step 1 第一件事是把 `harness-factory/` 写进父仓 `.git/info/exclude`。
 - **Step 2 · 旧账退役**：foundry 本地删 + GitHub archive；kit（被业务仓 tracked）走业务仓提交删除；v1 技能按 §9/§8 引用清单逐个搬运（**搬时修剪并改写为平台中立**，不原文 vendor）。
-- **Step 3 · 铺面**：novel 线（`novel/` 五文件 + 三个机检脚本 + 11 技能 + 快照）、news 线（5 技能链）、`platforms/trae.md` 与 `workbuddy.md` 定稿、写作库与新闻目录各跑一次 onboarding。
+- **Step 3 · 铺面**：novel 线（`novel/` 五文件 + 三个机检脚本 + 11 技能 + 快照）、news 线（5 技能链）、`platforms/trae.md` 与 `workbuddy.md` 定稿、写作库与新闻目录各跑一次 onboarding。**agent 层此时才扩**：① 在真平台验 `--agent` 式主线程切换有几家支持（§18），据结果决定 `director.md` 渲染给谁（§8.2）；② 加两个 slash command 与「档位声明可观测」hook（§10.1）——它们引入 `commands/` 这一新产物类别，故排在渲染链路证明之后。
 
 ## 17. 已否决方案（防未来反复）
 
-v2 §10 全量继承，另加本轮 7 条：
+v2 §10 全量继承，另加本设计自己的 15 条：
 
 | 否决项 | 理由 |
 |---|---|
@@ -398,7 +436,10 @@ v2 §10 全量继承，另加本轮 7 条：
 | 产物提交进项目仓（`track` 开关） | 无共享对象。要用了自己 clone、自管 workspace |
 | `.workspaces/` 自己 `git init` | 用户明确「不提交」。误删风险改由 hook 的 `.bak/` 快照兜底——机制兜底优先于人守规矩 |
 | canonical agent 放 `.agents/agents/` | 该目录受 agentskills.io 规范管辖，只定义 `skills/`；凭空发明子目录 = 假装存在一个不存在的规范 |
-| 第四个 agent（tester / planner / leader…） | 权限隔离是 agent 的唯一理由，三个已覆盖只读摸底 / 可写执行 / 只读挑刺。再加先回答「为什么不写成技能」 |
+| 第四个**职员** agent（tester / planner / debug-engineer…） | 权限隔离是 agent 的唯一理由，三个职员已覆盖只读摸底 / 可写执行 / 只读挑刺。再加先回答「它隔离了哪种能力，为什么不写成技能」。v1 七份角色 838 行里 `coder.md` 与 `implementer.md` 重复即为此病 |
+| director 做成**被 spawn 的 subagent**（三层组织图 CEO→leader→staff 全是 agent） | 三条已查证代价（§8.2）：subagent 一律拿不到 `AskUserQuestion`，问不了用户 = 守不了需要「等确认」的门禁；只回一段摘要，层级越深证据保真度越低；官方点名 planning/implementation/testing 三阶段共享上下文时不该委派 |
+| ponytail 式 A/B benchmark（`--arms baseline,caveman,ponytail --models haiku --runs 4`） | 那是给「公开卖点」准备的。单人工具、无 CI、被测物每 commit 在动，跑一次的 token 成本高于它给出的信息量。改留 §15 的 golden render + 真平台手测 |
+| 12 平台镜像目录（ponytail 有 `.cursor` `.qoder` `.windsurf` `.kiro` `.clinerules` `.grok` `.devin` `.opencode` `.github`…） | 每多一家 = 多一份要人维护的镜像，正是 v1 的死因。平台数是本设计的一等预算，v2.1 硬锁 4 家；第 5 家先讨论预算 |
 
 ## 18. 遗留开放问题（不阻塞 Step 0/1）
 
@@ -406,3 +447,4 @@ v2 §10 全量继承，另加本轮 7 条：
 - Codex skills 系统的实际发现路径（`.agents/skills/` 直读 or 需 `config.toml` 声明）：Step 0 在真 Codex 上验，若需声明则 `compiler/platforms/codex.ts` 加一行清单。
 - Trae `Include AGENTS.md in context` 与 `.agents` 开关是**用户级 UI 开关**，无法由文件写入完成：onboarding runbook 里列为人工两步 checklist。
 - 快照保留 20 份这个数是拍的：跑一段真实小说工作后按 `.bak/` 命中率调。
+- **director 的平台支持面**：Codex / Trae / WorkBuddy 有无「把整个会话切成某个 agent 定义」的等价物（Claude 侧是 `--agent` / `agent` 设置）。三家全缺则 director 退化为 claude 独家方言（§8.2 已给不阻塞的下界）；若 ≥2 家有，则 `compiler/platforms/*.ts` 各加一份产物。Step 3 在真平台验。

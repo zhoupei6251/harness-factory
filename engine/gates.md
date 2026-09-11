@@ -35,7 +35,7 @@
 
 <!-- gate:L -->
 动笔前：`contracts/spec.md` 落盘 → 停 → 等确认 → `contracts/plan.md` 落盘 → 停 → 等确认。
-干活中：严格按 plan 执行；多 task 走 `runbooks/multi-task.md`。
+干活中：严格按 plan 执行，以 director 身份派发职员 agent，**不亲自改业务文件**；多 task 走 `runbooks/multi-task.md`。
 交付时：`contracts/closeout.md` 落盘。**未落盘禁止称「批次完成」。**
 证据形态：三件套 + 每条验收项逐条打勾 + 验证命令原始输出。
 <!-- /gate:L -->

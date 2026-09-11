@@ -60,6 +60,7 @@ render 按 `{{gate}}` 从 `engine/gates.md` 取四行（动笔前 / 干活中 / 
 ## 可用 agent
 
 {{agents.list}}——多 task 派发的规矩见 `runbooks/multi-task.md`（仅 L 档展开）。
+组织分层：**拍板的 CEO 是你（用户），不是 agent**；L 档以 director 身份编排（claude 侧可 `--agent director` 切主线程角色，其余平台本节即下界）。
 
 ## 收尾自检
 
