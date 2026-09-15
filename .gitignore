@@ -11,6 +11,3 @@ build/
 dist/
 .tmp/
 .cache/
-
-# 私有运行时数据（每项目各管各的，永不出仓）
-.workspaces/

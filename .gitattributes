@@ -1,5 +1,0 @@
-# 产物必须逐字节可复现（§15 golden render），行尾不能交给各机器的 core.autocrlf
-* text=auto eol=lf
-*.json text eol=lf
-*.md text eol=lf
-*.ts text eol=lf
