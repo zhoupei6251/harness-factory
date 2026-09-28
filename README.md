@@ -1,6 +1,6 @@
 # Harness Factory
 
-Clean skeleton for shipping harness rules to 4 AI platforms (Claude / Codex / Trae / WorkBuddy) across 2 routes (code / news).
+Clean skeleton for shipping harness rules to 4 AI platforms (Claude / Codex / Trae / WorkBuddy) across 3 routes (code / novel / news).
 
 ## Why
 
@@ -42,7 +42,7 @@ harness-factory/
 ├── mcp-config/               # canonical MCP server snippets
 ├── platforms/                # 4 adapters with per-platform rules
 ├── references/               # traps.md + tooling.md (external tool setup)
-├── routes/                   # 2 route templates (code / news)
+├── routes/                   # 3 route templates (code / novel / news)
 ├── skills/                   # active skills (in use) + skills/archive/ (restorable on demand)
 ├── schemas/                  # 3 JSON schemas
 ├── scripts/bootstrap.ts      # projects canonical to platform format

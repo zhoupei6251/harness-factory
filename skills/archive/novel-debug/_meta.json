@@ -1,0 +1,10 @@
+{
+  "slug": "novel-debug",
+  "category": "novel.baseline",
+  "domain": "novel",
+  "tags": [
+    "novel",
+    "baseline"
+  ],
+  "purpose": "情节矛盾/角色冲突/伏笔遗漏排查与修复"
+}

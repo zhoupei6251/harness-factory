@@ -20,7 +20,7 @@ category: workflow
 - 需要分离 spec 检查和代码质量检查
 
 **不适用于**：
-- news 域（有独立的审查流程）
+- novel/news 域（各自有独立的审查流程）
 - 简单快速修复（可直接 reviewer 审查）
 
 ---

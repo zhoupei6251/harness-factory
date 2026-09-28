@@ -1,7 +1,7 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 36 active + 17 archived = 53 skills
+Total: 36 active + 51 archived = 87 skills
 
 ## Active (36)
 
@@ -44,7 +44,7 @@ Total: 36 active + 17 archived = 53 skills
 | understand-project | 理解项目结构和架构，生成知识图谱。触发：接手新项目、需要了解项目全局、询问架构设计。 |
 | writing-plans | Use when you have a spec or requirements for a multi-step task, before |
 
-## Archived (17)
+## Archived (51)
 
 > Not in active use. Restore via: `git mv skills/archive/<name> skills/<name>`
 
@@ -57,13 +57,47 @@ Total: 36 active + 17 archived = 53 skills
 | archive/code-insight-stack | 编排 codebase-memory + ripgrep + LSP 三层查询栈，按场景选择最便宜的工具组合。触发：探索陌生代码库、定位修改点、调查 bug、准备 refactor、计划实现、跨文件影 |
 | archive/cursor-orchestration | Cursor 多 subagent 并行编排，等价于 omx ultrawork。在用户已批准 plan 并说「开始实现」后，通过 harness-coder（代码）、harness-implemen |
 | archive/document-review | Systematic document review with type-specific rules. **Environment preparation** |
+| archive/fanqie | 用途与边界 |
+| archive/fanqie-novel-auto-publish | 番茄小说创作发布一条龙技能，整合 AI 创作与番茄发布，支持全自动批量上传、断点续传、错误重试、发布报告生成 |
 | archive/frontend-design | Create distinctive, production-grade frontend interfaces with high design |
+| archive/inkos | Autonomous novel writing CLI agent with web workbench (InkOS Studio) |
+| archive/junli-ai-novel | 长篇网文核心写作引擎，支持章节续写、扩写、重写，维护人物状态和伏笔追踪 |
 | archive/karpathy-guidelines | 写代码、审查代码、重构代码时的行为准则：先想再写、保持简单、只改必要的，目标驱动。code 域默认基线，P0 优先级。 |
-| archive/memory-manager | 通用项目记忆管理引擎，双域（code/news）共用架构，域隔离，状态机追踪，Agent 交接压缩协议 |
+| archive/memory-manager | 通用项目记忆管理引擎，三域（code/novel/news）共用架构，域隔离，状态机追踪，Agent 交接压缩协议 |
+| archive/novel-36-beats | 结构化节拍写作框架，基于 The Crucible Writing System 的 36-beat 三幕式结构，为长篇网文提供完整的情节骨架与节奏控制指南 |
+| archive/novel-ai-wash | 深度文风清洗引擎，四层清洗体系（词级→句式→叙事→人物声音），用于批量深度去AI味，与humanizer-zh互补 |
+| archive/novel-batch-write | 批量写作模式，当用户说"写到第N章"时触发，自动并行/串行写作 |
+| archive/novel-checkpoint | 创建、验证写作进度检查点，确保批量写作不丢失上下文 |
+| archive/novel-contexts | 小说上下文管理，维护角色设定、世界观、时间线的全局一致性 |
+| archive/novel-dashboard | 小说进度仪表板，显示当前书籍状态、章节进度、人物和伏笔状态 |
+| archive/novel-debug | 情节排查：角色矛盾/伏笔遗漏/节奏失控。发现问题后加载。 |
+| archive/novel-evaluator | 7维量化小说评分系统，基于情节/人物/文笔/世界观/情感/创新/钩子进行质量审查，联动63条陷阱检测，逐条引用原文举证 |
+| archive/novel-foreshadowing-dag | 伏笔有向无环图管理 — 借鉴 Openwrite 伏笔DAG系统，结构化管理和追踪所有伏笔的埋设、触发和回收 |
+| archive/novel-generator | 根据用户提供的内容方向自动生成提示词并创作爽文小说。适用场景：(1) 用户提供小说方向/题材/关键词，(2) 需要生成章节连贯的长篇爽文，(3) 需要维护角色、地点、情节的连续性 |
+| archive/novel-guardian | 法医式事实核查 Agent — 借鉴 Novel-OS Guardian，专门检查角色/时间线/世界观/情节的连续性 |
+| archive/novel-guidelines | 小说写作前思维基线：AI 陷阱 + 简洁原则。写章节/大纲/续写前必须加载。 |
+| archive/novel-improver | 双平台长篇改进skill。将长篇小说系统性地改良至番茄9.0+或起点精品标准。适用于：用户要求"改良小说"、"提升评分"、"去AI味"、"平台优化"、"让小说达到9.0+"等情况。覆盖多维度评审、结构 |
+| archive/novel-init | 新书创作向导，帮助用户从零开始创建小说项目 |
+| archive/novel-mechanical-scorer | 无LLM的确定性章节质量评分器 — 借鉴 autonovel (NousResearch) 机械评分器，在LLM审稿前做纯规则检查 |
+| archive/novel-metrics | 写作指标追踪，统计字数、速度、质量趋势 |
+| archive/novel-orchestrator | 小说创作总控调度器，协调 writer→planner→reviewer→humanizer→editor→memory-keeper 全链路，管理阶段门禁和返修闭环 |
+| archive/novel-protocol | 长篇网文写作协议——渐进式披露入口 + 因果链一致性强制。解决长篇小说两大痛点：(1) 全量加载 416KB novel 规则导致 token 浪费与注意力稀释；(2) 跨章世界观漂移、能力凭空出现、 |
+| archive/novel-quick-write | 快速单章写作，无需完整编排流程。适用于"写第X章"类型的简单写作任务 |
+| archive/novel-receiving-review | 接收审稿反馈，正确处理修改建议，不是盲目接受或机械执行 |
+| archive/novel-recovery | 会话恢复，当用户重新打开会话时恢复小说写作进度 |
+| archive/novel-safe-revision | 安全返修：审稿后小步修改，验证不破坏其他章节。 |
+| archive/novel-simplify | 章节自查：AI 痕迹/冗余/套路化。写后审稿前必须自查。 |
+| archive/novel-voice-profile | 为小说角色建立可复用的声音档案（Voice Profile），借鉴 ECC brand-voice 的 Source-First 方法论 |
+| archive/novel-writer-cn | 创建小说创作框架，包括人物设定、人物关系、剧情发展和多版本结局。Use when users ask to write novels, create story plots, design chara |
+| archive/piqie-writing | 番茄爆款写作技能（融合版）— 500章+350章两次长篇实战教训。快节奏爆款专项：3章一爽、平台算法适配、新人破零路径。触发场景：写番茄小说、写网文爆款、快节奏章节。 |
 | archive/prompt-engineering-expert | Advanced expert in prompt engineering, custom instructions design, and |
+| archive/qidian-writing | 起点中文网写作技能 — 慢热品质专项：设定硬、人物真、每章信息增量。基于《黑龙醒》前100章实战 + 起点读者行为分析。触发场景：写起点小说、慢热品质文、群像展开。 |
 | archive/security-auditor | Use when reviewing code for security vulnerabilities, implementing authentication |
 | archive/summarize | Summarize URLs or files with the summarize CLI (web, PDFs, images, audio, |
 | archive/superdesign | Expert frontend design guidelines for creating beautiful, modern UIs. |
 | archive/ui-ux-pro-max | UI/UX design intelligence and implementation guidance for building polished |
 | archive/web-design-guidelines | 网页设计规范和最佳实践指南 |
+| archive/web-novel-publishing-readiness-and-quality-check-skill | 小说质量检查技能。触发关键词：检查正文、质量报告、违禁词、套路句、章节衔接、逻辑漏洞、自检、人写感、大纲、人设。执行最大算力深度推理五步链，每章必须跑freq_check.py词频扫描+逐行违禁词扫描 |
 | archive/web-tools-guide | Web 工具使用指南：搜索、网页抓取、浏览器自动化。触发：查资料、上网、搜索、打开网站。 |
+| archive/writing-novel | 长篇小说写作skill。从500+章实战中提炼的全流程方法论。覆盖大纲设计、逐章写作、质量控制、平台优化、AI味消除。适用于番茄小说等网文平台。触发场景：写小说、写网文、写章节、设计大纲、做人物设定。 |
+| archive/zhi-dou-writing | 智斗小说专属写作技能。融合《第九特区》《犯上者》《诡秘之主》《赘婿》等顶级智斗作品的创作精华，专注于写出有真人感、高智商博弈、强情绪节奏的智斗/权谋小说。触发场景：写智斗小说、写权谋文、写高智商对抗、 |

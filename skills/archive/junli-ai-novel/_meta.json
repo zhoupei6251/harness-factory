@@ -1,0 +1,10 @@
+{
+  "slug": "junli-ai-novel",
+  "category": "novel.creation",
+  "domain": "novel",
+  "tags": [
+    "novel",
+    "creation"
+  ],
+  "purpose": "长篇网文核心写作引擎，支持章节续写、扩写、重写，维护人物状态和伏笔追踪"
+}

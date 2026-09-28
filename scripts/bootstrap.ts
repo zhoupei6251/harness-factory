@@ -7,7 +7,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 
 type Platform = "claude" | "codex" | "trae" | "workbuddy";
-type Route = "code" | "news";
+type Route = "code" | "novel" | "news";
 
 const PLATFORMS: Platform[] = ["claude", "codex", "trae", "workbuddy"];
 
@@ -20,11 +20,13 @@ const PLATFORM_DIR: Record<Platform, string> = {
 
 const ROUTE_RUNTIME: Record<Route, string[]> = {
   code: ["specs", "plans", "decisions", "verifications"],
+  novel: ["plans", "memory", "tracking"],
   news: ["plans", "memory", "articles"],
 };
 
 const ROUTE_BASE: Record<Route, string> = {
   code: ".ai-runtime-artifacts",
+  novel: ".harness-novel-runtime",
   news: ".harness-news-runtime",
 };
 
@@ -42,14 +44,14 @@ function parseArgs(argv: string[]): { platform: Platform | "all"; route: Route }
       }
     } else if (argv[i] === "--route" && argv[i + 1]) {
       const r = argv[++i];
-      if (r === "code" || r === "news") {
+      if (r === "code" || r === "novel" || r === "news") {
         route = r as Route;
       } else {
         console.error(`Unknown route: ${r}`);
         process.exit(1);
       }
     } else if (argv[i] === "-h" || argv[i] === "--help") {
-      console.log("Usage: bootstrap.ts [--platform claude|codex|trae|workbuddy|all] [--route code|news]");
+      console.log("Usage: bootstrap.ts [--platform claude|codex|trae|workbuddy|all] [--route code|novel|news]");
       process.exit(0);
     }
   }

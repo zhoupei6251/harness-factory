@@ -1,6 +1,6 @@
 ---
 name: memory-manager
-description: 通用项目记忆管理引擎，双域（code/news）共用架构，域隔离，状态机追踪，Agent 交接压缩协议
+description: 通用项目记忆管理引擎，三域（code/novel/news）共用架构，域隔离，状态机追踪，Agent 交接压缩协议
 metadata:
   domains: [code, novel, news]
   priority: P0

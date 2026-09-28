@@ -33,6 +33,7 @@ tags: [Rules, Runbook]
 | Route | Load | Project to |
 |-------|------|-----------|
 | `code` | `routes/code/MEMORY.md` + `capabilities/rules/` | `./MEMORY.md` |
+| `novel` | `routes/novel/MEMORY.md` | `./MEMORY.md` |
 | `news` | `routes/news/MEMORY.md` + `capabilities/rules/` | `./MEMORY.md` |
 
 ## Platform mapping

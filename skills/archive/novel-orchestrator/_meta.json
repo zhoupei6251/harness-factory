@@ -1,0 +1,10 @@
+{
+  "slug": "novel-orchestrator",
+  "category": "novel.orchestration",
+  "domain": "novel",
+  "tags": [
+    "novel",
+    "orchestration"
+  ],
+  "purpose": "小说创作总控调度器，协调 writer→planner→reviewer→humanizer→editor→memory-keeper 全链路，管理阶段门禁和返修闭环"
+}

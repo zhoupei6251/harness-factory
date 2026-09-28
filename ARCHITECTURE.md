@@ -2,17 +2,17 @@
 
 ## Why this exists
 
-`harness-factory` is the lean replacement for `harness-foundry` (1290 files) and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: 271 source files (vs 669 in harness-foundry), TypeScript only, no empty placeholders.
+`harness-factory` is the lean replacement for `harness-foundry` (1290 files) and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: 350 source files (vs 669 in harness-foundry), TypeScript only, no empty placeholders.
 
 ## Current state
 
 | Metric | Count |
 |---|---|
-| Source files (excl `.git` + `node_modules`) | 271 |
+| Source files (excl `.git` + `node_modules`) | 350 |
 | Core governance docs | 8 |
 | Platform adapters | 4 (claude, codex, trae, workbuddy) — all with placeholder rules |
-| Routes | 2 (code, news) — both with MEMORY templates |
-| Skills | 53 (36 active in `skills/` + 17 archived in `skills/archive/`, all restorable) |
+| Routes | 3 (code, novel, news) — all with MEMORY templates |
+| Skills | 87 (36 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
 | MCP servers | 1 (codebase-memory only; wired via committed root `.mcp.json` + `mcp-config/` snippet — see `references/tooling.md`) |
 | Capability verticals (in `capabilities/rules/`) | 3 (java, typescript, common) |
 | Schemas | 3 |
@@ -23,8 +23,8 @@
 1. **Foundation**: `core/` — 8 governance docs. Mandatory, no variation.
 2. **Capabilities**: `capabilities/rules/{java,typescript,common}/` — per-language rules. Other capability verticals (eval, intelligence, memory, etc.) were removed in phase-5 as empty placeholders.
 3. **Platforms**: `platforms/<name>/rules/ENTRY.md` — 4 thin adapters. Per-platform deltas.
-4. **Routes**: `routes/<name>/MEMORY.md` — 2 vertical templates (code, news). Per-domain state.
-5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 36 active; 17 unused live in `skills/archive/` (same structure, restore via `git mv`).
+4. **Routes**: `routes/<name>/MEMORY.md` — 3 vertical templates (code, novel, news). Per-domain state.
+5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 36 active; 51 unused live in `skills/archive/` (same structure, restore via `git mv`).
 
 ## How a session works
 
@@ -53,7 +53,7 @@ session end
 | Cut | Was in | Ceiling | Upgrade path |
 |---|---|---|---|
 | 315-file Claude adapter mirror | harness-foundry | format drift | `npm run bootstrap` regenerates |
-| 9 novel scripts | harness-foundry | none | novel route retired entirely (see below) |
+| 9 novel scripts | harness-foundry | none | novel route restored in v2.5 (archive skills, no scripts) |
 | 7 skill-meta scripts | harness-foundry | manual frontmatter | 1 script when 3+ skill editors needed |
 | 4 test layers (L1/L2/L3-eval/L3-intelligence) | harness-foundry | platform drift | 1 layer per platform when added |
 | 694 md files | harness-foundry | doc bloat | write on demand |
@@ -62,7 +62,6 @@ session end
 | 15+ unused MCP servers | harness-foundry's mcp-servers.json | none (placeholders never filled) | add when actually used |
 | 5 harness-foundry leftover files in skills/ | `_layer.yaml`, `categories.yaml`, `INDEX.md`, `README.md` | none (auto-gen script gone) | replace with new `skills/INDEX.md` (phase-5) |
 | 9 empty capability placeholders | design intent | none (YAGNI) | recreate when first content lands |
-| novel route + 34 writing-domain archive skills | harness-factory ≤ v2.1 | none (domain retired) | none — code + news only |
 
 ## How to add things
 
