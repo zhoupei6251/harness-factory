@@ -66,3 +66,4 @@ route=news 的多阶段任务按本工作流走。状态记在 `routes/news/MEMO
 1. **fact-check 不可跳过**：任何进入 publishing 的稿件/口播文案，`fact_check` 字段必须是 passed
 2. **状态随做随记**：每阶段结束更新 MEMORY，跨会话不丢进度
 3. **选题裁决先于生产**：没定 track 之前不要同时启动两条轨
+4. **产物写 route 运行时目录**：稿件/成片落 `.harness-news-runtime/`（`articles/`、`videos/`），**不要**写 `.ai-runtime-artifacts/`——那是 code 路由的运行时目录（specs/plans/decisions/verifications），news 产物放错域会脱离本产线的状态跟踪
