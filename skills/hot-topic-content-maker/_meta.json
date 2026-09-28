@@ -1,0 +1,11 @@
+{
+  "slug": "hot-topic-content-maker",
+  "category": "news.production",
+  "domain": "news",
+  "source": "@beatra-ai/hot-topic-content-maker@0.2.5 (skillhub)",
+  "tags": [
+    "news",
+    "hot-topic",
+    "content"
+  ]
+}

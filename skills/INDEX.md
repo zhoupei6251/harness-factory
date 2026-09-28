@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 43 active + 51 archived = 94 skills
+Total: 45 active + 51 archived = 96 skills
 
-## Active (43)
+## Active (45)
 
 | Skill | Description |
 |-------|-------------|
@@ -18,12 +18,14 @@ Total: 43 active + 51 archived = 94 skills
 | cn-video-script-writer | 短视频脚本生成专家，面向抖音、B站、YouTube、小红书、视频号内容创作者，快速生成爆款脚本和文案。触发场景：用户提到"写脚本"、"短视频脚本"、"抖音文案"、"B站脚本"、"视频选题"、"直播话术 |
 | code-review | Systematic code review patterns covering security, performance, maintainability, |
 | douyin-copy-extract | 粘贴抖音、快手、小红书、视频号公开可访问的短视频分享链接，一键提取标题、简介、口播文案，提供原版、优化朗读版、精简浓缩版，并支持违禁敏感词提醒与口播时长参考，排版整洁纯净，一键复制即用。 |
+| douyin-pro | 抖音短视频双路径生产体系（单 Skill 版）。Path A[付费·高质量]：策略大脑→（可选：素材混剪/AI高光提取）→脚本优化→AI生图/素材准备→配音渲染（百炼/GPT-SoVITS/CosyV |
 | fact-check | 事实核查 skill，对新闻内容进行多源交叉验证 |
 | find-skills | Helps users discover and install agent skills when they ask questions |
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |
 | get-callers | 获取调用指定符号的所有代码。触发：想知道谁在调用某个方法、分析依赖、评估影响。 |
 | git-xywh | 组织级 Git 工作流：三主干（main / test / develop）、五类临时分支、多环境隔离、Angular 提交与 MR 流程；涵盖合并、变基、冲突、恢复。任务涉及分支、提测、热修、版本标 |
 | harness-health | 系统健康度检查 Skill — 一键输出所有子系统的健康状态 |
+| hot-topic-content-maker | 把一个热点，变成今天就能发出去的内容。热点、事件、节日节点由你带来，也可以让它去读抖音热榜、TikTok 与 X 的热搜榜与趋势，或者你报一个话题，让它去搜小红书和抖音上正在发的相关内容，把值得接的话 |
 | humanizer | Remove signs of AI-generated writing from text. Use when editing or reviewing |
 | humanizer-zh | 中文 AI 文风清洗，消除 AI 生成特征，去套路化，句式重构，人物声音分化 |
 | index-project | 为项目建立代码索引。触发：大型项目、需要精准定位符号、快速查找调用关系。 |

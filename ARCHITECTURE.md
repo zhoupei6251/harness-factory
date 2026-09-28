@@ -2,17 +2,17 @@
 
 ## Why this exists
 
-`harness-factory` is the lean replacement for `harness-foundry` (1290 files) and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: 366 source files (vs 669 in harness-foundry), TypeScript only, no empty placeholders.
+`harness-factory` is the lean replacement for `harness-foundry` (1290 files) and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: 430 source files (vs 669 in harness-foundry), TypeScript only, no empty placeholders.
 
 ## Current state
 
 | Metric | Count |
 |---|---|
-| Source files (excl `.git` + `node_modules`) | 366 |
+| Source files (excl `.git` + `node_modules`) | 430 |
 | Core governance docs | 8 |
 | Platform adapters | 4 (claude, codex, trae, workbuddy) — all with placeholder rules |
 | Routes | 3 (code, novel, news) — all with MEMORY templates |
-| Skills | 94 (43 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
+| Skills | 96 (45 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
 | MCP servers | 1 (codebase-memory only; wired via committed root `.mcp.json` + `mcp-config/` snippet — see `references/tooling.md`) |
 | Capability verticals (in `capabilities/rules/`) | 3 (java, typescript, common) |
 | Schemas | 3 |
@@ -24,7 +24,7 @@
 2. **Capabilities**: `capabilities/rules/{java,typescript,common}/` — per-language rules. Other capability verticals (eval, intelligence, memory, etc.) were removed in phase-5 as empty placeholders.
 3. **Platforms**: `platforms/<name>/rules/ENTRY.md` — 4 thin adapters. Per-platform deltas.
 4. **Routes**: `routes/<name>/MEMORY.md` — 3 vertical templates (code, novel, news). Per-domain state.
-5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 43 active; 51 unused live in `skills/archive/` (same structure, restore via `git mv`).
+5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 45 active; 51 unused live in `skills/archive/` (same structure, restore via `git mv`).
 
 ## How a session works
 

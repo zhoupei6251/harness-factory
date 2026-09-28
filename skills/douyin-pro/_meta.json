@@ -1,0 +1,11 @@
+{
+  "slug": "douyin-pro",
+  "category": "news.production",
+  "domain": "news",
+  "source": "@user_3b54b400/douyin-pro@2.1.0 (skillhub)",
+  "tags": [
+    "news",
+    "short-video",
+    "douyin"
+  ]
+}

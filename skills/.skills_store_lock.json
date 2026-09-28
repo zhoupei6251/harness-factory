@@ -36,6 +36,36 @@
       "source": "pack:media-short-video-copy",
       "version": "",
       "installedAt": "2026-09-28T07:39:17Z"
+    },
+    "@user_3b54b400/douyin-pro": {
+      "name": "自动化克隆数字人口播混剪视频",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=douyin-pro&namespace=user_3b54b400",
+      "source": "community",
+      "version": "2.1.0",
+      "namespace": {
+        "canonicalName": "@user_3b54b400/douyin-pro",
+        "displayName": "user_3b54b400",
+        "handle": "user_3b54b400",
+        "publicSlug": "douyin-pro"
+      },
+      "internalSlug": "douyin-pro",
+      "publicSlug": "douyin-pro",
+      "installDir": "D:\\work\\xinyue\\aigc_platfrom_back\\harness-factory\\skills\\@user_3b54b400\\douyin-pro"
+    },
+    "@beatra-ai/hot-topic-content-maker": {
+      "name": "热点选题",
+      "zip_url": "https://api.skillhub.cn/api/v1/download?slug=hot-topic-content-maker&namespace=beatra-ai",
+      "source": "enterprise",
+      "version": "0.2.5",
+      "namespace": {
+        "canonicalName": "@beatra-ai/hot-topic-content-maker",
+        "displayName": "beatra-ai",
+        "handle": "beatra-ai",
+        "publicSlug": "hot-topic-content-maker"
+      },
+      "internalSlug": "hot-topic-content-maker",
+      "publicSlug": "hot-topic-content-maker",
+      "installDir": "D:\\work\\xinyue\\aigc_platfrom_back\\harness-factory\\skills\\@beatra-ai\\hot-topic-content-maker"
     }
   },
   "packs": {
