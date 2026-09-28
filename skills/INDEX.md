@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 45 active + 51 archived = 96 skills
+Total: 46 active + 51 archived = 97 skills
 
-## Active (45)
+## Active (46)
 
 | Skill | Description |
 |-------|-------------|
@@ -33,6 +33,7 @@ Total: 45 active + 51 archived = 96 skills
 | media-short-video-copy | 短视频文案工作流 skillset 入口：竞品文案提取 → 多平台脚本创作 → 爆款标题生成，串联 6 个技能完成短视频文案生产 |
 | news-generator | 新闻写作技能包：根据热点/素材生成新闻稿件 |
 | news-polish | 新闻稿件润色技能：去AI味、提升可读性、专业化表达 |
+| news-workflow | 新闻域总工作流入口：选题 → 文字/视频分轨生产 → 事实核查 → 润色/成片 → 发布，串联 news 域全部技能并给出选题双技能裁决规则。route=news 的多阶段任务从这里开始。 |
 | planning-with-files | Implements Manus-style file-based planning to organize and track progress |
 | playwright | Browser automation via Playwright MCP. Navigate websites, click elements, |
 | project-planner | Triage ideas, problems, and feature requests into the right format |

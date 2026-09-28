@@ -1,18 +1,13 @@
 ---
 name: fact-check
 description: 事实核查 skill，对新闻内容进行多源交叉验证
-metadata:
-  origin: placeholder
-  priority: P2
-  tags:
-  - news
-  - verification
-  - fact-check
 version: 1.0.0
-when_to_use: 调用 fact-check 时
+when_to_use: 草稿进入 fact_check 阶段时必须触发；引用外部数据/引语/时间线而无法确认来源时
 status: peripheral
 tags:
-- shared
+- news
+- verification
+- fact-check
 domain: news
 category: news.creation
 ---
