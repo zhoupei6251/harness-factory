@@ -1,0 +1,9 @@
+{
+  "slug": "news-generator",
+  "category": "news.production",
+  "domain": "news",
+  "tags": [
+    "news",
+    "production"
+  ]
+}

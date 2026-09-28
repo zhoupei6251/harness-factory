@@ -1,0 +1,10 @@
+{
+  "slug": "document-review",
+  "category": "code.review",
+  "domain": "code",
+  "tags": [
+    "code",
+    "review"
+  ],
+  "purpose": "Use when reviewing any document (spec, design, plan) for completeness, clarity, and quality — especially environment preparation completeness. Triggers: review document, check document, audit spec, au"
+}

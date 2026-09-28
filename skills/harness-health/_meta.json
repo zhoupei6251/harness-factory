@@ -1,0 +1,9 @@
+{
+  "slug": "harness-health",
+  "category": "shared.workflow",
+  "domain": "shared",
+  "tags": [
+    "health",
+    "check"
+  ]
+}

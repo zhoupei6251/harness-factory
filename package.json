@@ -1,24 +1,22 @@
 {
   "name": "harness-factory",
-  "version": "2.1.0",
-  "description": "Harness v2.1 + foundry 整合：核心大脑 + foundry 全素材库（skills/ capabilities/ / routes/ / schemas/ / mcp-config/）+ v3 编排层（router/ workflows/ mcp/ agents/）。单实例；按路线渲染到 `.harness/`。",
+  "version": "2.2.0",
+  "description": "多平台 AI harness 治理仓库：core 治理文档 + capabilities 语言规则 + 4 平台适配器（claude/codex/trae/workbuddy）+ code/news 双路由 + skills 库。单一事实源，npm run bootstrap 渲染到各平台目录。",
   "private": true,
   "type": "module",
   "scripts": {
-    "harness":  "node --experimental-strip-types scripts/bootstrap.ts",
-    "check":    "node --experimental-strip-types scripts/validate.ts",
-    "typecheck":"tsc --noEmit",
-    "test":     "npm run harness && npm run check && npm run typecheck",
-    "lint":     "node --experimental-strip-types scripts/lint-prompts.ts",
-    "render":   "node --experimental-strip-types scripts/render.ts",
-    "sync":     "node --experimental-strip-types scripts/sync-platforms.ts",
-    "eval":     "node --experimental-strip-types scripts/evals-runner.ts"
+    "bootstrap": "tsx scripts/bootstrap.ts",
+    "validate":  "tsx tests/validate-schemas.ts",
+    "index":     "tsx tests/build-index.ts",
+    "typecheck": "tsc --noEmit",
+    "test":      "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "tsx": "^4.23.13",
     "typescript": "^5.7.0"
   },
   "engines": {
-    "node": ">=22.12.0"
+    "node": ">=20.9.0"
   }
 }

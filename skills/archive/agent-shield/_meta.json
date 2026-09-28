@@ -1,0 +1,9 @@
+{
+  "slug": "agent-shield",
+  "category": "shared.workflow",
+  "domain": "shared",
+  "tags": [
+    "security",
+    "audit"
+  ]
+}
