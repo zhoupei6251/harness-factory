@@ -1,6 +1,6 @@
 {
   "name": "add-platform",
-  "description": "Add a new platform adapter to harness-factory. Walks through platforms/<plat>/rules/ENTRY.md creation and bootstrap.ts registration.",
+  "description": "Add a new platform adapter to harness-factory. Walks through platforms/<plat>/rules/ENTRY.md creation and bootstrap.ts registration (PLATFORMS, PLATFORM_DIR, PLATFORM_NATIVE_ENTRY).",
   "tags": ["Runbook"],
   "triggers": ["add platform", "new platform", "add adapter"],
   "version": "0.1.0"

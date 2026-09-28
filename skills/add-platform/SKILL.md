@@ -20,6 +20,7 @@ Add a new AI platform adapter to `harness-factory/platforms/<name>/`.
 3. (Optional) Edit `scripts/bootstrap.ts` to add the new platform:
    - Add to `PLATFORMS` array
    - Add to `PLATFORM_DIR` map
+   - Add to `PLATFORM_NATIVE_ENTRY` map — the file path this platform natively auto-loads (e.g. `AGENTS.md` for Codex, `CLAUDE.md` for Claude). Projecting only to platform dirs is not enough.
 4. (Optional) Update `schemas/platform.schema.json` enum
 5. Run `npm run bootstrap -- --platform <name> --route code` to test
 

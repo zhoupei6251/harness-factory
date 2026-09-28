@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 36 active + 51 archived = 87 skills
+Total: 43 active + 51 archived = 94 skills
 
-## Active (36)
+## Active (43)
 
 | Skill | Description |
 |-------|-------------|
@@ -15,7 +15,9 @@ Total: 36 active + 51 archived = 87 skills
 | analyze-impact | 评估代码变更的影响范围。触发：重构前、修改核心方法、批量修改前。 |
 | architecture-patterns | ## WHAT |
 | brainstorming | You MUST use this before any creative work - creating features, building |
+| cn-video-script-writer | 短视频脚本生成专家，面向抖音、B站、YouTube、小红书、视频号内容创作者，快速生成爆款脚本和文案。触发场景：用户提到"写脚本"、"短视频脚本"、"抖音文案"、"B站脚本"、"视频选题"、"直播话术 |
 | code-review | Systematic code review patterns covering security, performance, maintainability, |
+| douyin-copy-extract | 粘贴抖音、快手、小红书、视频号公开可访问的短视频分享链接，一键提取标题、简介、口播文案，提供原版、优化朗读版、精简浓缩版，并支持违禁敏感词提醒与口播时长参考，排版整洁纯净，一键复制即用。 |
 | fact-check | 事实核查 skill，对新闻内容进行多源交叉验证 |
 | find-skills | Helps users discover and install agent skills when they ask questions |
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |
@@ -26,6 +28,7 @@ Total: 36 active + 51 archived = 87 skills
 | humanizer-zh | 中文 AI 文风清洗，消除 AI 生成特征，去套路化，句式重构，人物声音分化 |
 | index-project | 为项目建立代码索引。触发：大型项目、需要精准定位符号、快速查找调用关系。 |
 | lsp-query | 通过 Language Server Protocol（typescript-language-server / pyright / gopls 等）做结构化代码查询：定义、引用、悬停信息、符号、代码 |
+| media-short-video-copy | 短视频文案工作流 skillset 入口：竞品文案提取 → 多平台脚本创作 → 爆款标题生成，串联 6 个技能完成短视频文案生产 |
 | news-generator | 新闻写作技能包：根据热点/素材生成新闻稿件 |
 | news-polish | 新闻稿件润色技能：去AI味、提升可读性、专业化表达 |
 | planning-with-files | Implements Manus-style file-based planning to organize and track progress |
@@ -38,10 +41,14 @@ Total: 36 active + 51 archived = 87 skills
 | requesting-code-review | Use when completing tasks, implementing major features, or before merging |
 | ripgrep-search | 使用 ripgrep（rg）做高速文本搜索，定位引用、字符串、关键字。触发：grep、find、搜索文本、定位字符串、查找引用、查找 TODO/FIXME、查找实现、查找日志、搜索代码。 |
 | self-improving | Self-reflection + Self-criticism + Self-learning + Self-organizing memory. |
+| short-video-script | 短视频脚本创作技能。用于生成抖音、快手、B站、视频号等平台的短视频脚本、标题、封面建议。适用于自媒体运营、内容创作需求。 |
+| short-video-script-creator | 短视频核心脚本创作，通过专属参数清晰区分产品信息、口吻对标、内容对标及历史文案，批量生成高质量脚本，原生支持PDF/Word。 |
 | simplify | Refactor code for clarity, consistency, and maintainability without changing |
 | skill-vetter | Security-first skill vetting for AI agents. Use before installing any |
 | two-stage-review | 两阶段审查：先验证 Spec 合规，再检查代码质量。code 域实现完成后使用。 |
 | understand-project | 理解项目结构和架构，生成知识图谱。触发：接手新项目、需要了解项目全局、询问架构设计。 |
+| viral-script-writer | 爆款口播视频脚本创作专家。基于50,000+高播放量视频分析总结的方法论，为用户创作符合"黄金3秒"原则的口播脚本。支持抖音、TikTok、YouTube、B站、X.com等多平台适配。当用户需要写口 |
+| viral-title-generator | 根据文章主题、关键词或内容摘要，一键生成多个平台的高点击率爆款标题，内置「数字+痛点+悬念」等爆款公式，输出10个标题并标注预估点击率。当用户提到爆款标题、标题生成、起标题、取标题、取个标题、帮我起个 |
 | writing-plans | Use when you have a spec or requirements for a multi-step task, before |
 
 ## Archived (51)

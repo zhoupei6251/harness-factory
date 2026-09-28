@@ -1,0 +1,56 @@
+{
+  "version": 1,
+  "skills": {
+    "douyin-copy-extract": {
+      "name": "douyin-copy-extract",
+      "source": "pack:media-short-video-copy",
+      "version": "",
+      "installedAt": "2026-09-28T07:39:17Z"
+    },
+    "short-video-script-creator": {
+      "name": "short-video-script-creator",
+      "source": "pack:media-short-video-copy",
+      "version": "",
+      "installedAt": "2026-09-28T07:39:17Z"
+    },
+    "cn-video-script-writer": {
+      "name": "cn-video-script-writer",
+      "source": "pack:media-short-video-copy",
+      "version": "",
+      "installedAt": "2026-09-28T07:39:17Z"
+    },
+    "viral-script-writer": {
+      "name": "viral-script-writer",
+      "source": "pack:media-short-video-copy",
+      "version": "",
+      "installedAt": "2026-09-28T07:39:17Z"
+    },
+    "short-video-script": {
+      "name": "short-video-script",
+      "source": "pack:media-short-video-copy",
+      "version": "",
+      "installedAt": "2026-09-28T07:39:17Z"
+    },
+    "viral-title-generator": {
+      "name": "viral-title-generator",
+      "source": "pack:media-short-video-copy",
+      "version": "",
+      "installedAt": "2026-09-28T07:39:17Z"
+    }
+  },
+  "packs": {
+    "media-short-video-copy": {
+      "displayName": "短视频文案",
+      "version": "",
+      "skillSlugs": [
+        "douyin-copy-extract",
+        "short-video-script-creator",
+        "cn-video-script-writer",
+        "viral-script-writer",
+        "short-video-script",
+        "viral-title-generator"
+      ],
+      "installedAt": "2026-09-28T07:39:17Z"
+    }
+  }
+}
