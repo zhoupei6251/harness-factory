@@ -27,11 +27,14 @@ harness-factory/
 ├── LICENSE
 ├── README.md
 ├── ARCHITECTURE.md           # design rationale
+├── .mcp.json                 # project-scoped MCP (codebase-memory), auto-offered by Claude Code
 ├── package.json
 ├── tsconfig.json
 ├── core/                     # 8 governance docs (always loaded)
 ├── capabilities/rules/       # per-language rules (java / typescript / common)
+├── mcp-config/               # canonical MCP server snippets
 ├── platforms/                # 4 adapters with per-platform rules
+├── references/               # traps.md + tooling.md (external tool setup)
 ├── routes/                   # 2 route templates (code / news)
 ├── skills/                   # active skills (in use) + skills/archive/ (restorable on demand)
 ├── schemas/                  # 3 JSON schemas
@@ -63,3 +66,12 @@ Skills are split into two tiers:
 - `npm run index` — regenerate `skills/INDEX.md`
 - `npm run typecheck` — TypeScript type check
 - `npm test` — runs validate + typecheck + bootstrap smoke test
+
+## Tooling
+
+Two recommended external tools — both local, free, no API keys. Full per-platform install guide: [`references/tooling.md`](references/tooling.md).
+
+- **codebase-memory-mcp** — code knowledge-graph MCP (tree-sitter + Hybrid LSP). Root `.mcp.json` is committed, so Claude Code offers it automatically on first open; the `query-symbol` / `get-callers` / `analyze-impact` skills (10 total) depend on it.
+- **[ponytail](https://github.com/DietrichGebert/ponytail)** — "laziest senior dev" decision ladder enforced before code generation; complements `core/NEVER.md` and rules R2 / R8. Claude Code: `/plugin marketplace add DietrichGebert/ponytail` + `/plugin install ponytail@ponytail`.
+
+Neither tool enters `package.json` or is rendered by bootstrap — they are per-machine environment config; the repo ships only the config snippets and the guide.

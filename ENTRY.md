@@ -43,3 +43,10 @@ tags: [Rules, Runbook]
 | Codex | `./AGENTS.md` + `~/.codex/` | `platforms/codex/` |
 | Trae | `~/.trae/` | `platforms/trae/` |
 | WorkBuddy | `~/.codebuddy/` | `platforms/workbuddy/` |
+
+## Tooling (recommended, per-machine install)
+
+| Tool | Why | Install |
+|------|-----|---------|
+| codebase-memory-mcp | code knowledge graph — evidence for R1 (read before write); powers `query-symbol` / `get-callers` / `analyze-impact` skills | root `.mcp.json` (Claude Code) or `references/tooling.md` |
+| ponytail | lazy-senior-dev decision ladder before any generation — complements R2 / R8 / `core/NEVER.md` | `references/tooling.md` |

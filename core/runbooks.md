@@ -6,6 +6,14 @@
 2. Verify with `npm run validate`
 3. Edit `ENTRY.md` to reflect project-specific behavior
 
+## Install recommended tooling (per machine, one-time)
+
+Full guide: `references/tooling.md`. Both tools are local and free — no API keys.
+
+1. **codebase-memory-mcp** — Claude Code: root `.mcp.json` is already committed, accept the enable prompt on first open. Other platforms / static-binary install: see `references/tooling.md`
+2. **ponytail** — Claude Code: `/plugin marketplace add DietrichGebert/ponytail` then `/plugin install ponytail@ponytail`. Codex / Cursor / Gemini / instruction-only adapters: see `references/tooling.md`
+3. Verify: ask the agent to call `list_projects` (MCP connected) and run `/ponytail-help` (plugin loaded)
+
 ## Add a skill
 
 1. Create `skills/<name>/SKILL.md` + `_meta.json`

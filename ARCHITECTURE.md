@@ -2,18 +2,18 @@
 
 ## Why this exists
 
-`harness-factory` is the lean replacement for `harness-foundry` (1290 files) and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: 269 source files (vs 669 in harness-foundry), TypeScript only, no empty placeholders.
+`harness-factory` is the lean replacement for `harness-foundry` (1290 files) and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: 271 source files (vs 669 in harness-foundry), TypeScript only, no empty placeholders.
 
 ## Current state
 
 | Metric | Count |
 |---|---|
-| Source files (excl `.git` + `node_modules`) | 269 |
+| Source files (excl `.git` + `node_modules`) | 271 |
 | Core governance docs | 8 |
 | Platform adapters | 4 (claude, codex, trae, workbuddy) — all with placeholder rules |
 | Routes | 2 (code, news) — both with MEMORY templates |
 | Skills | 53 (36 active in `skills/` + 17 archived in `skills/archive/`, all restorable) |
-| MCP servers | 1 (codebase-memory only; harness-foundry's 15+ bloat config removed) |
+| MCP servers | 1 (codebase-memory only; wired via committed root `.mcp.json` + `mcp-config/` snippet — see `references/tooling.md`) |
 | Capability verticals (in `capabilities/rules/`) | 3 (java, typescript, common) |
 | Schemas | 3 |
 | npm scripts | 5 (bootstrap, validate, index, typecheck, test) |

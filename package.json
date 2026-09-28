@@ -1,6 +1,6 @@
 {
   "name": "harness-factory",
-  "version": "2.2.0",
+  "version": "2.3.0",
   "description": "多平台 AI harness 治理仓库：core 治理文档 + capabilities 语言规则 + 4 平台适配器（claude/codex/trae/workbuddy）+ code/news 双路由 + skills 库。单一事实源，npm run bootstrap 渲染到各平台目录。",
   "private": true,
   "type": "module",
