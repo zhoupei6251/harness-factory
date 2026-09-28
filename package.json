@@ -1,6 +1,6 @@
 {
   "name": "harness-factory",
-  "version": "2.3.0",
+  "version": "2.4.0",
   "description": "多平台 AI harness 治理仓库：core 治理文档 + capabilities 语言规则 + 4 平台适配器（claude/codex/trae/workbuddy）+ code/news 双路由 + skills 库。单一事实源，npm run bootstrap 渲染到各平台目录。",
   "private": true,
   "type": "module",
@@ -8,13 +8,13 @@
     "bootstrap": "tsx scripts/bootstrap.ts",
     "validate":  "tsx tests/validate-schemas.ts",
     "index":     "tsx tests/build-index.ts",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
     "test":      "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
-    "tsx": "^4.23.13",
-    "typescript": "^5.7.0"
+    "@types/node": "^20.19.43",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=20.9.0"

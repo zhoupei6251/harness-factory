@@ -12,12 +12,19 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the design rationale.
 
 ```bash
 npm install
-npm run typecheck   # tsc --noEmit
+npm run typecheck   # TypeScript 7 native compiler
 npm run validate    # check schemas + skills
 npm run bootstrap -- --platform all --route code
 ```
 
 This projects `core/ENTRY.md` and `platforms/<plat>/rules/ENTRY.md` to `.claude/`, `.codex/`, `.trae/`, `.codebuddy/`, creates runtime dirs, and writes `./MEMORY.md` from the route template.
+
+## Toolchain
+
+- **Node 20.9+ ~ 26+** — tested green on 20.9.0 and 26.8.2 (`engines: >=20.9.0`)
+- **TypeScript 7** (Go-native compiler, ~10× faster typecheck). `npm run typecheck` calls `lib/tsc.js` directly: TS 7's `bin/tsc` launcher is an extensionless ESM file that Node <22 cannot load — calling the lib keeps the Node 20 floor
+- **tsx** runs all TS scripts (bootstrap / validate / index / tests) — no build step, no Babel
+- `tsconfig.json`: `erasableSyntaxOnly` (native-strip compatible) + `types: ["node"]` (TS 7 no longer auto-includes `@types/*`)
 
 ## Layout
 
@@ -64,7 +71,7 @@ Skills are split into two tiers:
 - `npm run bootstrap -- --platform X --route Y` — project canonical to platform format
 - `npm run validate` — schema + skill check
 - `npm run index` — regenerate `skills/INDEX.md`
-- `npm run typecheck` — TypeScript type check
+- `npm run typecheck` — TypeScript 7 native type check (via `lib/tsc.js` for Node 20 compat)
 - `npm test` — runs validate + typecheck + bootstrap smoke test
 
 ## Tooling
