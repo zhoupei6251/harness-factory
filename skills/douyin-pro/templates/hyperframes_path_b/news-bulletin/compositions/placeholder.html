@@ -1,8 +1,9 @@
 <!doctype html>
 <!--
-  news-bulletin · placeholder 占位版式 — 让 load_style_pack 通过;
+  news-bulletin · placeholder 占位版式 — **不参与版式选择**, load_style_pack 直接跳过本文件。
   真正的 hook / closer / 内容版式待后续按 frame.md 落地。
-  本文件**不会被 choose_layout 当作真版式**: 真正的版式文件落地后直接替换或删除它。
+  若 compositions/ 里只有本文件, 该 pack 视为**不可渲染**: 加载阶段就停机并点名
+  当前可渲染的 pack (不会等到渲染第 1 镜才失败)。补出真版式后删除本文件。
   渲染时如果误中, 会看到一个明显的"PLACEHOLDER"提示, 方便看出 pack 还没做完。
   地面色用 #1a1a1a (TONE_DARK, 已登记), 区分 pack 靠 data-template-name + 文字内容.
   真版式落地时要按 frame.md 把 bg 加进 GROUND_TONE_BY_HEX.

@@ -36,7 +36,7 @@ media-short-video-copy / viral-script-writer (Step 2)
 fact-check (Step 3, 硬门禁)
    ↓ 产出: drafts[].fact_check = passed
 douyin-pro Path B (Step 4)
-   ↓ 产出: .harness-news-runtime/videos/<id>/final.mp4
+   ↓ 产出: .harness-news-runtime/videos/<id>/final.mp4 + aigc.json (标识侧车)
 douyin-upload upload-video (Step 5)
    ↓ 产出: MEMORY.published_at 回填
 ```
@@ -61,9 +61,9 @@ skills/news-workflow/SKILL.md        ← 入口: 6 步工作流
 skills/douyin-pro/                   ← 渲染器 (Path B)
 ├── SKILL.md                         ← 通用 Skill (Path A 仍标注为"非新闻可用")
 ├── scripts/
-│   ├── path_b_build.py             ← 9 步发射器 (解析→配音→发射→自检→门禁→渲染→动量→烧字幕→联络表)
+│   ├── path_b_build.py             ← 9 步发射器 (解析→配音→发射→自检→门禁→渲染→动量→烧字幕+AIGC→联络表)
 │   ├── layout_selfcheck.py          ← 17 条结构不变量 (渲前拦截)
-│   ├── path_b_selftest.py           ← 47 项纯函数断言 (含 12 pack 加载检查)
+│   ├── path_b_selftest.py           ← 58 项纯函数断言 (含 12 pack 加载 + AIGC 标识合规)
 │   ├── commons_media.py             ← 图片层 (path B 当前未启用, 留作图片型模板扩展)
 │   └── install_path_b_deps.py       ← 依赖一键装
 ├── templates/hyperframes_path_b/   ← 12 个节目包
@@ -71,7 +71,9 @@ skills/douyin-pro/                   ← 渲染器 (Path B)
 │   ├── news-ink/                    ← frame + host + placeholder (待补 composition)
 │   ├── ... (10 more)
 │   └── <12 包>/frame.md             ← token 与版面法则 (唯一事实源)
-└── skills/video-render-engine/        ← 配音×渲染 详解 (子模块)
+└── skills/video-render-engine/        ← 配音×渲染 详解（douyin-pro **内部**子模块，
+                                         全路径 skills/douyin-pro/skills/video-render-engine/，
+                                         不在仓库 skills/ 顶层）
 skills/douyin-upload/                 ← 发布 (`sau` CLI 包装)
 skills/fact-check/                    ← 事实核查 (硬门禁)
 skills/media-short-video-copy/        ← 视频脚本生成器 (主)
@@ -79,7 +81,7 @@ skills/viral-script-writer/           ← 视频脚本生成器 (备)
 skills/hot-topic-content-maker/       ← 选题
 ```
 
-**核心发射器 `path_b_build.py` 不动**——已经支持 12 pack + `--template` 参数。
+**核心发射器 `path_b_build.py`**——支持 12 pack + `--template`，并无条件产出 AIGC 标识（画面角标 + mp4 元数据 + `aigc.json` 侧车）。
 
 ---
 
@@ -105,10 +107,11 @@ skills/hot-topic-content-maker/       ← 选题
 - `host.html`: 画布骨架 + 5 个占位符 (COMPOSITION_ID / W / H / TOTAL / SCENES / AUDIOS)
 - `compositions/*.html`: 实际版式（hook / closer / 内容卡 …）
 
-**当前状态**（自检 `t_full_loadability_progress` 实时报告）：
-- `news-coral`: 完整（7 个 composition）
-- 其余 11 个: frame.md + host.html + 1 个 placeholder composition
-- 后续 composition 一个个补；补完一个，`t_full_loadability_progress` X/12 递增
+**当前状态**（自检 `t_full_loadability_progress` 实时报告——名字沿用，口径已改成"有真版式"而不是"能加载不抛"，后者在 12/12 放好占位壳后就是饱和指标）：
+- `news-coral`: 完整（7 个 composition）—— **当前唯一可渲染的包**（`可渲染 pack (有真版式): 1/12`）
+- 其余 11 个: frame.md + host.html + 只有 `placeholder.html`（占位壳，**不参与版式选择**）
+- 只有占位壳的包在 `load_style_pack` **加载阶段**停机并点名可渲染替代，不会拖到渲染第 1 镜
+- 后续 composition 一个个补；补完一个（并删除 placeholder.html），可渲染计数递增
 
 ---
 
@@ -121,7 +124,8 @@ skills/hot-topic-content-maker/       ← 选题
 | D3 | 12 pack 决策树 | 一份脚本可对应 12 种视觉气质；决策由稿件特征词驱动，不靠人挑 |
 | D5 | fact-check 硬门禁 | 不通过 = 不发；多源交叉验证（澎湃/工人日报/搜狐/官方回应）|
 | D6 | 屏句 ≠ 配音 | `onscreen:` 行单独成屏上屏上整句，配音未授权走正文；这条结构保证来自 path_b_build.py 的 `check_onscreen` 闸门 |
-| D7 | placeholder 不参与选择 | 11 个新 pack 的 placeholder composition 只是让 `load_style_pack` 通过；真正的 hook/closer/内容版式待续 |
+| D7 | placeholder 不参与选择 | 11 个新 pack 的 placeholder composition 被 `load_style_pack` **直接跳过**；只剩占位壳的包视为不可渲染，在加载阶段停机点名替代包（2026-09-29 审计后收紧，旧口径"只是让加载通过"会误导到渲染期才崩）|
+| D8 | AIGC 标识三件套不可关 | 显式角标（字芯 ≥ 最短边 5%、贯穿全片）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ 发布时 `--declaration 内容由AI生成`；①② 由发射器无条件产出并读回核验，缺侧车的老成片一律重渲 |
 
 ---
 
@@ -133,7 +137,9 @@ skills/hot-topic-content-maker/       ← 选题
 .harness-news-runtime/
 ├── articles/<id>-script.md     ← 口播稿 (Step 2 产出)
 ├── videos/<id>/final.mp4       ← 成片 (Step 4 产出)
-└── verifications/<date>-*.md   ← 端到端验证记录 (可选)
+├── videos/<id>/aigc.json       ← AIGC 标识侧车 (无此文件 = 成片不合规)
+├── videos/<id>/contact-sheet.jpg ← 人工验收联络表
+└── verifications/<date>-*.md   ← 端到端验证记录
 ```
 
 **禁止写 `.ai-runtime-artifacts/`** — 那是 code 路由的运行时域 (news-workflow/SKILL.md 硬性规则 4 已说明)。
@@ -147,7 +153,9 @@ skills/hot-topic-content-maker/       ← 选题
 3. **模板决策先于脚本**: 不知道选哪个模板就不开始写脚本
 4. **产物写 `.harness-news-runtime/`**: 不写 `.ai-runtime-artifacts/` (那是 code 域)
 5. **Path B only**: 不要传 `--template` 之外的渲染选项；不要尝试 Path A
-6. **12 pack 自检**: 任何新加的 pack 必须先有 frame.md 才能 commit；通过 `path_b_selftest.py` 47 项
+6. **12 pack 自检**: 任何新加的 pack 必须先有 frame.md 才能 commit；通过 `path_b_selftest.py` 58 项
+7. **AIGC 标识不可关**: ①画面角标 ②mp4 元数据 ③发布自主声明 三件齐活；`aigc.json` 缺失的成片先重渲
+8. **不可渲染的包不许选**: 决策树命中只有占位壳的 pack 时, 改落 `news-coral` 或先补真版式
 
 ---
 
@@ -155,31 +163,32 @@ skills/hot-topic-content-maker/       ← 选题
 
 ```
 $ python skills/douyin-pro/scripts/path_b_selftest.py
-[selftest] 47 项 · style=news-coral
-  ok    t_all_templates_in_constant
-  ok    t_every_template_has_frame_md
-  ok    t_fully_loaded_packs_have_required_files
-  ok    t_partial_packs_logged
-  ok    t_default_style_matches_first_template
-      12 pack 中已完整加载 (host.html 在位) 的: 12/12
+[selftest] 58 项 · style=news-coral
   ok    t_full_loadability_progress
+      可渲染 pack (有真版式): 1/12 —— news-coral
   ...
-[selftest] 全绿 47/47
+[selftest] 全绿 58/58
 ```
 
 集成状态：
-- ✅ 12 pack frame.md (token 1面)
-- ✅ 12 pack host.html + placeholder composition (loadable)
-- ⏳ 11 pack 的真 composition (一个个补, 不在 v2 范围)
+- ✅ 12 pack frame.md (token 面) + host.html
+- ✅ AIGC 标识落地：画面角标（字芯 62px ≥ 最短边 5%、贯穿全片）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ `aigc.json` 侧车 + 读回核验（读不回即拒绝交付）
+- ✅ 发布链路：`--declaration 内容由AI生成` 已对齐上游源码，成功凭据写进 skill
+- ✅ 占位包改为**加载期停机**（不再拖到渲染第 1 镜）
+- ✅ 进度指标换成可交叉核验的"有真版式 pack 数"（1/12）
+- ⏳ 11 pack 的真 composition（一个个补）
+- ⏳ t001 成片仍是 AIGC 标识落地前渲的（`aigc_label: none`）→ 需按 v003 脚本重渲
+- ⏳ 抖音账号未登录 → 发布这一步只能交用户手动完成
 
 ---
 
 ## 9. 下一步建议 (按 ROI 排序)
 
-1. **先跑一条 t001 验证 v2 整链路**: `--template news-coral`, 跑出来确认 wire 通
-2. **补 1-2 个高 ROI 包的 composition**: `news-policy` + `news-stat` (视觉差异最大)
-3. **把 news-polish / humanizer-zh 从工作流 skill 引用里删掉**: 它们不在 v2 用, 留着误导新人
-4. **Path A 在 douyin-pro/SKILL.md 标 "Coming soon for non-news"**: 不删 (其他领域可能用), 但明示新闻域不用
+1. **按 v003 脚本重渲 t001**：现有三版成片都没有 AIGC 标识（`aigc_label: none`），是唯一还挂在合规外的产物
+2. **补 1-2 个高 ROI 包的 composition**：`news-policy` + `news-stat`（视觉差异最大，且新闻域真会命中）；补完删掉 `placeholder.html`，可渲染计数自然涨
+3. **登录抖音账号（用户本人扫码）**：链路已到"可发布"，缺的只是 cookie；agent 不代替扫码
+4. **免费采集层 `news-collect`**：热点来源现在靠人工粘贴，补一个 stdlib-only 的兜底（自建 DailyHotApi `--base-url`，无服务器时退回 RSS），落 `.harness-news-runtime/hotboard/<date>.json`
+5. ~~news-polish / humanizer-zh 从工作流引用里删掉~~ ✅ 已做（v1 文字轨已从 `core/runbooks.md` / `core/intent-routing.md` 清干净，两条治理文档改为指向 `skills/news-workflow/SKILL.md` 单一事实源）
 
 ---
 

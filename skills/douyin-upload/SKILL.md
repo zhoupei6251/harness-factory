@@ -52,6 +52,21 @@ category: news.publish
 - `cookies/`、`*cookie*.json`、`verify_code.txt` 必须处于 git ignore 状态；真实 cookie 一律不提交
 - 发布是对外动作：`--title/--desc/--tags/--declaration/--schedule` 的取值需来自已核查的稿件或用户明确指令，不可自行编造事实或话题
 
+## AIGC 合规（发布前必查）
+
+《人工智能生成合成内容标识办法》2025-09-01 施行，抖音同日起要求内容发布者**主动声明** AI 生成内容。
+一次合规发布要同时具备三样，本 skill 只管第 ③：
+
+| ① 画面内显式标识 | ② 文件元数据隐式标识 | ③ 平台自主声明 |
+|---|---|---|
+| 由 `path_b_build.py` 烧进成片（左上角贯穿全片「AI 生成合成内容」） | 由 `path_b_build.py` 写 mp4 元数据键 `AIGC`（GB 45438-2025 附录 E） | `sau douyin upload-video --declaration 内容由AI生成` |
+
+- 成片旁没有 `aigc.json` 侧车 = ①② 缺失（老成片就是这个状态），**先回 douyin-pro 重渲再发**。
+- `--declaration` 必须传弹窗**选项原文** `内容由AI生成`；上游选不上只 warning、**不阻断发布**，
+  所以成功凭据只有日志里的 `自主声明已选择「内容由AI生成」`。看不到这行就按未声明处理，
+  改 `--headed` 人工补勾（细节与源码行号：`references/cli-contract.md` § 自主声明）。
+- 声明文案与稿件事实同源：AI 生成 + 转载混合时，口径先与用户确认，不要自行选一个。
+
 ## 支持动作
 
 - 使用 `sau douyin login --account <name>` 登录抖音

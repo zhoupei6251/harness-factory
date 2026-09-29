@@ -54,6 +54,8 @@ touch $MD/chromium-1208/INSTALLATION_COMPLETE $MD/chromium_headless_shell-1208/I
 
 - 上传走的是发布页 + `channel="chromium"` 无头浏览器，参数固定为 `--no-sandbox --disable-blink-features=AutomationControlled`；首次真实发布建议 `--headed` 观察一遍
 - `--schedule` 只在用户明确要求定时发布时给，格式 `%Y-%m-%d %H:%M`
-- `--declaration` 需要**页面原文**（AI 生成内容声明等），不要凭猜测填；文案若含 AI 生成素材，先与用户确认声明口径
+- `--declaration` 已于 2026-09-29 对齐上游源码（`sau_cli.py:821`、`douyin_uploader/main.py:481`）：
+  必须传**弹窗选项原文**，AI 生成内容填 `内容由AI生成`。**上游选不上只 warning、不阻断发布**，
+  因此以日志 `自主声明已选择「…」` 为唯一成功凭据；失败改 `--headed` 人工补勾。详见 `cli-contract.md` § 自主声明
 - 图文正文用 `--notef <文件>` 比长字符串转义稳（Windows shell 对中文/引号/`&` 不友好）
 - 一次 `upload-video` 只发一个文件；成片路径必须是绝对路径

@@ -64,9 +64,11 @@ skills:
 回填 MEMORY `videos[].template: <pack_name>`。
 
 **当前进度**（12 pack = frame.md / host.html / compositions/*.html 三层齐全度）：
-- `news-coral`: 完整（已有 7 个真 composition）
-- 其余 11 个: frame.md + host.html + 1 个 placeholder composition（待补真 composition）
-- 校验：`python skills/douyin-pro/scripts/path_b_selftest.py` 跑 `t_full_loadability_progress` 看 X/12
+- `news-coral`: 完整（7 个真 composition）—— **当前唯一可渲染的包**
+- 其余 11 个: frame.md + host.html + 只有 `placeholder.html`（占位壳，**不参与选择**）
+- ⚠️ 决策树命中不可渲染的包时：改落 `news-coral`，或按该包 frame.md 契约补真 composition。
+  `load_style_pack` 会在**加载阶段**就停机并点名可渲染替代（不会等到渲染第 1 镜）
+- 校验：`python skills/douyin-pro/scripts/path_b_selftest.py` → `可渲染 pack (有真版式): X/12`
 
 ---
 
@@ -103,22 +105,27 @@ skills:
 
 ```bash
 python skills/douyin-pro/scripts/path_b_build.py \
-  --input .harness-news-runtime/articles/<topic_id>-script.md \
+  --input .harness-news-runtime/articles/<topic_id>-scenes.json \
   --template <videos[].template> \
   --source <署名/频道> \
+  --aigc-producer <你的频道/主体名> \
   --output .harness-news-runtime/videos/<topic_id>/final.mp4
 ```
+
+**输入格式**：场景 JSON 数组最稳（每镜 `layout/kicker/title/body/onscreen`）。走 `.md` 脚本时
+每镜必须自带 `屏:` 行，否则 `check_onscreen` 闸门拒收；JSON 里的 `onscreen` 要用 `｜` 标记语法
+（`parse_input` 按该标记重写 `onscreen`/`onscreenAccent`，直传 accent 字段会被覆盖）。
 
 **9 步硬链路**（Path B 内部）：
 1. 解析输入（.md 或 .json 场景）
 2. edge-tts 配音（每段 .mp3 + .vtt）
-3. 发射合成 HTML（读 12 pack 之一 + 逐镜挂子合成）
+3. 发射合成 HTML（读 12 pack 之一 + 逐镜挂子合成；只有占位壳的包在此停机）
 4. layout_selfcheck（17 条结构不变量，渲前拦截）
 5. hyperframes check --strict（引擎门禁）
 6. HyperFrames 渲染 → silent.mp4
 7. scdet 动量审计（每镜尾段必须仍在变化）
-8. ffmpeg 合成（拼配音 + 烧 ASS 字幕）
-9. 联络表 contact-sheet.jpg（人工验收比对）
+8. ffmpeg 合成（拼配音 + 烧 ASS 字幕 + **贯穿全片左上角 AIGC 显式角标 + mp4 元数据隐式标识，读回核验**）
+9. 联络表 contact-sheet.jpg（人工验收比对）+ `aigc.json` 标识侧车
 
 回填 MEMORY `videos[].output` + `videos[].render_status: done`。
 
@@ -132,14 +139,21 @@ python skills/douyin-pro/scripts/path_b_build.py \
 
 **前置门禁**（任一不成立就不发）：
 - `drafts[].fact_check == passed`
+- 成片旁有 `aigc.json` 且 `burned_in: true`（AIGC 标识是合规硬要求，老成片没有 → 重渲再发）
 - `sau douyin check --account <name>` 返回 `valid`
 - **未登录时不代替用户扫码**，把成品交用户手动发
 
 ```bash
-# 视频轨（成片必须绝对路径）
+# 视频轨（成片必须绝对路径；AI 生成内容必须带自主声明）
 sau douyin upload-video --account <name> --file <abs>/final.mp4 \
-  --title "<稿内标题>" --desc "<正文+话题>" --tags tag1,tag2
+  --title "<稿内标题>" --desc "<正文+话题>" --tags tag1,tag2 \
+  --declaration 内容由AI生成
 ```
+
+`--declaration` 的取值是抖音发布页弹窗的**选项原文**（上游源码实测：`内容由AI生成` /
+`内容为转载信息` / `内容为个人观点或见解`）。**上游选不上只 warning、不阻断发布**，
+所以成功凭据是日志出现 `自主声明已选择「内容由AI生成」`；没有这行 = 未声明（见
+`skills/douyin-upload/references/cli-contract.md` § 自主声明）。
 
 发布后回填 `topics.published_at`、`in_progress` 清空。
 
@@ -152,7 +166,10 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
 3. **模板决策先于脚本**：不知道选哪个模板就不开始写脚本（避免返工）
 4. **产物写 `.harness-news-runtime/`**：稿件/成片落 `articles/`、`videos/`，**不要**写 `.ai-runtime-artifacts/`（code 域）
 5. **Path B only**：本工作流只使用 Path B（`--template` 即可）；不要尝试 Path A（付费路径，不在新闻域使用）
-6. **12 pack 自检先行**：新加的 pack 必须先有 frame.md + host.html + composition 才提交；`path_b_selftest.py` 47 项必绿
+6. **12 pack 自检先行**：新加的 pack 必须先有 frame.md + host.html + 真 composition 才提交；`path_b_selftest.py` 58 项必绿
+7. **AIGC 标识不可关**：成片必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
+   ①② 由 `path_b_build.py` 无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供。
+   没有 `aigc.json` 侧车的老成片一律视为不合规，**重渲**而不是直发
 
 ---
 

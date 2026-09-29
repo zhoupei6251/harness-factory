@@ -42,8 +42,12 @@ sau douyin upload-video \
   [--tags tag1,tag2] \
   [--schedule "YYYY-MM-DD HH:MM"] \
   [--thumbnail <image-path>] \
+  [--thumbnail-portrait <image-path>] \
+  [--thumbnail-landscape <image-path>] \
   [--product-link <url>] \
   [--product-title "<title>"] \
+  [--declaration "<声明选项原文>"] \
+  [--collection <已存在的合集名>] \
   [--debug] \
   [--headless | --headed]
 ```
@@ -56,12 +60,29 @@ sau douyin upload-video \
   - `--desc`
   - `--tags`
   - `--schedule`
-  - `--thumbnail`
+  - `--thumbnail`（3:4 竖版）/ `--thumbnail-portrait`（同义）/ `--thumbnail-landscape`（4:3 横版）
   - `--product-link`
   - `--product-title`
+  - `--declaration` —— 抖音「自主声明」选项**原文**，AI 生成内容填 `内容由AI生成`（详见下节）
+  - `--collection` —— 加入已存在的合集，合集不存在则失败
   - `--debug`
   - `--headless`
   - `--headed`
+
+### 自主声明 `--declaration`（AIGC 合规入口，2026-09-29 对齐上游 `0012d2c` 源码）
+
+参数存在性是**读上游源码确认的**，不是猜的：`sau_cli.py:821-824` 注册了 `--declaration`，
+`uploader/douyin_uploader/main.py:481-559` 实现 `set_self_declaration`。
+
+- 抖音发布页真实弹窗：header「请选择声明类型（单选）」，选项 `label.semi-radio > span.semi-radio-addon`
+  文本为 `内容由AI生成` / `内容为转载信息` / `内容为个人观点或见解` 等；底部 `button.semi-button-primary` =「确定」。
+  → 传参必须用**选项原文**（`--declaration 内容由AI生成`），精确匹配优先、`has_text` 兜底。
+- **失败不阻断发布**：弹窗没打开或选项没命中时，上游只打 `warning` 然后继续发布
+  （`main.py:522 / 558`）。所以**不能把"命令跑成功了"当作已声明**。
+- 核验口径：日志必须出现 `自主声明已选择「内容由AI生成」`；出现 `自主声明弹窗未打开` 或
+  `自主声明设置失败` = **未声明**，这条发布按不合规处理（改 `--headed` 人工补勾）。
+- 与成片内的标识是两件事：`path_b_build.py` 负责视频里显式角标 + mp4 元数据隐式标识（GB 45438-2025），
+  `--declaration` 负责平台侧的自主声明。两道都要有。
 
 ### 上传图文
 

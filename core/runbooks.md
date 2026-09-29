@@ -36,12 +36,13 @@ Full guide: `references/tooling.md`. Both tools are local and free — no API ke
 
 ## News pipeline
 
-Route: `news`. Runtime: `.harness-news-runtime/` (plans / memory / articles). State: root `MEMORY.md` (projected from `routes/news/MEMORY.md`).
+Route: `news`. Runtime: `.harness-news-runtime/` (plans / articles / videos). State: root `MEMORY.md` (projected from `routes/news/MEMORY.md`).
 
-1. **Research** — collect facts into `.harness-news-runtime/plans/`; register the topic in `MEMORY.md` (`topics[]`, status `researching`). Every fact must carry a source URL and trust level.
-2. **Draft** — invoke `news-generator` (inverted pyramid, 5W1H lead). Write the draft to `.harness-news-runtime/articles/<topic-id>-draft.md`; set topic status `drafting`.
-3. **Fact check** — invoke `fact-check` on the draft. All named facts, figures, names, and dates must pass multi-source verification; update `drafts[].fact_check` to `passed` / `flagged`. `flagged` blocks publishing.
-4. **Polish** — invoke `news-polish` (headline ≤20 chars, tight lead, one idea per paragraph), then `humanizer` to remove AI-writing signs. Save the final to `.harness-news-runtime/articles/<topic-id>.md`.
-5. **Publish** — set topic status `published` with `published_at`, update `MEMORY.md` `last_updated`, and report the article path to the user.
+**This runbook does not describe the pipeline — it points at its single source.** The news track is v2 single-track (topic → template decision → script → fact-check → Path B render → publish) and it lives in `skills/news-workflow/SKILL.md`; the visual/technical detail lives in `routes/news/ARCHITECTURE.md`. Governance docs only route intent here (see `intent-routing.md`); restating the stages creates drift, and v1's text track (`news-generator` / `news-polish` / `humanizer`) was already written back twice.
+
+Load `skills/news-workflow/SKILL.md` and follow it. The two rules that must survive anywhere in this repo:
+
+1. **fact-check is a hard gate** — no script enters rendering unless `drafts[].fact_check == passed`.
+2. **artifacts go to `.harness-news-runtime/`** — never `.ai-runtime-artifacts/` (that dir belongs to the `code` route).
 
 Phase is always mirrored in `MEMORY.md` → `in_progress.current_phase` so any session can resume.
