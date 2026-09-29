@@ -27,7 +27,9 @@
 ## 2. 数据流（6 步一气呵成）
 
 ```
-hot-topic-content-maker (Step 1)
+news-collect (Step 0 · 零成本采集，无 key 无付费)
+   ↓ 产出: .harness-news-runtime/hotboard/<date>.json（选题线索清单）
+hot-topic-content-maker (Step 1 · 只做裁决/脚本导向，不调它的付费热榜)
    ↓ 产出: 选题 + 简报
 media-short-video-copy / viral-script-writer (Step 2)
    ↓ 产出: 口播稿 (.harness-news-runtime/articles/<id>-script.md)
@@ -41,7 +43,7 @@ douyin-upload upload-video (Step 5)
    ↓ 产出: MEMORY.published_at 回填
 ```
 
-每一步产出都写回 MEMORY.md；流程是 6 步, 但实际写状态只要 4 个字段：
+每一步产出都写回 MEMORY.md；流程是 6 步（步骤 0–5，采集层是步骤 0 的输入，不另算一步）, 但实际写状态只要 4 个字段：
 - `topics[].status` (researching → drafting → fact_check → rendering → published)
 - `drafts[].fact_check` (pending → passed / flagged)
 - `videos[].template` (12 选 1)
@@ -78,7 +80,8 @@ skills/douyin-upload/                 ← 发布 (`sau` CLI 包装)
 skills/fact-check/                    ← 事实核查 (硬门禁)
 skills/media-short-video-copy/        ← 视频脚本生成器 (主)
 skills/viral-script-writer/           ← 视频脚本生成器 (备)
-skills/hot-topic-content-maker/       ← 选题
+skills/news-collect/                  ← 步骤 0 采集层（stdlib-only：百度热搜 board + feedx RSS；无 key 无付费）
+skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询在本域禁用**）
 ```
 
 **核心发射器 `path_b_build.py`**——支持 12 pack + `--template`，并无条件产出 AIGC 标识（画面角标 + mp4 元数据 + `aigc.json` 侧车）。
@@ -135,6 +138,7 @@ skills/hot-topic-content-maker/       ← 选题
 
 ```
 .harness-news-runtime/
+├── hotboard/<date>.json          ← 选题线索 (Step 0 news-collect 产出)
 ├── articles/<id>-script.md     ← 口播稿 (Step 2 产出)
 ├── videos/<id>/final.mp4       ← 成片 (Step 4 产出)
 ├── videos/<id>/aigc.json       ← AIGC 标识侧车 (无此文件 = 成片不合规)
@@ -156,6 +160,7 @@ skills/hot-topic-content-maker/       ← 选题
 6. **12 pack 自检**: 任何新加的 pack 必须先有 frame.md 才能 commit；通过 `path_b_selftest.py` 58 项
 7. **AIGC 标识不可关**: ①画面角标 ②mp4 元数据 ③发布自主声明 三件齐活；`aigc.json` 缺失的成片先重渲
 8. **不可渲染的包不许选**: 决策树命中只有占位壳的 pack 时, 改落 `news-coral` 或先补真版式
+9. **采集零付费**: 热点线索只来自 `skills/news-collect`（stdlib-only，本机可复跑）；不调用任何按次扣费的榜单/话题搜索（Beatra 6/60 credits）。缺源补免费源，不花钱
 
 ---
 
@@ -177,17 +182,18 @@ $ python skills/douyin-pro/scripts/path_b_selftest.py
 - ✅ 占位包改为**加载期停机**（不再拖到渲染第 1 镜）
 - ✅ 进度指标换成可交叉核验的"有真版式 pack 数"（1/12）
 - ⏳ 11 pack 的真 composition（一个个补）
-- ⏳ t001 成片仍是 AIGC 标识落地前渲的（`aigc_label: none`）→ 需按 v003 脚本重渲
+- ✅ t001 已按 v003 脚本重渲为 `videos/t001-v4/`（标识三件套 + 三处独立核验通过）；v001/v002/v003 保留为历史
+- ⏳ 发布前定 `--aigc-producer` 真实主体名（现在是默认值 harness-news-pathb）
 - ⏳ 抖音账号未登录 → 发布这一步只能交用户手动完成
 
 ---
 
 ## 9. 下一步建议 (按 ROI 排序)
 
-1. **按 v003 脚本重渲 t001**：现有三版成片都没有 AIGC 标识（`aigc_label: none`），是唯一还挂在合规外的产物
+1. ~~按 v003 脚本重渲 t001~~ ✅ 已做（`videos/t001-v4/`，59.3s / 1.97MB，标识三件套 + 三处独立核验通过）。剩下一件人定的事：**发布前把 `--aigc-producer` 换成真实主体名**再渲一次（现在是默认值）
 2. **补 1-2 个高 ROI 包的 composition**：`news-policy` + `news-stat`（视觉差异最大，且新闻域真会命中）；补完删掉 `placeholder.html`，可渲染计数自然涨
 3. **登录抖音账号（用户本人扫码）**：链路已到"可发布"，缺的只是 cookie；agent 不代替扫码
-4. **免费采集层 `news-collect`**：热点来源现在靠人工粘贴，补一个 stdlib-only 的兜底（自建 DailyHotApi `--base-url`，无服务器时退回 RSS），落 `.harness-news-runtime/hotboard/<date>.json`
+4. ~~免费采集层 `news-collect`~~ ✅ 已建并接入步骤 0（stdlib-only，无 key 无付费）：百度热搜 board API + feedx RSS 双轨，实测源/新鲜度/字段坑见 `skills/news-collect/SKILL.md`。DailyHotApi 公共实例本机 DNS 解析失败 → 只做 `--base-url` 自建选项，不作默认。`npm run index` 已收录（48 active）
 5. ~~news-polish / humanizer-zh 从工作流引用里删掉~~ ✅ 已做（v1 文字轨已从 `core/runbooks.md` / `core/intent-routing.md` 清干净，两条治理文档改为指向 `skills/news-workflow/SKILL.md` 单一事实源）
 
 ---

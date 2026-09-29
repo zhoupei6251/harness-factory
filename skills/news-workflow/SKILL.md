@@ -10,6 +10,7 @@ tags:
 domain: news
 category: news.workflow
 skills:
+  - "news-collect"
   - "hot-topic-content-maker"
   - "media-short-video-copy"
   - "viral-script-writer"
@@ -29,14 +30,25 @@ skills:
 
 ## 步骤 0：选题裁决（先做这个决定）
 
-两个选题技能触发词重叠，按"出不出片"裁决：
+**先采集，再裁决**。采集层是 `news-collect`（零成本：百度热搜 board API + feedx 中文媒体 RSS，
+一条命令把线索写进 `.harness-news-runtime/hotboard/<date>.json`）；`hot-topic-content-maker` 只用来做选题裁决与脚本导向。
 
-| 场景 | 用哪个 |
+| 场景 | 用什么 |
 |------|--------|
-| 当天采集热点 + 1 条内容到脚本 + 待验证 | **hot-topic-content-maker** |
+| 手上没素材，要看今天什么在热 | `python skills/news-collect/scripts/collect.py --limit 12 --print`（只要新料再加 `--max-age-days 3`）|
+| 从线索里定 1 条并推到脚本 | **hot-topic-content-maker**（裁决/脚本导向；**不调它的热榜查询**，见下）|
 | 用户自己带来了热点/素材 | 跳过采集，直接进步骤 1 |
 
-裁决后在 MEMORY `topics` 记录 `id + title + source`，**`status: researching`**。
+⛔ **新闻域不使用 `hot-topic-content-maker` 的热榜查询**：那一步按次扣 Beatra 付费额度
+（抖音热榜 6 credits，抖音/小红书按话题搜索各 60 credits）。本路线硬约束是零付费创作 —— 采集一律走 `news-collect`。
+
+采集到的是**线索，不是事实**，三个实测的坑（细节见 `skills/news-collect/SKILL.md` §4/§5/§9）：
+`hot` 字段恒为空（没有真热度值，只能看榜内 `rank`）；百度条目的 url 是搜索结果页不是原文；
+feedx 三个源新鲜度从「当天」到「9 个月前」都有 → 按 `feed_stats` / `age_days` 先筛一遍。
+裁决结果仍必须进步骤 3 的 fact-check 硬门禁，本层不豁免任何东西。
+
+裁决后在 MEMORY `topics` 记录 `id + title + source`，**`status: researching`**；
+`source` 写成可回溯形式，例如 `百度热搜榜 #3（news-collect 采集于 2026-09-29）`。
 
 ---
 
@@ -170,6 +182,8 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
 7. **AIGC 标识不可关**：成片必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
    ①② 由 `path_b_build.py` 无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供。
    没有 `aigc.json` 侧车的老成片一律视为不合规，**重渲**而不是直发
+8. **采集只走 `news-collect`**：热点线索来自本地可复跑的免费采集器，**不**调用任何按次扣费的榜单/搜索接口
+   （Beatra 热榜 6 / 话题搜索 60 credits）。付费不是本路线的可选项，缺源就补免费源而不是花钱
 
 ---
 

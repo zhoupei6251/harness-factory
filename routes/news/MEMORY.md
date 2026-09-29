@@ -15,7 +15,7 @@
 
 | Phase | 技能 |
 |-------|------|
-| researching | hot-topic-content-maker |
+| researching | news-collect（采集线索，零成本）→ hot-topic-content-maker（选题裁决；**付费热榜查询本域禁用**）|
 | drafting | media-short-video-copy / viral-script-writer |
 | fact_check | fact-check（必须，不可跳过）|
 | rendering | douyin-pro（Path B only：`--template <pack>`；产出自带 AIGC 显式角标 + 元数据隐式标识）|
@@ -122,7 +122,7 @@ videos:
     render_status: done
     output: .harness-news-runtime/videos/t001-v3/final.mp4
     spec: 1080×1920 / 59.3s / 1.87MB（当前最优一版）
-    aigc_label: none             # ⛔ 同上 —— t001 要发布必须**重渲**
+    aigc_label: none             # ⛔ 同上 —— 已由 v004（同脚本 + AIGC 标识）取代，发布用 v004
   - id: probe-aigc
     topic_id: null               # 不是新闻成片，是 AIGC 标识端到端验证探针（2 镜）
     template: news-coral
@@ -130,6 +130,18 @@ videos:
     output: .harness-news-runtime/videos/aigc-e2e/final.mp4
     spec: 1080×1920 / 11.9s / 1.01MB + aigc.json + contact-sheet.jpg
     aigc_label: verified         # ✅ 角标字芯实测 62px(≥54px 线)，元数据 ffprobe format_tags 读回一致
+  - id: v004
+    topic_id: t001
+    template: news-coral
+    render_status: done
+    output: .harness-news-runtime/videos/t001-v4/final.mp4
+    spec: 1080×1920 / 59.3s / 1.97MB / 字幕轨 14 条 + aigc.json + contact-sheet.jpg + build.log
+    voice: zh-CN-XiaoxiaoNeural
+    aigc_label: verified         # ✅ 三处独立核验：① 元数据 ffprobe format_tags 读回（自证之外再查一次）
+                                 #    ② 左上角 560×90 亮像素 5s/30s/55s 恒定 12.8k → 角标贯穿全片
+                                 #    ③ 裁图目视 = 「AI 生成合成内容」白字黑边
+    caveat: ContentProducer 用的是默认值 harness-news-pathb；真要发布前先定**主体名**再用
+            `--aigc-producer <主体名>` 重渲一次（GB 45438-2025 要求可追溯到发布主体）
   # - id: v001
   #   topic_id: t001
   #   template: <12 选 1, 见上方决策树>
@@ -141,8 +153,12 @@ videos:
 in_progress:
   - current_phase: publishing
     topic_id: t001
-    blocker: 两把锁 —— ① 抖音账号未登录（`sau douyin check` 前不发）；② **现有 t001 三版成片都没有 AIGC 标识**（09-29 才把标识能力做进构建），发布前必须用 v003 那版脚本重渲
-    note: 重渲命令见上方「跑命令」；重渲后核对 `videos/<id>/aigc.json` + contact-sheet 左上角标，再走 upload-video。发布主路径已接入（skills/douyin-upload + 本机 .venv/Scripts/sau.exe，见其 references/local-env.md）
+    blocker: 一把锁 —— 抖音账号未登录（`sau douyin check` 返回 valid 前不发）。原第二把锁
+             「t001 成片无 AIGC 标识」已于 09-29 12:09 解除：v004 = 同脚本重渲 + 标识三件套，独立核验通过
+    note: 发布走 upload-video 时必须带 `--declaration 内容由AI生成`，成功凭据是日志出现
+          `自主声明已选择「…」`（上游失败只 warning、不阻断）。发布前还有一件人定的事：
+          把 `--aigc-producer` 换成真实主体名重渲（见 v004.caveat）。发布主路径已接入
+          （skills/douyin-upload + 本机 .venv/Scripts/sau.exe，见其 references/local-env.md）
 
 ## Last updated
 last_updated: 2026-09-29

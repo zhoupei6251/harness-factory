@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 47 active + 51 archived = 98 skills
+Total: 48 active + 51 archived = 99 skills
 
-## Active (47)
+## Active (48)
 
 | Skill | Description |
 |-------|-------------|
@@ -32,9 +32,10 @@ Total: 47 active + 51 archived = 98 skills
 | index-project | 为项目建立代码索引。触发：大型项目、需要精准定位符号、快速查找调用关系。 |
 | lsp-query | 通过 Language Server Protocol（typescript-language-server / pyright / gopls 等）做结构化代码查询：定义、引用、悬停信息、符号、代码 |
 | media-short-video-copy | 短视频文案工作流 skillset 入口：竞品文案提取 → 多平台脚本创作 → 爆款标题生成，串联 6 个技能完成短视频文案生产 |
+| news-collect | 零成本热点采集：百度热搜 board API + feedx 中文媒体 RSS，一条命令把"今天什么在热"落成选题线索 JSON，喂给 news-workflow 步骤 0。stdlib-only，无 |
 | news-generator | 新闻写作技能包：根据热点/素材生成新闻稿件 |
 | news-polish | 新闻稿件润色技能：去AI味、提升可读性、专业化表达 |
-| news-workflow | 新闻域总工作流入口：选题 → 文字/视频分轨生产 → 事实核查 → 润色/成片 → 发布，串联 news 域全部技能并给出选题双技能裁决规则。route=news 的多阶段任务从这里开始。 |
+| news-workflow | 新闻域总工作流入口（v2 单轨）：选题 → 模板决策 → 脚本 → 事实核查 → 成片 → 发布。所有 path = Path B（免费·零云费）。route=news 且任务跨多阶段时使用。 |
 | planning-with-files | Implements Manus-style file-based planning to organize and track progress |
 | playwright | Browser automation via Playwright MCP. Navigate websites, click elements, |
 | project-planner | Triage ideas, problems, and feature requests into the right format |

@@ -1,0 +1,13 @@
+{
+  "slug": "news-collect",
+  "category": "news.research",
+  "domain": "news",
+  "tags": [
+    "news",
+    "hot-topic",
+    "collect",
+    "rss",
+    "zero-cost"
+  ],
+  "purpose": "零成本热点采集：百度热搜 board API + feedx 中文媒体 RSS，产出 news-workflow 步骤 0 的选题线索 JSON（无 key、无付费、不占端口）"
+}
