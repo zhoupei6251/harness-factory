@@ -1186,6 +1186,36 @@ def t_auto_layout_stems_are_the_only_vocabulary():
         stems = set(pb.load_style_pack(pack_name)["layouts"])
         assert stems <= vocab, f"{pack_name} 交出自动模式选不到的版式: {sorted(stems - vocab)}"
 
+
+# ---------------- 版式闸门的用法错误(不许"0 个文件"空过) ----------------
+def t_layout_selfcheck_refuses_a_directory_with_no_layouts():
+    # 硬规则 6 的三道闸里, layout_selfcheck 是唯一"参数在人手里"的那道: 把 pack 名当目录
+    # 传进去时, 旧版打印「版式自检通过：0 个文件，0 条违规」并 exit 0 —— 一次打错参数的
+    # 绿闸门其实一条不变量都没查, 这是所有假绿里最难发现的一种(2026-09-29 订正文档时撞到)。
+    # 闸门要的是"查过了", 不是"没报错", 所以这里双向锁死: 真目录必须 0, 空目录必须非 0。
+    import contextlib
+    import io
+
+    lsc = pb.layout_selfcheck
+    real = os.path.join(pb.TEMPLATE_ROOT, "news-coral")
+    assert lsc.discover_layouts(Path(real)), f"测试前提坏了: {real} 读不到版式文件"
+
+    def run(*argv):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf):
+            code = lsc.main(list(argv))
+        return code, buf.getvalue()
+
+    code, out = run(real)
+    assert code == 0, f"真版式目录被误判为用法错误: code={code} | {out}"
+    for bad in ("news-coral", os.path.join(pb.TEMPLATE_ROOT, "no-such-pack")):
+        for argv in ([bad], ["--quiet", bad]):
+            code, out = run(*argv)
+            assert code == 1, f"{argv}: 目录里一个版式文件都没有却返回 0(空过)"
+            assert str(bad) in out, f"报错没点名是哪个目录空过: {out}"
+            assert "compositions" in out, f"报错要教正确的参数写法: {out}"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

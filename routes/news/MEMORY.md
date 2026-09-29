@@ -113,10 +113,11 @@ python skills/douyin-pro/scripts/path_b_build.py \
 - `news-coral`: 完整（frame + host + 7 真 compositions）
 - `news-policy`: 完整（frame + host + 5 真 compositions，占位壳已删）
 - 其余 10 个: frame + host + 1 placeholder（真 composition 待补，且**当前不可渲染**）
-- 校验（三道闸，仓库根执行）：`path_b_selftest.py` **71 项**（含 AIGC 标识、草稿轨、发布闸门与
-  姿态文件的判据、占位包停机、色板复算与版式词表的负例）+ `audit_pack_contrast.py`（12 pack 色板/对比度复算）+
-  `layout_selfcheck.py <pack 目录…>`（17 条结构不变量；**要传目录不是包名**，传包名会得到
-  "0 个文件 0 条违规"的空过）
+- 校验（三道闸，仓库根执行）：`path_b_selftest.py`（**项数以脚本末行输出为准，别在文档里抄数**；覆盖
+  AIGC 标识、草稿轨、发布闸门与姿态文件的判据、占位包停机、色板复算、版式词表，以及三道闸各自的
+  假绿负例）+ `audit_pack_contrast.py`（12 pack 色板/对比度复算）+
+  `layout_selfcheck.py <pack 目录…>`（17 条结构不变量；**参数是含 `compositions/*.html` 的目录不是包名** ——
+  传进去而里面没有版式文件现在当场 exit 1 并点名该目录，不再"0 个文件 0 条违规"空过，见 ARCHITECTURE D13）
 - 发布前另过一道 `check_publishable.py <成片.mp4>`：它不审版式，只照 `aigc.json` 核 ①② 在不在，
   ③ 按姿态文件决定打不打 `--declaration 内容由AI生成`（关着就打警告 + 要求留痕；退出码 1 = 这份东西不许发）
 

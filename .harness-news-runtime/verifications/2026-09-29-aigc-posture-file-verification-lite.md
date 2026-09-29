@@ -147,6 +147,9 @@ python skills/douyin-pro/scripts/check_publishable.py <成片> [--allow-undeclar
    一次打错参数的"绿闸门"其实什么都没查。本次只订正文档（要传**目录**：
    `templates/hyperframes_path_b/news-coral`，实测 12 文件 0 违规），**未**顺手改脚本判据，
    以免超出这次的范围；已作为独立建议提出。
+   **订正（同日，用户点头后在本分支做了）**：脚本判据已改 —— 显式目录里 0 个版式文件即 exit 1
+   （`--quiet` 同样拦），自测加一条双向负例，决策记为 **D13**；
+   见 `2026-09-29-layout-selfcheck-no-empty-pass-verification-lite.md`。
 3. **草稿日志双括号绕口**：`草稿模式(draft(... render=draft))` 改为 `草稿模式[...]`，与侧车
    `草稿渲染[...]` 同形（纯显示，不参与判据）。
 

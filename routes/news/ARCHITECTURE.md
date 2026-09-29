@@ -68,13 +68,15 @@ skills/douyin-pro/                   ← 渲染器 (Path B)
 ├── SKILL.md                         ← 通用 Skill (Path A 仍标注为"非新闻可用")
 ├── scripts/
 │   ├── path_b_build.py             ← 9 步发射器 (解析→配音→发射→自检→门禁→渲染→动量→烧字幕+AIGC→联络表)
-│   ├── layout_selfcheck.py          ← 17 条结构不变量 (渲前拦截)
+│   ├── layout_selfcheck.py          ← 17 条结构不变量 (渲前拦截; 参数是目录, 空目录=用法错误非零退出, 见 D13)
 │   ├── audit_pack_contrast.py       ← frame.md 色板与对比度表复算 (文档里的"实测值"不许手抄)
 │   ├── verify_aigc_badge.py         ← AIGC 角标真像素复测 (字芯/墨迹/时长三项; 时序基准 = silent 同刻重烧无角标 ASS; 文档数字只认它)
 │   ├── check_publishable.py         ← 发布闸门 (照 aigc.json 核 ①② + 打出 ③ 必带参数; 草稿在这里被拒)
 │   ├── aigc_mode.py                 ← 两开关的**默认姿态**裁决 (旗标 > routes/news/aigc-mode.json > 代码默认; 值不合法即 ModeError)
 │   ├── fixtures/badge_probe_shots.json ← 探针**输入** (5 镜 news-policy): 发射器渲它、复测器量它
-│   ├── path_b_selftest.py           ← 71 项纯函数断言 (12 pack 加载 + AIGC 合规 + 草稿轨/发布闸门/姿态文件 + 词表 + 上面两闸门的负例)
+│   ├── path_b_selftest.py           ← 纯函数断言集 (项数以脚本输出为准, 别在文档里抄数; 覆盖 12 pack 加载
+│   │                                  + AIGC 合规 + 草稿轨/发布闸门/姿态文件 + 词表
+│   │                                  + 三道闸各自的假绿负例: 色板种错数 / 版式传空目录 / 草稿与缺侧车)
 │   ├── commons_media.py             ← 图片层 (path B 当前未启用, 留作图片型模板扩展)
 │   └── install_path_b_deps.py       ← 依赖一键装
 ├── templates/hyperframes_path_b/   ← 12 个节目包
@@ -145,6 +147,7 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 | D12 | 关标识这件事**落在文件里，不落在代码里** | 用户 2026-09-29 又说「先帮我把两开关先关了吧」。把 `path_b_build.py` 的默认值改成草稿 = 让一次会话的偏好固化成合规基线（D11 正是为堵这个定的），所以改成三层裁决：**旗标 > 姿态文件 `routes/news/aigc-mode.json` > 代码默认（full / required）**。姿态文件受版本管理，于是"关掉了什么、谁关的、哪天关的、怎么回退"都能 `git diff` 出来（`since` / `by` / `revert` 三段是硬要求，由 `t_repo_aigc_mode_file_is_valid_and_recorded` 上闸）；两个方向都有单次旗标可压：渲染 `--draft`/`--deliver`、发布 `--allow-undeclared`/`--require-declaration`，同时给 = 报错。值拼错（`render: off`）或 JSON 坏了 **停机不回退默认**（R6）—— 一次拼写错误不该替用户决定合规姿态。日志、`aigc.json` 的 `switch` 与 `draft.reason`、闸门输出都**带真出处**（`draft(<路径> render=draft)` / `draft(旗标 --draft)`），事后能查是谁关的。**这条不改 D11 的判据**：姿态把渲染变成草稿后，闸门照旧 EXIT=1 —— 文件能决定"③ 带不带"，决定不了"没标的可以发"；② 元数据过抖音转码即失，③ 是唯一活到平台侧的那一件，所以 `declaration=undeclared` 期间发出去的每一条都要在 `videos[].declaration` 记 `undeclared` |
 | D9 | 版式名只认**文件名词干** | 自动选版的词表是 `path_b_build.AUTO_LAYOUT_STEMS`（`hook / closer / story / stat / quote / catalog / rail`，元组顺序即兜底顺序）；pack 自己起的名字**不能**进自动候选 —— 只能按语义落到 canonical 文件名，映射在 pack 的 frame.md §6 记全，别让人再猜一遍。composition id 由 `MOUNT_TPL` 与文件名解耦，可保留 pack 前缀（`np-*`）维持公文身份。**这条坑是静默的**：2026-09-29 清点出 10 个未落地 pack 的 §7 共计划了 16 个词表外文件名（`evidence`/`lead-detail`/`compare`/`drilldown`/`clock`/`sit`/`list`/`diagram`/`list-steps`/`risk-callout`/`segment`/`chain`/`play`/`score`/`map`/`region`）—— 照那些名字建文件不会报错，只会得到一个自动模式永远选不到的惰性版式。已由 `t_auto_layout_stems_are_the_only_vocabulary` 上闸（点名表 ⊆ 词表 = 词表，可渲染 pack 的词干 ⊆ 词表）|
 | D10 | 设计系统里的数字必须有**复算入口** | frame.md 的对比度表是"实测值"，但此前只能靠手抄维护：2026-09-29 首次全量复算抓到 11 个包共 **42 处**漂移，其中 `news-blast` 文档写 `score / pitch 5.0`（真值 **1.18**）而 §3 字阶据此把 22cqw 的主队比分染成红字压绿底 —— 手抄的假数会直接变成**播出后看不清的巨号字**。现在这类数一律由 `audit_pack_contrast.py` 从 §2 色板原值复算（判读线写进常量：正文 4.5 / 大字 3.0，1080 宽下 ≥2.22cqw ≈ 24px），文档只许写命令不许写脚本残留路径，改色板或改判定即红。**法则可以比数学严，数学不行**：gold 只作形状是包内法则，"gold 数学不过线"是假陈述 —— 审计按此区分 `VERDICT_CONTRADICTS_ARITHMETIC` |
+| D13 | 闸门**不许空过**：显式传入的目录里没有版式文件 = 用法错误，非零退出 | 三道闸的价值是"查过了"，不是"没报错"。`layout_selfcheck.py` 旧行为：把 pack 名当目录传（`layout_selfcheck.py news-coral news-policy`）时逐条打印「没找到版式文件」，结尾仍输出「版式自检通过：0 个文件，0 条违规」并 **exit 0**（2026-09-29 订正 D12 文档时撞到）。假绿比红危险 —— 红会让人停下，假绿会被当凭据抄进文档与台账，且这是三道闸里唯一"参数握在人手里"的那道。现在显式目录贡献 0 个文件即 exit 1，报错点名是哪个目录并写出正确参数写法，`--quiet` 同样不放过（自测 `t_layout_selfcheck_refuses_a_directory_with_no_layouts` **双向**锁：真目录仍 0、pack 名与不存在目录必须 1）。取舍：没有"传了目录又想跳过检查"的合法写法 —— 要跳过就不传参数（`nargs="+"` 直接拒），不存在第三种。渲染期内部那道 `gate_layout_selfcheck` 走 `check_layout()` 逐文件，本来就不经过 CLI，不受影响。四条命令的真输出（绿/红/quiet/`--check-only`）见 `.harness-news-runtime/verifications/2026-09-29-layout-selfcheck-no-empty-pass-verification-lite.md` |
 
 ---
 
@@ -182,8 +185,11 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 4. **产物写 `.harness-news-runtime/`**: 不写 `.ai-runtime-artifacts/` (那是 code 域)
 5. **Path B only**: 不要传 `--template` 之外的渲染选项；不要尝试 Path A
 6. **12 pack 自检**: 任何新加的 pack 必须先有 frame.md 才能 commit；三道闸全绿才算过 ——
-   `path_b_selftest.py`(71 项) + `layout_selfcheck.py <pack 目录…>`(17 条结构不变量) +
-   `audit_pack_contrast.py`(色板复算, 见 D10)。新 pack 的名字必须落 `AUTO_LAYOUT_STEMS`(见 D9)
+   `path_b_selftest.py`(项数以脚本输出为准) + `layout_selfcheck.py <pack 目录…>`(17 条结构不变量) +
+   `audit_pack_contrast.py`(色板复算, 见 D10)。新 pack 的名字必须落 `AUTO_LAYOUT_STEMS`(见 D9)。
+   `layout_selfcheck.py` 的参数是**目录**（含 `compositions/*.html`），不是 pack 名：传进去而里面
+   没有任何版式文件 = 用法错误，当场非零退出（旧版打印「0 个文件，0 条违规」还 exit 0，
+   一次打错参数的"绿闸门"其实什么都没查 —— 假绿比红更难发现，见 D13）
 7. **AIGC 标识对交付件不可关**: 交付件三件齐活 —— ①画面角标 ②mp4 元数据 ③发布自主声明，`aigc.json` 缺失的成片先重渲；
    发之前必须过 `check_publishable.py <成片>`（退出码 1 即不许发）。想不要标识只有**草稿轨**一条路
    （旗标 `--draft` 或姿态文件 `render=draft`），而它的产物本身就不可发布（见 D11）；③ 可以由
@@ -199,7 +205,7 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 
 ```
 $ python skills/douyin-pro/scripts/path_b_selftest.py
-[selftest] 71 项 · style=news-coral
+[selftest] 72 项 · style=news-coral
   ok    t_aigc_mode_code_defaults_are_all_on
   ok    t_aigc_mode_file_flips_defaults_and_flags_override_both_ways
   ok    t_aigc_mode_reason_names_the_true_source
@@ -208,12 +214,13 @@ $ python skills/douyin-pro/scripts/path_b_selftest.py
   ok    t_draft_badge_absent_but_subtitles_kept
       可渲染 pack (有真版式): 2/12 —— news-coral, news-policy
   ok    t_full_loadability_progress
+  ok    t_layout_selfcheck_refuses_a_directory_with_no_layouts
   ok    t_pack_contrast_docs_match_palette_math
   ok    t_publish_gate_default_requires_declaration
   ok    t_publish_gate_refuses_draft_and_missing_sidecar
       姿态文件 D:\work\...\harness-factory\routes\news\aigc-mode.json: render=draft · declaration=undeclared
   ok    t_repo_aigc_mode_file_is_valid_and_recorded
-[selftest] 全绿 71/71
+[selftest] 全绿 72/72
 
 $ python skills/douyin-pro/scripts/audit_pack_contrast.py
 对比度审计通过：12 个 pack 的 frame.md 色板与文档一致（0 条警告）
@@ -222,6 +229,13 @@ $ python skills/douyin-pro/scripts/layout_selfcheck.py \
     skills/douyin-pro/templates/hyperframes_path_b/news-coral \
     skills/douyin-pro/templates/hyperframes_path_b/news-policy
 版式自检通过：12 个文件，0 条违规
+
+$ python skills/douyin-pro/scripts/layout_selfcheck.py news-coral news-policy   # 参数写成包名
+news-coral: 没找到版式文件
+news-policy: 没找到版式文件
+
+版式自检不过：显式传入的 2 个目录里没有任何版式文件（news-coral、news-policy）—— 参数要写含
+compositions/*.html 的**目录**…只写 pack 名不算检查，也不算通过。            (旧行为: exit 0)
 ```
 
 集成状态：
@@ -269,6 +283,12 @@ $ python skills/douyin-pro/scripts/layout_selfcheck.py \
   ③ 警告，`--allow-undeclared` 与 `--require-declaration` 同时给 = 矛盾停机。记录见
   `.harness-news-runtime/verifications/2026-09-29-aigc-posture-file-verification-lite.md`
   ⚠️ **姿态开着就等于"默认渲染不可发布"**：现在要交付必须显式 `--deliver`，别顺着默认渲完就发
+- ✅ **版式闸门不再空过**（D13，同一轮文档订正时撞到）：`layout_selfcheck.py` 收到一个不含
+  `compositions/*.html` 的显式目录（典型写法错误：只传 pack 名）从前的收尾是「0 个文件，0 条违规」
+  **exit 0**；现在点名该目录并 exit 1，`--quiet` 一样拦。自测新增
+  `t_layout_selfcheck_refuses_a_directory_with_no_layouts`（**双向**锁：真目录必须 0、pack 名与不存在目录
+  必须 1，`--quiet` 也要拦）；上面 §8 那一对命令就是凭据（一条绿一条红，都是真输出）。
+  项数只在 §8 那次真转录里出现，别处不抄（加断言必然让抄进文档的数过期）
 - ✅ 发布链路：`--declaration 内容由AI生成` 已对齐上游源码，成功凭据写进 skill
 - ✅ 占位包改为**加载期停机**（不再拖到渲染第 1 镜）
 - ✅ 进度指标换成可交叉核验的"有真版式 pack 数"（2/12）

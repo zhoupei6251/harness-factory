@@ -87,7 +87,10 @@ feedx 三个源新鲜度从「当天」到「9 个月前」都有 → 按 `feed_
   - `path_b_selftest.py` → 末行 `[selftest] 全绿 N/N`（**项数以脚本输出为准**，别在文档里抄数：
     61→63→66 这三级台阶全是加断言造成的手抄漂移），并报告 `可渲染 pack (有真版式): X/12`
   - `audit_pack_contrast.py` → `对比度审计通过：12 个 pack 的 frame.md 色板与文档一致`
-  - `layout_selfcheck.py <pack…>` → `版式自检通过：N 个文件，0 条违规`
+  - `layout_selfcheck.py <版式目录…>` → `版式自检通过：N 个文件，0 条违规`。参数是**含
+    `compositions/*.html` 的目录**（`skills/douyin-pro/templates/hyperframes_path_b/news-coral`），
+    不是 pack 名：显式传入的目录里没有版式文件 = 用法错误，当场 exit 1 并点名该目录
+    （旧版会打印「0 个文件，0 条违规」还 exit 0 —— 一次打错参数的绿闸门什么都没查，见 D13）
   - ⚠️ **前提**：`hyperframes` 要 Node ≥ 22；nvm 若指向 20.x，`npx -y hyperframes check` 只会产出
     空的 `check.json` + `requires Node.js >= 22`，那不是版式失败
 - ⚠️ **补包前先重映射版式名**：自动选版只认 `path_b_build.AUTO_LAYOUT_STEMS`（hook / closer /

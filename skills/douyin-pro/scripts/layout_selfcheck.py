@@ -23,7 +23,8 @@ news-coral 与 news-policy —— 规则本身不认包名, 只认契约与不�
 
     python layout_selfcheck.py <版式目录> [<版式目录> ...] [--quiet]
 
-返回码：0 = 全部版式通过；1 = 有违规（逐条打印 文件:规则:说明）。
+返回码：0 = 全部版式通过；1 = 有违规（逐条打印 文件:规则:说明），**或**某个显式传入的目录
+里一个版式文件都没有 —— 那是用法错误（把 pack 名当成目录传了），不许算成"通过"。
 """
 
 from __future__ import annotations
@@ -368,15 +369,17 @@ def main(argv: list[str] | None = None) -> int:
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Path B 版式结构自检（逐 pack 目录跑）")
     parser.add_argument("directories", nargs="+", type=Path, help="含 compositions/*.html 的版式目录")
-    parser.add_argument("--quiet", action="store_true", help="只在有违规时输出")
+    parser.add_argument("--quiet", action="store_true", help="只在有违规或用法错误时输出")
     args = parser.parse_args(argv)
 
     total_files = 0
     all_violations: list[Violation] = []
+    empty_dirs: list[str] = []
     for directory in args.directories:
         layouts = discover_layouts(directory)
         if not layouts:
             print(f"{directory}: 没找到版式文件")
+            empty_dirs.append(str(directory))
             continue
         for layout in layouts:
             total_files += 1
@@ -386,6 +389,16 @@ def main(argv: list[str] | None = None) -> int:
         for violation in all_violations:
             print(str(violation))
         print(f"\n版式自检不过：{total_files} 个文件里 {len(all_violations)} 条违规")
+        return 1
+    # 空过比违规更危险：一次打错参数的运行看起来是绿的，实际一条不变量都没查。
+    # 闸门（硬规则 6）要的是"查过了"，不是"没报错"，所以这里必须非零退出。
+    if empty_dirs:
+        print(
+            f"\n版式自检不过：显式传入的 {len(empty_dirs)} 个目录里没有任何版式文件"
+            f"（{'、'.join(empty_dirs)}）—— 参数要写含 compositions/*.html 的**目录**"
+            "（如 skills/douyin-pro/templates/hyperframes_path_b/news-coral），"
+            "只写 pack 名不算检查，也不算通过。"
+        )
         return 1
     if not args.quiet:
         print(f"版式自检通过：{total_files} 个文件，0 条违规")
