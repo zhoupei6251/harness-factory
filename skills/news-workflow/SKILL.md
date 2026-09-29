@@ -148,14 +148,17 @@ python skills/douyin-pro/scripts/path_b_build.py \
 5. hyperframes check --strict（引擎门禁）
 6. HyperFrames 渲染 → silent.mp4
 7. scdet 动量审计（每镜尾段必须仍在变化）
-8. ffmpeg 合成（拼配音 + 烧 ASS 字幕 + **开场 4 秒左下角 AIGC 显式角标 + mp4 元数据隐式标识，读回核验**）
+8. ffmpeg 合成（拼配音 + 烧 ASS 字幕 + **交付轨才烧开场 4 秒左下角 AIGC 显式角标 + 写 mp4 元数据隐式标识并读回核验**；
+   草稿轨两步都跳过 —— 走哪条轨见下面「哪条轨」一段，由旗标 > `routes/news/aigc-mode.json` > 代码默认裁决）
 9. 联络表 contact-sheet.jpg（人工验收比对）+ `aigc.json` 标识侧车
 
 回填 MEMORY `videos[].output` + `videos[].render_status: done`。
 
-**调版式用草稿轨**：加 `--draft` 就不烧 ① 角标、不写 ② 元数据，侧车只留 `draft` 一段。
-这份产物在步骤 5 的闸门里**必然被拒**（`check_publishable.py` 读到 `draft` 即 EXIT=1），
-所以它可以用来量像素、看留白、比版式，但不论如何发不出去。交付不加这个 flag。
+**哪条轨（2026-09-29 起仓库默认 = 草稿轨）**：`render` 现在在姿态文件里写着 `draft`，所以
+**不加旗标渲出来的每一份都是草稿** —— 不烧 ① 角标、不写 ② 元数据，侧车只留 `draft` 一段（出处会写成
+`draft(<姿态文件路径> render=draft)`）。这份产物在步骤 5 的闸门里**必然被拒**（读到 `draft` 即 EXIT=1），
+所以它可以用来量像素、看留白、比版式，但不论如何发不出去。**要交付就显式加 `--deliver`**
+（旗标压过姿态文件，侧车 `switch` 会记 `full(旗标 --deliver)`），长期恢复默认则把 `render` 改回 `full`。
 
 **注意**：`--template` 与 `--style` 同义（兼容旧用法）；`DEFAULT_TEMPLATE = news-coral`。
 
@@ -168,13 +171,17 @@ python skills/douyin-pro/scripts/path_b_build.py \
 **前置门禁**（任一不成立就不发）：
 - `drafts[].fact_check == passed`
 - **闸门先过**：`python skills/douyin-pro/scripts/check_publishable.py <abs>/final.mp4` 退出码必须是 0。
-  它照 `aigc.json` 核 ①`explicit.burned_in` 与 ②`metadata_key`/`implicit`，并把 ③ 必带的
-  `--declaration 内容由AI生成` 连整条命令打出来；`--draft` 草稿与无侧车的老成片都在这里被拒（EXIT=1 → 重渲）
+  它照 `aigc.json` 核 ①`explicit.burned_in` 与 ②`metadata_key`/`implicit`，草稿与无侧车的老成片都在这里被拒
+  （EXIT=1 → 重渲）；③ 那行 `--declaration 内容由AI生成` **给不给由姿态文件的 `declaration` 决定** ——
+  现在仓库写着 `undeclared`，闸门只打警告并要求在 `videos[].declaration` 记 `undeclared`。
+  要按老规矩带声明：闸门加 `--require-declaration`（本次）或把姿态改回 `required`（长期）
 - `sau douyin check --account <name>` 返回 `valid`
 - **未登录时不代替用户扫码**，把成品交用户手动发
 
 ```bash
 # 视频轨（成片必须绝对路径；AI 生成内容必须带自主声明）
+# 姿态 declaration=undeclared 期间闸门不给最后一行 —— 那是当前默认；
+# 要带声明就照下面写（或先给闸门加 --require-declaration 让它把命令打全）
 sau douyin upload-video --account <name> --file <abs>/final.mp4 \
   --title "<稿内标题>" --desc "<正文+话题>" --tags tag1,tag2 \
   --declaration 内容由AI生成
@@ -200,12 +207,13 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
    （`path_b_selftest.py` 全量断言 + `audit_pack_contrast.py` 色板复算 + `layout_selfcheck.py` 结构不变量；
    项数以脚本输出为准，见步骤 1），
    且版式文件名只许落 `AUTO_LAYOUT_STEMS`（见步骤 1 的重映射提示）
-7. **AIGC 标识对交付件不可关**：成片必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
-   ①② 由 `path_b_build.py` 无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供，
+7. **AIGC 标识对交付件不可关**：交付件必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
+   ①② 由 `path_b_build.py` 在**交付轨**上无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供，
    发之前由 `check_publishable.py` 逐件核。没有 `aigc.json` 侧车的老成片一律视为不合规，**重渲**而不是直发。
-   唯一"不要标识"的合法轨道是 `--draft`（步骤 4），它的产物被闸门判为不可发布 ——
-   **开关买到的是调试自由，不是免标识的成品**；真要跳过 ③ 只能显式
-   `check_publishable.py --allow-undeclared`，且要在 `videos[].declaration` 记 `undeclared` 留痕
+   "不要标识"的唯一合法轨道是**草稿轨**（旗标 `--draft` 或姿态文件 `render=draft`，步骤 4），它的产物被闸门判为不可发布 ——
+   **开关买到的是调试自由，不是免标识的成品**；③ 可以显式关掉（`--allow-undeclared` 或姿态
+   `declaration=undeclared`，2026-09-29 起仓库默认就是关的），关掉必须在 `videos[].declaration` 记 `undeclared`
+   留痕 —— ② 过抖音转码即失，③ 是唯一活到平台侧的那一件，代价由发布的人承担，不由脚本承担
 8. **采集只走 `news-collect`**：热点线索来自本地可复跑的免费采集器，**不**调用任何按次扣费的榜单/搜索接口
    （Beatra 热榜 6 / 话题搜索 60 credits）。付费不是本路线的可选项，缺源就补免费源而不是花钱
 

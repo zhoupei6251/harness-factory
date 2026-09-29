@@ -1,0 +1,8 @@
+{
+  "render": "draft",
+  "declaration": "undeclared",
+  "since": "2026-09-29",
+  "by": "用户 2026-09-29「先帮我把两开关先关了吧」（同日先前口径是「那还是默认都打开吧」，本文件是临时姿态不是新默认）",
+  "revert": "把本文件的 render 改回 full、declaration 改回 required；或直接删掉本文件 —— 两个开关的代码默认值都是「开」",
+  "note": "本文件只改**默认姿态**，不改判据：渲染成草稿后 check_publishable.py 依旧拒发（「草稿不可发布」这条不许被任何姿态关掉）。单次渲染要交付用 --deliver，单次发布要带声明用 --require-declaration。代价：declaration=undeclared 时 ③ 平台自主声明默认不带，而元数据过抖音转码即失，③ 是唯一活到平台侧的那一件 —— 发布后必须在 routes/news/MEMORY.md 的 videos[].declaration 记 undeclared。"
+}

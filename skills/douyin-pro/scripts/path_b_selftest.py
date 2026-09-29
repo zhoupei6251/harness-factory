@@ -27,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import audit_pack_contrast as apc  # noqa: E402  (判据 6 的色板层: frame.md 对比度表复算)
+import aigc_mode as amode  # noqa: E402  (标识开关的姿态文件: 旗标 > 文件 > 代码默认)
 import check_publishable as cpk  # noqa: E402  (发布闸门: 照台账核 ①②, ③ 的必带参数由它给)
 import commons_media as cm  # noqa: E402  (判据 4 的图片层纯函数; 与 pb 同样必须先落地 sys.path)
 import path_b_build as pb  # noqa: E402  (sys.path 必须先落地)
@@ -1010,11 +1011,120 @@ def t_publish_gate_default_requires_declaration():
     assert cpk.DECLARATION_TEXT == "内容由AI生成", f"声明文案被改了: {cpk.DECLARATION_TEXT!r}"
     assert cpk.DECLARATION_PROOF == f"自主声明已选择「{cpk.DECLARATION_TEXT}」", (
         f"成功凭据与文案脱钩: {cpk.DECLARATION_PROOF!r}")
-    # main() 里 --allow-undeclared 是唯一逃生门, 且默认关闭(用户口径: 默认都打开)
+    # ③ 的开关有两处: 旗标(--allow-undeclared 关 / --require-declaration 开)与姿态文件,
+    # 而**代码默认**必须是关不掉的那一档(用户口径: 「默认都打开」; 临时关走姿态文件)。
     import inspect
     src = inspect.getsource(cpk.main)
     assert '"--allow-undeclared"' in src and "action=\"store_true\"" in src, (
-        "③ 的开关必须存在且默认 off")
+        "③ 的关旗标必须存在且默认 off")
+    assert '"--require-declaration"' in src, "③ 必须有反向旗标(盖掉姿态文件的关闭)"
+    assert "aigc_mode.resolve_declaration" in src, "③ 的默认值必须由姿态文件裁决, 不在代码里硬开关"
+
+
+def t_aigc_mode_code_defaults_are_all_on():
+    # 没有姿态文件 = 三件全开。这条锁的是"代码里不许藏着关闭默认"——
+    # 用户要临时关标识走 routes/news/aigc-mode.json, 而不是改这两个函数的返回值。
+    assert amode.resolve_render({})[0] == "full"
+    assert amode.resolve_declaration({})[0] == "required"
+    assert amode.RENDER_DEFAULT == "full" and amode.DECLARATION_DEFAULT == "required"
+    assert "代码默认全开" in amode.resolve_render({})[1], "原因必须说明是全开来的"
+
+
+def t_aigc_mode_file_flips_defaults_and_flags_override_both_ways():
+    posture = {"_path": "routes/news/aigc-mode.json",
+               "render": "draft", "declaration": "undeclared"}
+    # 姿态文件把两档默认都关掉(本次用户的"先关了吧"就落在这里)
+    mode, cause = amode.resolve_render(posture)
+    assert mode == "draft" and "render=draft" in cause, cause
+    assert amode.resolve_declaration(posture)[0] == "undeclared"
+    # 反向旗标必须盖得过姿态文件 —— 一次交付不该被仓库默认挡住
+    assert amode.resolve_render(posture, deliver=True)[0] == "full"
+    assert amode.resolve_declaration(posture, require_declaration=True)[0] == "required"
+    # 正向旗标照样有效(姿态是全开时也能单次关)
+    assert amode.resolve_render({}, draft=True)[0] == "draft"
+    assert amode.resolve_declaration({}, allow_undeclared=True)[0] == "undeclared"
+    # 同时给两个相反旗标 = 停机, 不许"后者覆盖前者"这种猜
+    for fn, kw in ((amode.resolve_render, {"draft": True, "deliver": True}),
+                   (amode.resolve_declaration,
+                    {"allow_undeclared": True, "require_declaration": True})):
+        try:
+            fn(posture, **kw)
+        except amode.ModeError:
+            pass
+        else:
+            raise AssertionError(f"{fn.__name__}{kw} 互相矛盾却不报错")
+    # 发射器确实接的是这套裁决(而不是自己读文件、自己定默认)
+    import inspect
+    src = inspect.getsource(pb)
+    assert "aigc_mode.resolve_render" in src and '"--deliver"' in src, (
+        "渲染层开关必须由 aigc_mode 裁决, 且反向旗标 --deliver 要在")
+    assert "draft=is_draft" in src, "mux_and_burn 必须吃裁决结果, 不是吃 args.draft"
+    # 草稿台账里要写**真原因**, 并且姿态文件那条给的是**能执行的恢复动作**
+    assert "草稿渲染[{render_cause}]" in src, "台账的 reason 必须带上开关取值出处"
+    assert "aigc-mode.json 的 render 改回 full" in src, (
+        "由姿态文件关掉的标, 台账要说出怎么改回来")
+
+
+def t_aigc_mode_reason_names_the_true_source():
+    # 台账/闸门必须说清"是谁关的标": 旗标、姿态文件、还是代码默认。
+    # 这句是事后审计唯一的抓手 —— 只写"没标"等于没写。
+    posture = {"_path": "/repo/routes/news/aigc-mode.json", "render": "draft",
+               "declaration": "undeclared"}
+    assert "旗标 --draft" in amode.resolve_render(posture, draft=True)[1]
+    assert "aigc-mode.json render=draft" in amode.resolve_render(posture)[1]
+    assert "旗标 --deliver" in amode.resolve_render(posture, deliver=True)[1]
+    assert "旗标 --allow-undeclared" in amode.resolve_declaration(
+        posture, allow_undeclared=True)[1]
+    assert "aigc-mode.json declaration=undeclared" in amode.resolve_declaration(posture)[1]
+    assert "代码默认全开" in amode.resolve_declaration({})[1]
+
+
+def t_aigc_mode_rejects_bad_values_instead_of_defaulting():
+    # R6: 拼错/坏 JSON 一律停机点名, 不许静默回退到全开 —— 回退会让"以为关了其实开着"
+    # 与"以为开着其实关了"两种错都变成不可见的。
+    with tempfile.TemporaryDirectory() as d:
+        root = os.path.join(d, "routes", "news")
+        os.makedirs(root)
+        good = os.path.join(root, "aigc-mode.json")
+        open(good, "w", encoding="utf-8").write('{"render": "draft"}')
+        assert amode.load_mode(good)["render"] == "draft"
+        # 只写一段时, 另一段按全开走(不是报错) —— 文件允许只关一个开关
+        assert amode.resolve_declaration(amode.load_mode(good))[0] == "required"
+        open(good, "w", encoding="utf-8").write('{"render": "off"}')
+        try:
+            amode.load_mode(good)
+        except amode.ModeError as exc:
+            assert "render" in str(exc) and "off" in str(exc), exc
+        else:
+            raise AssertionError("render=off 不认却不报错")
+        open(good, "w", encoding="utf-8").write("{not json")
+        try:
+            amode.load_mode(good)
+        except amode.ModeError:
+            pass
+        else:
+            raise AssertionError("坏 JSON 必须报 ModeError")
+        # 指了路径却文件不存在 = 停机(说"当没有"是最难查的静默失败)
+        try:
+            amode.load_mode(os.path.join(d, "nope.json"))
+        except amode.ModeError:
+            pass
+        else:
+            raise AssertionError("指定路径不存在必须报错")
+
+
+def t_repo_aigc_mode_file_is_valid_and_recorded():
+    # 仓库里那份姿态文件(如果存在)必须过校验: 一次拼写错误不该让默认姿态静默改变。
+    # 同时把当前姿态打到自测输出里 —— 自测那行从此能看见"标现在是开着还是关着"。
+    path = amode.find_mode_file()
+    if path is None:
+        print("      (无姿态文件 → 两个开关按代码默认全开)")
+        return
+    mode = amode.load_mode(path)
+    assert mode["render"] in amode.RENDER_MODES and mode["declaration"] in amode.DECLARATION_MODES
+    assert mode.get("revert"), f"{path} 少了 revert 一行: 怎么恢复必须写在文件里"
+    assert mode.get("since") and mode.get("by"), f"{path} 要记什么时候、谁决定的"
+    print(f"      {amode.describe(mode)}")
 
 
 def t_ffprobe_tag_entry_uses_format_tags():

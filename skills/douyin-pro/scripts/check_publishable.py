@@ -9,13 +9,20 @@ skills/douyin-upload/SKILL.md 的「三件套」表一一对应:
     ② 文件隐式元数据 → sidecar.metadata_key / implicit 必须存在 (发射器已 ffprobe 读回过)
     ③ 平台自主声明   → 本脚本把它需要的 `--declaration 内容由AI生成` 原样打出来
 
-**默认三件全开** (2026-09-29 用户口径: 「那还是默认都打开吧」):
-- 渲染加 `--draft` 可以不做 ①② (调版式、看效果、量像素用), 那份成片在这里就是
-  不可发布 —— 草稿的台账**不含** metadata_key / implicit / explicit 三段, 缺什么
-  记什么缺, 不写一堆 false 装作"标识在只是没开"。
-- ③ 只有 `--allow-undeclared` 这一个显式逃生门, 用了会打警告并要求留痕。
+**默认三件全开** (2026-09-29 用户口径: 「那还是默认都打开吧」), 但"现在想关"落在**姿态文件**
+`routes/news/aigc-mode.json` (同日「先帮我把两开关先关了吧」), 由 `aigc_mode.py` 统一裁决:
 
-退出码: 0 = 可发布, 1 = 拒绝(打印缺的是哪一件)。
+    旗标 (--draft / --deliver / --allow-undeclared / --require-declaration)
+      > 姿态文件 (render / declaration)
+        > 代码默认 (full / required)
+
+- 渲染加 `--draft` 或姿态文件 `render=draft` ⇒ 那份成片在这里就是**不可发布** —— 草稿的
+  台账**不含** metadata_key / implicit / explicit 三段, 缺什么记什么缺, 不写一堆 false
+  装作"标识在只是没开"。**这条与发布层开关无关**: 姿态怎么改都买不到"没标但可发"。
+- ③ 由 `declaration` 决定默认给不给: `required`(默认) 必须带 `--declaration`,
+  `undeclared` 不打必带参数, 但**一定**警告并要求在 `MEMORY.videos[].declaration` 留痕。
+
+退出码: 0 = 可发布, 1 = 拒绝(打印缺的是哪一件)或姿态文件本身有问题。
 
 用法:
     python skills/douyin-pro/scripts/check_publishable.py <成片.mp4>
@@ -27,6 +34,8 @@ import argparse
 import json
 import os
 import sys
+
+import aigc_mode
 
 #: 抖音发布页「自主声明」弹窗的**选项原文**, 不是我们自己编的话术。
 #: 取值凭据(上游源码行号)见 skills/douyin-upload/references/cli-contract.md § 自主声明。
@@ -47,10 +56,13 @@ def check(sidecar: dict | None) -> list[str]:
                 "path_b_build.py 重跑一次再发"]
     bad: list[str] = []
     if sidecar.get("draft"):
-        # 草稿轨 (--draft) 的产物: ①② 根本没做。这是用户要的"渲染层开关"落点,
-        # 代价就写在这里 —— 不能发, 而不是"发出去没人知道是 AI 做的"。
-        why = sidecar["draft"].get("to_publish") or "去掉 --draft 重渲"
-        return [f"这是 --draft 草稿(① 角标与 ② 元数据都没写), 不得发布 —— {why}"]
+        # 草稿轨的产物: ①② 根本没做。这是渲染层"关掉标识"的落点, 代价就写在这里 ——
+        # 不能发, 而不是"发出去没人知道是 AI 做的"。措辞用台账里那句**真原因**
+        # (旗标 --draft 还是姿态文件 render=draft), 别在这里替用户猜是谁关的。
+        draft = sidecar["draft"]
+        cause = draft.get("reason") or "草稿渲染(① 角标与 ② 元数据都没写)"
+        why = draft.get("to_publish") or "去掉 --draft 重渲"
+        return [f"{cause} —— 不得发布: {why}"]
     explicit = sidecar.get("explicit") or {}
     if explicit.get("burned_in") is not True:
         bad.append("① 显式角标缺失或未烧录 (sidecar.explicit.burned_in != true) —— 重渲")
@@ -65,8 +77,22 @@ def main() -> int:
     ap.add_argument("video", help="成片 .mp4 路径")
     ap.add_argument("--allow-undeclared", action="store_true",
                     help=f"不带 ③ 平台自主声明(--declaration {DECLARATION_TEXT})"
-                         "仍然放行 —— 默认不给, 用了要在 MEMORY.videos[].declaration 留痕")
+                         "仍然放行 —— 覆盖姿态文件里的 declaration=required; "
+                         "用了要在 MEMORY.videos[].declaration 留痕")
+    ap.add_argument("--require-declaration", action="store_true",
+                    help=f"反向旗标: 本次强制必须带 ③(--declaration {DECLARATION_TEXT}), "
+                         "用来盖掉 routes/news/aigc-mode.json 里的 declaration=undeclared; "
+                         "与 --allow-undeclared 同时给 = 报错")
     args = ap.parse_args()
+
+    try:
+        posture = aigc_mode.load_mode()
+        decl_mode, decl_cause = aigc_mode.resolve_declaration(
+            posture, allow_undeclared=args.allow_undeclared,
+            require_declaration=args.require_declaration)
+    except aigc_mode.ModeError as exc:
+        print(f"❌ ③ 的开关读不出来: {exc}")
+        return 1
 
     path = sidecar_for(args.video)
     sidecar = None
@@ -102,15 +128,15 @@ def main() -> int:
               f"{exp.get('shown_seconds')}s")
         print(f"   ② 元数据键 {sidecar.get('metadata_key')} · "
               f"Label={sidecar.get('implicit', {}).get('AIGC', {}).get('Label')}")
-    if args.allow_undeclared:
-        print("⚠️  --allow-undeclared: ③ 平台自主声明不带 —— 《标识办法》§ 4-四 的"
+    if decl_mode == "undeclared":
+        print(f"⚠️ ③ 平台自主声明不带 —— 开关取值: {decl_cause}。《标识办法》§ 4-四 的"
               "「应当」里, 元数据过抖音转码即失, ③ 是唯一活到平台侧的那一件。")
         print("   请在 routes/news/MEMORY.md 的 videos[].declaration 记 undeclared, "
               "谁决定的、什么时候, 事后能查。")
         print(f"   发布命令(无 --declaration): sau douyin upload-video "
               f"--account <账号> --file {args.video} --title … --desc … --tags …")
         return 0
-    print(f"③ 必须带: --declaration {DECLARATION_TEXT}")
+    print(f"③ 必须带: --declaration {DECLARATION_TEXT}   (开关取值: {decl_cause})")
     print(f"   成功凭据 = 日志出现「{DECLARATION_PROOF}」, 没有这行按未声明处理")
     print(f"   发布命令: sau douyin upload-video --account <账号> --file {args.video} "
           f"--title … --desc … --tags … --declaration {DECLARATION_TEXT}")
