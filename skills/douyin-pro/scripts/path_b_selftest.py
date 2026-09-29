@@ -986,7 +986,8 @@ def t_draft_badge_absent_but_subtitles_kept():
 
 
 def t_publish_gate_refuses_draft_and_missing_sidecar():
-    # 发布闸门的判据表: 交付件(①② 都在)过, 草稿/无侧车/半成品全部拦下并点名缺哪件。
+    # 发布闸门的判据表(D14 后): 可发布的底线是「② 齐活 + ① 有交代」,
+    # 草稿/无侧车/半成品/没交代的没烧标全部拦下并点名缺哪件。
     deliverable = {
         "file": "final.mp4", "metadata_key": "AIGC",
         "implicit": {"AIGC": {"Label": "1"}},
@@ -998,11 +999,56 @@ def t_publish_gate_refuses_draft_and_missing_sidecar():
                                             "to_publish": "去掉 --draft 重渲"}}
     bad = cpk.check(draft)
     assert len(bad) == 1 and "draft" in bad[0], f"草稿要一条点名草稿的拦截: {bad}"
-    # 半成品(有台账但没烧标 / 没元数据)各拦一条, 不许静默放行
-    assert cpk.check({**deliverable, "explicit": {"burned_in": False}}), "未烧标必须拦"
+    # 半成品(没交代为什么没烧 / 没元数据)各拦一条, 不许静默放行
+    assert cpk.check({**deliverable, "explicit": {"burned_in": False}}), \
+        "未烧标又没 disabled_by 必须拦 —— 关了什么得记什么关"
+    assert cpk.check({k: v for k, v in deliverable.items() if k != "explicit"}), \
+        "① 段整个缺失必须拦(旧产物或手改都不许当交付件)"
     assert cpk.check({**deliverable, "metadata_key": None}), "无元数据台账必须拦"
     # 布尔位只认真 true: 字符串 "false" 与 1 都不算数(台账是 JSON 写的, 但老产物可能手改)
     assert cpk.check({**deliverable, "explicit": {"burned_in": "true"}}), "burned_in 必须是布尔 true"
+
+
+def t_no_badge_is_publishable_but_demands_declaration():
+    # D14 的整条链路: ① 可以单独关(中间档), 但**必须**在台账里点名是谁关的,
+    # 关了 ① 就把 ③ 变成必带 —— 这一步是整个放宽里唯一不许打折的代价。
+    no_badge = {
+        "file": "final.mp4", "metadata_key": "AIGC",
+        "implicit": {"AIGC": {"Label": "1"}},
+        "explicit": {"burned_in": False, "disabled_by": "no-badge(旗标 --no-badge)",
+                     "to_enable": "渲染时加 --deliver 再重渲一次"},
+    }
+    assert cpk.check(no_badge) == [], "② 在 + ① 点名关掉 = 可发布(D14)"
+    assert cpk.badge_burned(no_badge) is False, "没烧标不许被当成烧过"
+    assert cpk.requires_declaration(no_badge) is True, "① 没烧 ⇒ ③ 必带"
+    assert cpk.requires_declaration({**no_badge, "explicit": {"burned_in": True}}) is False, \
+        "① 在的时候仍按姿态走 —— 别把代价扩大到完整交付件"
+    assert cpk.requires_declaration(None) is True, "读出台账以外一律按最严的一档办"
+    # 渲染层确实有中间档, 而且三档各自的话术都在(日志与台账只从 RENDER_WHAT 取话)
+    assert amode.RENDER_MODES == ("full", "no-badge", "draft"), amode.RENDER_MODES
+    assert set(amode.RENDER_WHAT) == set(amode.RENDER_MODES), "每档都得说清做了什么"
+    assert amode.resolve_render({}, no_badge=True)[0] == "no-badge"
+    assert amode.resolve_render({"_path": "x", "render": "no-badge"})[0] == "no-badge"
+    assert amode.resolve_render({"_path": "x", "render": "no-badge"}, deliver=True)[0] == "full", \
+        "反向旗标要盖得过中间档"
+    # 三个旗标只能挑一个: 任意两两同给都是矛盾, 不许"后者覆盖前者"那种猜
+    for kw in ({"deliver": True, "no_badge": True}, {"no_badge": True, "draft": True},
+               {"deliver": True, "draft": True}):
+        try:
+            amode.resolve_render({}, **kw)
+        except amode.ModeError as exc:
+            assert "--" in str(exc), f"矛盾旗标的报错要点名是哪两个旗标: {exc}"
+        else:
+            raise AssertionError(f"resolve_render{kw} 互相矛盾却不报错")
+    # 发射器接的是三档而不是布尔, 中间档的台账要写 disabled_by/to_enable
+    import inspect
+    src = inspect.getsource(pb)
+    assert '"--no-badge"' in src, "单次关掉 ① 的旗标必须在发射器里"
+    assert "render=render_mode" in src, "mux_and_burn 必须吃三档裁决, 不是吃布尔 args.draft"
+    assert "disabled_by" in src and "to_enable" in src, \
+        "no-badge 的台账要记下谁关的与怎么开回来 —— 空着等于让下一个人猜"
+    gate = inspect.getsource(cpk.main)
+    assert "requires_declaration" in gate, "闸门必须把「① 关 ⇒ ③ 必带」这条代价落地"
 
 
 def t_publish_gate_default_requires_declaration():
@@ -1058,7 +1104,7 @@ def t_aigc_mode_file_flips_defaults_and_flags_override_both_ways():
     src = inspect.getsource(pb)
     assert "aigc_mode.resolve_render" in src and '"--deliver"' in src, (
         "渲染层开关必须由 aigc_mode 裁决, 且反向旗标 --deliver 要在")
-    assert "draft=is_draft" in src, "mux_and_burn 必须吃裁决结果, 不是吃 args.draft"
+    assert "render=render_mode" in src, "mux_and_burn 必须吃裁决结果, 不是吃 args.draft"
     # 草稿台账里要写**真原因**, 并且姿态文件那条给的是**能执行的恢复动作**
     assert "草稿渲染[{render_cause}]" in src, "台账的 reason 必须带上开关取值出处"
     assert "aigc-mode.json 的 render 改回 full" in src, (
@@ -1073,6 +1119,10 @@ def t_aigc_mode_reason_names_the_true_source():
     assert "旗标 --draft" in amode.resolve_render(posture, draft=True)[1]
     assert "aigc-mode.json render=draft" in amode.resolve_render(posture)[1]
     assert "旗标 --deliver" in amode.resolve_render(posture, deliver=True)[1]
+    # 中间档(no-badge, D14)同样要点名出处 —— 台账说"① 没烧"却不说是谁关的, 事后无从举证
+    posture_nb = {"_path": "/repo/routes/news/aigc-mode.json", "render": "no-badge"}
+    assert "旗标 --no-badge" in amode.resolve_render(posture, no_badge=True)[1]
+    assert "aigc-mode.json render=no-badge" in amode.resolve_render(posture_nb)[1]
     assert "旗标 --allow-undeclared" in amode.resolve_declaration(
         posture, allow_undeclared=True)[1]
     assert "aigc-mode.json declaration=undeclared" in amode.resolve_declaration(posture)[1]
@@ -1088,6 +1138,9 @@ def t_aigc_mode_rejects_bad_values_instead_of_defaulting():
         good = os.path.join(root, "aigc-mode.json")
         open(good, "w", encoding="utf-8").write('{"render": "draft"}')
         assert amode.load_mode(good)["render"] == "draft"
+        # 中间档必须是**合法值**(D14): 校验表认不了它就等于姿态写不进 no-badge
+        open(good, "w", encoding="utf-8").write('{"render": "no-badge"}')
+        assert amode.load_mode(good)["render"] == "no-badge"
         # 只写一段时, 另一段按全开走(不是报错) —— 文件允许只关一个开关
         assert amode.resolve_declaration(amode.load_mode(good))[0] == "required"
         open(good, "w", encoding="utf-8").write('{"render": "off"}')

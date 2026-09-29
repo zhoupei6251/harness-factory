@@ -151,17 +151,20 @@ python skills/douyin-pro/scripts/path_b_build.py \
 5. hyperframes check --strict（引擎门禁）
 6. HyperFrames 渲染 → silent.mp4
 7. scdet 动量审计（每镜尾段必须仍在变化）
-8. ffmpeg 合成（拼配音 + 烧 ASS 字幕 + **交付轨才烧开场 4 秒左下角 AIGC 显式角标 + 写 mp4 元数据隐式标识并读回核验**；
-   草稿轨两步都跳过 —— 走哪条轨见下面「哪条轨」一段，由旗标 > `routes/news/aigc-mode.json` > 代码默认裁决）
+8. ffmpeg 合成（拼配音 + 烧 ASS 字幕 + **交付轨写 mp4 元数据隐式标识并读回核验；① 开场 4 秒左下角
+   显式角标只在 `full` 档烧**；草稿轨两步都跳过 —— 走哪一档见下面「哪条轨」一段，
+   由旗标 > `routes/news/aigc-mode.json` > 代码默认裁决）
 9. 联络表 contact-sheet.jpg（人工验收比对）+ `aigc.json` 标识侧车
 
 回填 MEMORY `videos[].output` + `videos[].render_status: done`。
 
-**哪条轨（2026-09-29 起仓库默认 = 草稿轨）**：`render` 现在在姿态文件里写着 `draft`，所以
-**不加旗标渲出来的每一份都是草稿** —— 不烧 ① 角标、不写 ② 元数据，侧车只留 `draft` 一段（出处会写成
-`draft(<姿态文件路径> render=draft)`）。这份产物在步骤 5 的闸门里**必然被拒**（读到 `draft` 即 EXIT=1），
-所以它可以用来量像素、看留白、比版式，但不论如何发不出去。**要交付就显式加 `--deliver`**
-（旗标压过姿态文件，侧车 `switch` 会记 `full(旗标 --deliver)`），长期恢复默认则把 `render` 改回 `full`。
+**哪条轨（2026-09-29 D14 起仓库默认 = `no-badge`，即可发布的交付轨）**：`render` 现在在姿态文件里写着
+`no-badge`，所以**不加旗标渲出来的每一份都不烧 ① 角标、但照写 ② 元数据**（出处会写成
+`no-badge(<姿态文件路径> render=no-badge)`，侧车 `explicit` 段记 `burned_in: false` + `disabled_by` +
+`to_enable`）。这份产物**可发布**（D14 放宽的是判据不是能力），代价是 ③ 从此必带 —— 姿态把
+`declaration` 改成 `undeclared` 时闸门会 EXIT=1 拒绝，不给豁免。另两档：`--draft` ①② 都不做、
+产物不可发布（量像素看留白比版式用）；`--deliver` 把 ① 烧回画面上（旗标压过姿态文件，侧车记
+`full(旗标 --deliver)`），长期恢复则把 `render` 改回 `full`。三个旗标只能挑一个。
 
 **注意**：`--template` 与 `--style` 同义（兼容旧用法）；`DEFAULT_TEMPLATE = news-coral`。
 
@@ -174,17 +177,18 @@ python skills/douyin-pro/scripts/path_b_build.py \
 **前置门禁**（任一不成立就不发）：
 - `drafts[].fact_check == passed`
 - **闸门先过**：`python skills/douyin-pro/scripts/check_publishable.py <abs>/final.mp4` 退出码必须是 0。
-  它照 `aigc.json` 核 ①`explicit.burned_in` 与 ②`metadata_key`/`implicit`，草稿与无侧车的老成片都在这里被拒
-  （EXIT=1 → 重渲）；③ 那行 `--declaration 内容由AI生成` **给不给由姿态文件的 `declaration` 决定** ——
-  现在仓库写着 `undeclared`，闸门只打警告并要求在 `videos[].declaration` 记 `undeclared`。
-  要按老规矩带声明：闸门加 `--require-declaration`（本次）或把姿态改回 `required`（长期）
+  它照 `aigc.json` 核 D14 判据 —— ② `metadata_key`/`implicit` 永远不许缺，① 要么
+  `explicit.burned_in: true`、要么带 `disabled_by` 点名关掉；草稿、无侧车的老成片、以及"没烧又没交代"
+  都在这里被拒（EXIT=1 → 重渲）。③ 那行 `--declaration 内容由AI生成` **给不给由姿态文件的
+  `declaration` 决定** —— 仓库现在写着 `required`（① 没烧的产物必须带 ③，改成 `undeclared` 闸门
+  会 EXIT=1 并打三条出路），所以它会连发布命令一起打出来，照抄即可
 - `sau douyin check --account <name>` 返回 `valid`
 - **未登录时不代替用户扫码**，把成品交用户手动发
 
 ```bash
 # 视频轨（成片必须绝对路径；AI 生成内容必须带自主声明）
-# 姿态 declaration=undeclared 期间闸门不给最后一行 —— 那是当前默认；
-# 要带声明就照下面写（或先给闸门加 --require-declaration 让它把命令打全）
+# 当前姿态 declaration=required，闸门会把这条命令原样打出来；
+# 若有人把姿态改成 undeclared —— ① 没烧的产物会被闸门拒绝，不存在"关 ① 又关 ③"的合法组合
 sau douyin upload-video --account <name> --file <abs>/final.mp4 \
   --title "<稿内标题>" --desc "<正文+话题>" --tags tag1,tag2 \
   --declaration 内容由AI生成
@@ -210,13 +214,16 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
    （`path_b_selftest.py` 全量断言 + `audit_pack_contrast.py` 色板复算 + `layout_selfcheck.py` 结构不变量；
    项数以脚本输出为准，见步骤 1），
    且版式文件名只许落 `AUTO_LAYOUT_STEMS`（见步骤 1 的重映射提示）
-7. **AIGC 标识对交付件不可关**：交付件必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
-   ①② 由 `path_b_build.py` 在**交付轨**上无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供，
-   发之前由 `check_publishable.py` 逐件核。没有 `aigc.json` 侧车的老成片一律视为不合规，**重渲**而不是直发。
-   "不要标识"的唯一合法轨道是**草稿轨**（旗标 `--draft` 或姿态文件 `render=draft`，步骤 4），它的产物被闸门判为不可发布 ——
-   **开关买到的是调试自由，不是免标识的成品**；③ 可以显式关掉（`--allow-undeclared` 或姿态
-   `declaration=undeclared`，2026-09-29 起仓库默认就是关的），关掉必须在 `videos[].declaration` 记 `undeclared`
-   留痕 —— ② 过抖音转码即失，③ 是唯一活到平台侧的那一件，代价由发布的人承担，不由脚本承担
+7. **AIGC 标识的判据是"② + ③ 齐活"，① 由开关决定**（2026-09-29 D14 放宽，原口径"交付件三件齐活"）：
+   ② mp4 元数据 `AIGC` 键**任何交付档都不许缺**（`path_b_build.py` 写了就读回自检，读不回即拒绝交付），
+   ③ 平台自主声明由发布命令 `--declaration` 提供，① 画面内角标则按渲染档决定（`full` 烧 / `no-badge` 不烧）。
+   发之前由 `check_publishable.py` 逐件核；没有 `aigc.json` 侧车的老成片、以及 ① "没烧又没交代"的台账，
+   一律视为不合规，**重渲**而不是直发。两档交付轨的差别只在代价：`no-badge` 的产物 ③ **必带**——
+   姿态 `declaration=undeclared` 与旗标 `--allow-undeclared` 对这类台账都是 EXIT=1，关 ① 换不来"什么都不用说"；
+   `full`（① 烧着）时 ③ 才允许按姿态关，关掉必须在 `videos[].declaration` 记 `undeclared` 留痕 ——
+   ② 过抖音转码即失，③ 是唯一活到平台侧的那一件，代价由发布的人承担，不由脚本承担。
+   仍然不可发布的那条是**草稿轨**（旗标 `--draft` 或姿态 `render=draft`，步骤 4）：①② 都没有，
+   **开关买到的是调试自由，不是免标识的成品**
 8. **采集只走 `news-collect`**：热点线索来自本地可复跑的免费采集器，**不**调用任何按次扣费的榜单/搜索接口
    （Beatra 热榜 6 / 话题搜索 60 credits）。付费不是本路线的可选项，缺源就补免费源而不是花钱
 

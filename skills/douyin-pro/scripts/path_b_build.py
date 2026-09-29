@@ -1972,9 +1972,9 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
                  aigc_badge_seconds: float = 0.0,
                  aigc_producer: str = DEFAULT_AIGC_PRODUCER,
                  aigc_label: str = AIGC_LABEL_TEXT,
-                 draft: bool = False,
-                 draft_cause: str = "--draft"):
-    """拼配音 → 烧 ASS 字幕(含 AIGC 显式角标) → 写 AIGC 隐式元数据 → 读回核验。
+                 render: str = "full",
+                 render_cause: str = "full(代码默认全开)"):
+    """拼配音 → 烧 ASS 字幕(交付轨含 AIGC 显式角标) → 写 AIGC 隐式元数据 → 读回核验。
 
     `aigc_badge_seconds` 是角标持续时长, 主流程传 `aigc_badge_seconds(全片时长)`
     (= 开场 4 秒, 片长不足则等于片长); 低于 `AIGC_LABEL_MIN_SECONDS` 直接停机 ——
@@ -1985,30 +1985,40 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
     不一致就抛 EmitterError。字幕轨为空时降级为只合成音频(不许让成片不可用)。
     返回真正落到文件里的那份标识 JSON, 供调用方落 sidecar 备查。
 
-    `draft=True` 是**草稿轨**, 不是交付件的逃生门: ① 角标与 ② 元数据都不写,
-    返回 None, 调用方据此把 `aigc.json` 落成只有 `draft` 一段的样子 ——
-    `check_publishable.py` 读到那份侧车就拒绝发布。所以"把标识关掉"的代价被
-    定成"这份东西发不出去", 而不是"发出去没人知道它是 AI 做的"。
-    调版式、看效果、量像素用草稿; 交付不用。
-    `draft_cause` 只影响日志与台账里"为什么是草稿"那句话(旗标 `--draft` 还是姿态文件
-    `routes/news/aigc-mode.json render=draft`), 不参与任何判据 —— 出处必须如实,
-    否则事后查不到是谁关的标。
+    `render` 是**三档**而不是布尔(2026-09-29 用户点头放宽判据, 见 ARCHITECTURE D14):
+
+        full      烧 ① + 写 ②          —— 原交付轨
+        no-badge  不烧 ①、**照写 ②**   —— 交付轨: 产物可发布, 代价是发布必须带 ③
+        draft     ①② 都不做, 返回 None —— 草稿轨: 侧车只落 draft 一段,
+                                        check_publishable.py 读到即拒绝发布
+
+    ② 是"能不能交付"的分界: draft 之外都必须留下读得回的元数据, 所以 `aigc_producer`
+    为空只在要写 ② 时停机 —— 可交付的成片不提供"关掉标识"这条路(《标识办法》§ 2 的
+    "应当"不容许拿空参数当开关), 要改的是标识内容而不是有无。
+    ≥2 秒那条线是**① 的**判据, 只在真烧角标时卡: no-badge 没有画面标识, 拿 ① 的
+    时长线去挡 ② 交付件是判据错位。
+    `render_cause` 只影响日志与台账里"这一档是谁定的"那句话(旗标 `--deliver` /
+    `--no-badge` / `--draft`, 还是姿态文件 `routes/news/aigc-mode.json`),
+    不参与任何判据 —— 出处必须如实, 否则事后查不到是谁关的标。
     """
-    if not draft:
+    burn_badge = render == "full"
+    write_meta = render != "draft"
+    if write_meta and not burn_badge and render != "no-badge":
+        raise EmitterError(f"未知的渲染档 {render!r} —— 只能是 {aigc_mode.RENDER_MODES}")
+    if write_meta:
         if not aigc_producer:
             # 可交付的成片不提供"关掉标识"这条路: 《标识办法》§ 2 要求"应当"添加,
             # 拿空参数当开关等于给用户一个违法的便利。要改的是标识内容
-            # (--aigc-producer 填主体名), 不是有无。不想要标只有草稿轨一条路
-            # (旗标 --draft, 或姿态文件 render=draft 把它变成默认), 那条轨的产物
-            # 直接不可发布, 而不是"无标的成品"。
+            # (--aigc-producer 填主体名), 不是有无。两件都能关的只有草稿轨,
+            # 那条轨的产物直接不可发布, 而不是"无标的成品"。
             raise EmitterError(
                 "AIGC 标识不可关闭 (aigc_producer 为空) —— 无标识成片不得交付, "
                 "请填生成者名称: --aigc-producer <你的频道/主体名>")
-        if aigc_badge_seconds < AIGC_LABEL_MIN_SECONDS:
-            raise EmitterError(
-                f"全片时长只有 {aigc_badge_seconds:.2f}s, 开场角标达不到国标 "
-                f"{AIGC_LABEL_MIN_SECONDS}s 的显式标识持续下限 —— 补足内容, "
-                "或在剪辑端另加一条 ≥2s 的显著标识后再交付")
+    if burn_badge and aigc_badge_seconds < AIGC_LABEL_MIN_SECONDS:
+        raise EmitterError(
+            f"全片时长只有 {aigc_badge_seconds:.2f}s, 开场角标达不到国标 "
+            f"{AIGC_LABEL_MIN_SECONDS}s 的显式标识持续下限 —— 补足内容, "
+            "或在剪辑端另加一条 ≥2s 的显著标识后再交付")
     narr = os.path.join(work_dir, "narration.mp3")
     # concat 解封装器把 list.txt 里的相对路径按 **list.txt 自己的目录** 解析。
     # 实测传 "--work-dir .harness-news-runtime/tmp/x" 这种相对目录时, 条目写成
@@ -2031,8 +2041,8 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
 
     ass_path = os.path.join(work_dir, "subs.ass")
     write_text(ass_path, build_ass(cues, w, h,
-                                   aigc_text=None if draft else aigc_label,
-                                   aigc_seconds=0.0 if draft else aigc_badge_seconds))
+                                   aigc_text=aigc_label if burn_badge else None,
+                                   aigc_seconds=aigc_badge_seconds if burn_badge else 0.0))
     err_log = os.path.join(work_dir, "ffmpeg_final.log")
     # 明确取流: 视频只从渲染产物拿, 声音只从拼接好的 narration 拿。
     # 合成里现在挂了 <audio>, 渲染出的 silent.mp4 也可能带一层声音;
@@ -2042,8 +2052,8 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
     # 实测 `-movflags +faststart` 会把不认识的键**静默丢掉**(ffprobe 读不到、
     # 字节里也搜不到), 必须加 use_metadata_tags 才落到 mdta atom。
     movflags = ["-movflags", "+faststart+use_metadata_tags"]
-    aigc_meta = None if draft else aigc_metadata_json(aigc_producer, silent)
-    meta_args = [] if draft else ["-metadata", f"{AIGC_METADATA_KEY}={aigc_meta}"]
+    aigc_meta = aigc_metadata_json(aigc_producer, silent) if write_meta else None
+    meta_args = [] if aigc_meta is None else ["-metadata", f"{AIGC_METADATA_KEY}={aigc_meta}"]
     ff = which("ffmpeg") or "ffmpeg"
     if not cues:
         log("⚠️ 字幕轨为空, 跳过烧录字幕(仅合成配音)")
@@ -2064,10 +2074,15 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
         r = run_exe(cmd, stdout=subprocess.DEVNULL, stderr=elf)
     if r.returncode != 0 or not os.path.exists(final):
         _ffmpeg_failure(err_log, f"ffmpeg 合成失败, 详见 {err_log}")
-    if draft:
-        log(f"⚠️ 草稿模式[{draft_cause}]: 角标没烧、元数据没写 —— 台账会标成草稿, "
+    if not write_meta:
+        log(f"⚠️ 草稿模式[{render_cause}]: 角标没烧、元数据没写 —— 台账会标成草稿, "
             "发布那一步(check_publishable.py)读到即拒绝")
         return None
+    if not burn_badge:
+        # 这一档是 D14 放宽判据买到的东西: 产物可发布, 但代价在闸门那侧结算 ——
+        # ① 没烧 ⇒ ③ 必带, 姿态文件与 --allow-undeclared 都关不掉它。
+        log(f"⚠️ 未烧 ① 角标[{render_cause}]: ② 元数据照写并读回 —— 这份**可发布**, "
+            "代价是发布必须带 ③ 自主声明(check_publishable.py 会拒绝 undeclared)")
     # 写完立刻读回来验一次: 标识"写了"不等于"在文件里", 而缺标识的成片是违法
     # 品而不是瑕疵品 —— 这里必须停机, 不能只在日志里抱怨一句。
     # 比对按语义而不是按字节: ffprobe 的输出层可能给特殊字符换层壳, 而真正要
@@ -2124,11 +2139,16 @@ def main():
                     help="草稿轨: 不烧 AIGC 角标、不写隐式元数据, 侧车只落 "
                          "draft 一段(不含 explicit/metadata_key/implicit) —— "
                          "check_publishable.py 读到即拒绝发布。调版式/看效果用它, 交付不用。"
-                         "覆盖姿态文件里的 render=full")
+                         "覆盖姿态文件里的 render=full/no-badge")
+    ap.add_argument("--no-badge", action="store_true",
+                    help="交付轨但不烧 ① 画面角标(ARCHITECTURE D14): ② 隐式元数据照写并读回, "
+                         "产物**可发布**, 代价是发布必须带 ③ 自主声明"
+                         "(check_publishable.py 对这份台账拒绝 undeclared)。"
+                         "与 --draft / --deliver 同时给 = 报错")
     ap.add_argument("--deliver", action="store_true",
-                    help="反向旗标: 本次强制走交付轨(烧 ① + 写 ②), 用来盖掉 "
-                         "routes/news/aigc-mode.json 里的 render=draft; "
-                         "与 --draft 同时给 = 报错")
+                    help="反向旗标: 本次强制走完整交付轨(烧 ① + 写 ②), 用来盖掉 "
+                         "routes/news/aigc-mode.json 里的 render=no-badge/draft; "
+                         "与 --draft / --no-badge 同时给 = 报错")
     ap.add_argument("--fps", type=int, default=DEFAULT_FPS, help=f"渲染帧率 (默认 {DEFAULT_FPS})")
     ap.add_argument("--quality", default=DEFAULT_QUALITY, choices=QUALITY_CHOICES,
                     help=f"渲染质量 (默认 {DEFAULT_QUALITY})")
@@ -2163,18 +2183,18 @@ def main():
 
     # 标识开关: 旗标 > 姿态文件 > 代码默认(全开)。姿态文件是"临时把标关掉"的
     # 唯一落点 —— 代码默认值不跟着一次会话的偏好改(ARCHITECTURE D11)。
+    # 渲染层从两档变三档(D14): full / no-badge / draft, 三个旗标只能挑一个。
     try:
         aigc_posture = aigc_mode.load_mode()
         render_mode, render_cause = aigc_mode.resolve_render(
-            aigc_posture, draft=args.draft, deliver=args.deliver)
+            aigc_posture, draft=args.draft, deliver=args.deliver,
+            no_badge=args.no_badge)
     except aigc_mode.ModeError as exc:
         log(f"❌ {exc}")
         sys.exit(1)
     is_draft = render_mode == "draft"
     log(f"[aigc] {aigc_mode.describe(aigc_posture)}")
-    log(f"[aigc] 渲染层开关 → {render_cause} → "
-        + ("**草稿轨**: 不烧 ① 角标、不写 ② 元数据, 这份产物不可发布" if is_draft
-           else "交付轨: ① 角标 + ② 元数据照写"))
+    log(f"[aigc] 渲染层开关 → {render_cause} → {aigc_mode.RENDER_WHAT[render_mode]}")
 
     work = args.work_dir or tempfile.mkdtemp(prefix="pathb_")
     os.makedirs(work, exist_ok=True)
@@ -2254,12 +2274,13 @@ def main():
         # 显式标识时长 = 开场 AIGC_LABEL_ON_SECONDS 秒(不足则等于全片时长),
         # 由 mux_and_burn 卡 ≥ AIGC_LABEL_MIN_SECONDS: 单镜短片的真实时长可以低到
         # MIN_SLOT_SECONDS(1s), 达不到国标 2 秒线, 必须挡。
+        # (这条线只在真烧角标那一档生效 —— no-badge 没有画面标识, 见 D14)
         badge_seconds = aigc_badge_seconds(sum(durations))
         aigc_meta = mux_and_burn(silent, audio_files, cues, work, final, w, h,
                                  aigc_badge_seconds=badge_seconds,
                                  aigc_producer=args.aigc_producer,
                                  aigc_label=args.aigc_label,
-                                 draft=is_draft, draft_cause=render_cause)
+                                 render=render_mode, render_cause=render_cause)
         # 标识台账: 发布环节(douyin-upload)要照着它做平台侧自主声明,
         # 监管要举证时也拿这份对着成片核。只随成片走, 不进工作目录。
         # glyph_height_px 是**合规线上真正被量的那个数**(字芯高, 不是 em 高),
@@ -2267,6 +2288,10 @@ def main():
         # 草稿的台账**故意不含 metadata_key / implicit / explicit 三段** ——
         # 缺什么就记什么缺, 而不是写一堆 false 装作"标识在只是没开";
         # check_publishable.py 认这三段的存在性, 草稿因此过不了发布闸门。
+        # no-badge(D14)反过来: ② 在、① 被点名关掉, 所以 explicit 段**必须存在**并写明
+        # burned_in=false + 谁关的(disabled_by) + 怎么开回来(to_enable)。
+        # 「关了什么记什么关」与「缺什么记什么缺」是两件事 —— 台账留空等于让下一个人
+        # 猜这版是没烧还是烧丢了。
         badge_fs = aigc_badge_font_size(w, h)
         if is_draft:
             to_publish = ("去掉 --draft 重渲一次, 让 ①② 落进成片" if args.draft else
@@ -2283,12 +2308,8 @@ def main():
                 "resolution": f"{w}x{h}",
             }
         else:
-            sidecar = {
-                "file": os.path.basename(final),
-                "switch": render_cause,
-                "metadata_key": AIGC_METADATA_KEY,
-                "implicit": json.loads(aigc_meta),
-                "explicit": {
+            if render_mode == "full":
+                explicit = {
                     "text": args.aigc_label,
                     "position": "bottom-left",
                     "font_size_px": badge_fs,
@@ -2297,7 +2318,22 @@ def main():
                     "margin_v_px": aigc_badge_margin_v(w, h),
                     "shown_seconds": round(badge_seconds, 3),
                     "burned_in": True,
-                },
+                }
+            else:
+                explicit = {
+                    "burned_in": False,
+                    "disabled_by": render_cause,
+                    "to_enable": ("去掉 --no-badge 重渲一次(或加 --deliver), 让 ① 落进成片"
+                                  if args.no_badge else
+                                  "把 routes/news/aigc-mode.json 的 render 改回 full"
+                                  "(或渲染时加 --deliver)再重渲一次, 让 ① 落进成片"),
+                }
+            sidecar = {
+                "file": os.path.basename(final),
+                "switch": render_cause,
+                "metadata_key": AIGC_METADATA_KEY,
+                "implicit": json.loads(aigc_meta),
+                "explicit": explicit,
                 "resolution": f"{w}x{h}",
             }
         write_text(os.path.join(os.path.dirname(os.path.abspath(final)), "aigc.json"),

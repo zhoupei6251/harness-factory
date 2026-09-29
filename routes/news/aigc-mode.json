@@ -1,8 +1,8 @@
 {
-  "render": "draft",
-  "declaration": "undeclared",
+  "render": "no-badge",
+  "declaration": "required",
   "since": "2026-09-29",
-  "by": "用户 2026-09-29「先帮我把两开关先关了吧」（同日先前口径是「那还是默认都打开吧」，本文件是临时姿态不是新默认）",
-  "revert": "把本文件的 render 改回 full、declaration 改回 required；或直接删掉本文件 —— 两个开关的代码默认值都是「开」",
-  "note": "本文件只改**默认姿态**，不改判据：渲染成草稿后 check_publishable.py 依旧拒发（「草稿不可发布」这条不许被任何姿态关掉）。单次渲染要交付用 --deliver，单次发布要带声明用 --require-declaration。代价：declaration=undeclared 时 ③ 平台自主声明默认不带，而元数据过抖音转码即失，③ 是唯一活到平台侧的那一件 —— 发布后必须在 routes/news/MEMORY.md 的 videos[].declaration 记 undeclared。"
+  "by": "用户 2026-09-29 点头放宽判据（ARCHITECTURE D14：「判据放宽：交付件可以不带 ①」）。先前姿态是 render=draft · declaration=undeclared",
+  "revert": "要 ① 回到画面上：把 render 改回 full（或渲染时加 --deliver）；要整个恢复代码默认：删掉本文件（代码默认是 full · required）",
+  "note": "这是 D14 新增的中间档：① 画面角标不烧，② 隐式元数据照写并读回，于是产物**可发布**（旧行为下「不要角标」只能得到不可发布的草稿）。代价由发布闸门结算：① 没烧 ⇒ ③ 平台自主声明必带 —— check_publishable.py 对这类台账拒绝 declaration=undeclared 也拒绝 --allow-undeclared（EXIT=1），所以本文件的 declaration 不再是 undeclared。判据没被姿态改掉：draft 依旧不可发布，② 依旧不许缺，台账里 ① 必须写明是谁关的（disabled_by）。"
 }

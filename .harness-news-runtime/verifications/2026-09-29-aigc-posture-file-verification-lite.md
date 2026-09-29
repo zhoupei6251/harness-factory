@@ -201,6 +201,14 @@ $ python skills/douyin-pro/scripts/layout_selfcheck.py \
 若用户确实要"彻底去掉角标能力"，那是改判据（要动 D8/D11 与硬规则 7），需要本人点头；
 当前"两开关都关"已经由姿态文件满足，不需要删代码。
 
+> **订正（同日 · 该决定已由用户本人裁决，落为 ARCHITECTURE D14）**：用户点头的不是"删掉烧角标那段"，
+> 而是「**判据放宽：交付件可以不带 ①** … 改的是判据，不是能力」。于是渲染层加了中间档 `no-badge`
+> （② 照写、可发布、③ 必带），仓库姿态从本记录的 `render=draft · declaration=undeclared`
+> 改为 **`render=no-badge · declaration=required`** —— 第二个开关（③）在这一档被判据重新打开，
+> 因为画面没标时 ② 过抖音转码即失、③ 是唯一活到平台侧的那一件。本节三点事实照旧成立
+> （没执行删码、消息无出处、工作树里那段代码一行没少），凭据见
+> `.harness-news-runtime/verifications/2026-09-29-aigc-no-badge-rail-D14-verification-lite.md`。
+
 ## 9. 产物位置（`.harness-news-runtime/` 被 gitignore，本记录是它们的证据）
 
 ```

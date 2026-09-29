@@ -39,9 +39,9 @@ fact-check (Step 3, 硬门禁)
    ↓ 产出: drafts[].fact_check = passed
 douyin-pro Path B (Step 4)
    ↓ 产出: .harness-news-runtime/videos/<id>/final.mp4 + aigc.json (标识侧车)
-   ↓ 姿态: 交付轨 or 草稿轨由 aigc_mode.py 裁决 —— 旗标 > routes/news/aigc-mode.json > 代码默认(全开)
+   ↓ 姿态: 交付轨(full) / 交付轨不烧角标(no-badge) / 草稿轨(draft) 由 aigc_mode.py 裁决 —— 旗标 > routes/news/aigc-mode.json > 代码默认(全开)
 check_publishable.py (Step 4.5 · 发布闸门)
-   ↓ 判据: 照 aigc.json 核 ①②, 打出 ③ 必带的 --declaration 参数(姿态关了则改为警告+留痕); 退出码 1 = 不许发
+   ↓ 判据: 照 aigc.json 核「② 在 + ① 有交代」(D14), 打出 ③ 必带的 --declaration 参数; ① 没烧时 ③ 不给豁免; 退出码 1 = 不许发
 douyin-upload upload-video (Step 5)
    ↓ 产出: MEMORY.published_at 回填
 ```
@@ -60,7 +60,7 @@ douyin-upload upload-video (Step 5)
 routes/news/                         ← 新闻域状态层
 ├── ARCHITECTURE.md                  ← 本文件 (单轨设计)
 ├── MEMORY.md                        ← 选题 / 草稿 / 成片 / 进度 状态
-├── aigc-mode.json                   ← 标识两开关的**当前姿态**(受版本管理; 没有这文件=全开, 见 D12)
+├── aigc-mode.json                   ← 标识两开关的**当前姿态**(受版本管理; 没有这文件=全开, 见 D12; render 三档 full/no-badge/draft, 见 D14)
 └── (无产物目录, 运行时落 .harness-news-runtime/)
 
 skills/news-workflow/SKILL.md        ← 入口: 6 步工作流
@@ -70,13 +70,13 @@ skills/douyin-pro/                   ← 渲染器 (Path B)
 │   ├── path_b_build.py             ← 9 步发射器 (解析→配音→发射→自检→门禁→渲染→动量→烧字幕+AIGC→联络表)
 │   ├── layout_selfcheck.py          ← 17 条结构不变量 (渲前拦截; 参数是目录, 空目录=用法错误非零退出, 见 D13)
 │   ├── audit_pack_contrast.py       ← frame.md 色板与对比度表复算 (文档里的"实测值"不许手抄)
-│   ├── verify_aigc_badge.py         ← AIGC 角标真像素复测 (字芯/墨迹/时长三项; 时序基准 = silent 同刻重烧无角标 ASS; 文档数字只认它)
-│   ├── check_publishable.py         ← 发布闸门 (照 aigc.json 核 ①② + 打出 ③ 必带参数; 草稿在这里被拒)
-│   ├── aigc_mode.py                 ← 两开关的**默认姿态**裁决 (旗标 > routes/news/aigc-mode.json > 代码默认; 值不合法即 ModeError)
+│   ├── verify_aigc_badge.py         ← AIGC 角标真像素复测 (字芯/墨迹/时长三项; 时序基准 = silent 同刻重烧无角标 ASS; 文档数字只认它; 只量 full 档, no-badge 产物它报"没有 AIGC 事件"即 EXIT=1)
+│   ├── check_publishable.py         ← 发布闸门 (照 aigc.json 核"② 在 + ① 有交代", D14; 打出 ③ 必带参数, ① 没烧时不给 ③ 豁免; 草稿在这里被拒)
+│   ├── aigc_mode.py                 ← 两开关的**默认姿态**裁决 (渲染层三档 full/no-badge/draft + 发布层两档; 旗标 > routes/news/aigc-mode.json > 代码默认; 值不合法即 ModeError)
 │   ├── fixtures/badge_probe_shots.json ← 探针**输入** (5 镜 news-policy): 发射器渲它、复测器量它
 │   ├── path_b_selftest.py           ← 纯函数断言集 (项数以脚本输出为准, 别在文档里抄数; 覆盖 12 pack 加载
-│   │                                  + AIGC 合规 + 草稿轨/发布闸门/姿态文件 + 词表
-│   │                                  + 三道闸各自的假绿负例: 色板种错数 / 版式传空目录 / 草稿与缺侧车)
+│   │                                  + AIGC 合规 + 三档渲染/发布闸门判据/姿态文件 + 词表
+│   │                                  + 三道闸各自的假绿负例: 色板种错数 / 版式传空目录 / 草稿与缺侧车与没交代的 ①)
 │   ├── commons_media.py             ← 图片层 (path B 当前未启用, 留作图片型模板扩展)
 │   └── install_path_b_deps.py       ← 依赖一键装
 ├── templates/hyperframes_path_b/   ← 12 个节目包
@@ -96,7 +96,7 @@ skills/news-collect/                  ← 步骤 0 采集层（stdlib-only：百
 skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询在本域禁用**）
 ```
 
-**核心发射器 `path_b_build.py`**——支持 12 pack + `--template`，交付轨无条件产出 AIGC 标识（画面角标 + mp4 元数据 + `aigc.json` 侧车）；草稿轨（旗标 `--draft` 或姿态文件 `render=draft`）不烧不写，代价由 `check_publishable.py` 结算：草稿发不出去。走哪条轨由 `aigc_mode.py` 一处裁决（旗标 > `routes/news/aigc-mode.json` > 代码默认全开），见 D11/D12。
+**核心发射器 `path_b_build.py`**——支持 12 pack + `--template`，交付轨产出 AIGC 标识并读回核验：**full 档**烧 ① 画面角标 + 写 ② mp4 元数据 + `aigc.json` 侧车，**no-badge 档**（D14 新增）只写 ②，产物依旧可发布、代价是发布必须带 ③；草稿轨（旗标 `--draft` 或姿态文件 `render=draft`）不烧不写，代价由 `check_publishable.py` 结算：草稿发不出去。② 两档都不许缺，缺侧车的老成片一律重渲。走哪一档由 `aigc_mode.py` 一处裁决（旗标 `--deliver` / `--no-badge` / `--draft` 三选一 > `routes/news/aigc-mode.json` > 代码默认 full），见 D11/D12/D14。
 
 ---
 
@@ -142,12 +142,13 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 | D5 | fact-check 硬门禁 | 不通过 = 不发；多源交叉验证（澎湃/工人日报/搜狐/官方回应）|
 | D6 | 屏句 ≠ 配音 | `onscreen:` 行单独成屏上屏上整句，配音未授权走正文；这条结构保证来自 path_b_build.py 的 `check_onscreen` 闸门 |
 | D7 | placeholder 不参与选择 | 11 个新 pack 的 placeholder composition 被 `load_style_pack` **直接跳过**；只剩占位壳的包视为不可渲染，在加载阶段停机点名替代包（2026-09-29 审计后收紧，旧口径"只是让加载通过"会误导到渲染期才崩）|
-| D8 | AIGC 标识三件套对**交付件**不可关 | 显式角标（**左下角、字芯 ≥ 最短边 5%、开场常驻 4 秒**）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ 发布时 `--declaration 内容由AI生成`；①② 由发射器无条件产出并读回核验，缺侧车的老成片一律重渲。**法律底线与自我加码要分清**：《标识办法》§ 4-四 的"应当"只落在**起始画面**与**播放周边**，末尾/中间是"可以"；左上角、贯穿全片、7.9% 字高都是我们自己加的，2026-09-29 按用户取舍退到线上（左下角 + 擦边字号 + 4 秒）。退掉的两档代价记在这里：①**播放周边**不再由贯穿全片的角标承担，改由 ② 元数据 + ③ 发布端声明承担；②左下角正是抖音标题/头像/进度条那一层的叠加区，平台 UI 会盖在角标上面（旧实现落左上角避开的就是这一层）；③擦边字号**没有余量**兜字体回退，换字体/换机器必须重量一次字面率（重量入口 `skills/douyin-pro/scripts/verify_aigc_badge.py`，量真实渲染像素而不是模型自己）|
-| D11 | 标识的开关只能把东西变成**发不出去**，不能把它变成**没标** | 用户 2026-09-29 先要"默认关掉"、同日改口"还是默认都打开"，于是开关按**分层**落地，默认三件全开：渲染层 `--draft`（不烧 ①、不写 ②，侧车只留 `draft` 一段）与发布层 `check_publishable.py --allow-undeclared`（③ 可以不带，但要警告 + 在 `videos[].declaration` 留痕）。**关键设计不是"能不能关"，而是关完之后这份东西是什么**：草稿的台账**不含** `explicit` / `metadata_key` / `implicit` 三段（缺什么记什么缺，不写一堆 `false` 装作"标识在只是没开"），发布闸门读到即 EXIT=1 —— 所以"关掉标识"买到的是"能调版式、能量像素、不许发"，而不是"无标的成品"。合规默认值不许由一次会话的偏好改动：两个开关的**代码默认**永远是全开（不敲旗标、没有姿态文件 = 全开），"现在想关"落在 D12 的姿态文件里 |
-| D12 | 关标识这件事**落在文件里，不落在代码里** | 用户 2026-09-29 又说「先帮我把两开关先关了吧」。把 `path_b_build.py` 的默认值改成草稿 = 让一次会话的偏好固化成合规基线（D11 正是为堵这个定的），所以改成三层裁决：**旗标 > 姿态文件 `routes/news/aigc-mode.json` > 代码默认（full / required）**。姿态文件受版本管理，于是"关掉了什么、谁关的、哪天关的、怎么回退"都能 `git diff` 出来（`since` / `by` / `revert` 三段是硬要求，由 `t_repo_aigc_mode_file_is_valid_and_recorded` 上闸）；两个方向都有单次旗标可压：渲染 `--draft`/`--deliver`、发布 `--allow-undeclared`/`--require-declaration`，同时给 = 报错。值拼错（`render: off`）或 JSON 坏了 **停机不回退默认**（R6）—— 一次拼写错误不该替用户决定合规姿态。日志、`aigc.json` 的 `switch` 与 `draft.reason`、闸门输出都**带真出处**（`draft(<路径> render=draft)` / `draft(旗标 --draft)`），事后能查是谁关的。**这条不改 D11 的判据**：姿态把渲染变成草稿后，闸门照旧 EXIT=1 —— 文件能决定"③ 带不带"，决定不了"没标的可以发"；② 元数据过抖音转码即失，③ 是唯一活到平台侧的那一件，所以 `declaration=undeclared` 期间发出去的每一条都要在 `videos[].declaration` 记 `undeclared` |
+| D8 | AIGC 标识三件套对**交付件**不可关 | 显式角标（**左下角、字芯 ≥ 最短边 5%、开场常驻 4 秒**）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ 发布时 `--declaration 内容由AI生成`；①② 由发射器无条件产出并读回核验，缺侧车的老成片一律重渲。**法律底线与自我加码要分清**：《标识办法》§ 4-四 的"应当"只落在**起始画面**与**播放周边**，末尾/中间是"可以"；左上角、贯穿全片、7.9% 字高都是我们自己加的，2026-09-29 按用户取舍退到线上（左下角 + 擦边字号 + 4 秒）。退掉的两档代价记在这里：①**播放周边**不再由贯穿全片的角标承担，改由 ② 元数据 + ③ 发布端声明承担；②左下角正是抖音标题/头像/进度条那一层的叠加区，平台 UI 会盖在角标上面（旧实现落左上角避开的就是这一层）；③擦边字号**没有余量**兜字体回退，换字体/换机器必须重量一次字面率（重量入口 `skills/douyin-pro/scripts/verify_aigc_badge.py`，量真实渲染像素而不是模型自己）。**判据在 D14 放宽过一次**：本行的"三件套对交付件不可关"改成"②③ 不可关、① 由开关决定" |
+| D11 | 标识的开关只能把东西变成**发不出去**，不能把它变成**没标** | 用户 2026-09-29 先要"默认关掉"、同日改口"还是默认都打开"，于是开关按**分层**落地，默认三件全开：渲染层 `--draft`（不烧 ①、不写 ②，侧车只留 `draft` 一段）与发布层 `check_publishable.py --allow-undeclared`（③ 可以不带，但要警告 + 在 `videos[].declaration` 留痕）。**关键设计不是"能不能关"，而是关完之后这份东西是什么**：草稿的台账**不含** `explicit` / `metadata_key` / `implicit` 三段（缺什么记什么缺，不写一堆 `false` 装作"标识在只是没开"），发布闸门读到即 EXIT=1 —— 所以"关掉标识"买到的是"能调版式、能量像素、不许发"，而不是"无标的成品"。合规默认值不许由一次会话的偏好改动：两个开关的**代码默认**永远是全开（不敲旗标、没有姿态文件 = 全开），"现在想关"落在 D12 的姿态文件里。**D14 把本行收窄为"draft 档只把东西变成发不出去"**：中间档 `no-badge` 买到的是"① 没烧但可发布"，代价换成"③ 从此必带"，不再是"不许发" |
+| D12 | 关标识这件事**落在文件里，不落在代码里** | 用户 2026-09-29 又说「先帮我把两开关先关了吧」。把 `path_b_build.py` 的默认值改成草稿 = 让一次会话的偏好固化成合规基线（D11 正是为堵这个定的），所以改成三层裁决：**旗标 > 姿态文件 `routes/news/aigc-mode.json` > 代码默认（full / required）**。姿态文件受版本管理，于是"关掉了什么、谁关的、哪天关的、怎么回退"都能 `git diff` 出来（`since` / `by` / `revert` 三段是硬要求，由 `t_repo_aigc_mode_file_is_valid_and_recorded` 上闸）；两个方向都有单次旗标可压：渲染 `--draft`/`--deliver`、发布 `--allow-undeclared`/`--require-declaration`，同时给 = 报错。值拼错（`render: off`）或 JSON 坏了 **停机不回退默认**（R6）—— 一次拼写错误不该替用户决定合规姿态。日志、`aigc.json` 的 `switch` 与 `draft.reason`、闸门输出都**带真出处**（`draft(<路径> render=draft)` / `draft(旗标 --draft)`），事后能查是谁关的。**这条不改 D11 的判据**：姿态把渲染变成草稿后，闸门照旧 EXIT=1 —— 文件能决定"③ 带不带"，决定不了"没标的可以发"；② 元数据过抖音转码即失，③ 是唯一活到平台侧的那一件，所以 `declaration=undeclared` 期间发出去的每一条都要在 `videos[].declaration` 记 `undeclared`。**D14 之后本行的姿态取值变了**：渲染档可以是 `no-badge`（中间档），而 ① 一旦没烧，`declaration` 就**不能**再是 `undeclared` —— 闸门对这类台账拒 EXIT=1，所以仓库当前姿态是 `render=no-badge · declaration=required`（旧写法 `render=draft · declaration=undeclared` 已由用户改选放宽判据）|
 | D9 | 版式名只认**文件名词干** | 自动选版的词表是 `path_b_build.AUTO_LAYOUT_STEMS`（`hook / closer / story / stat / quote / catalog / rail`，元组顺序即兜底顺序）；pack 自己起的名字**不能**进自动候选 —— 只能按语义落到 canonical 文件名，映射在 pack 的 frame.md §6 记全，别让人再猜一遍。composition id 由 `MOUNT_TPL` 与文件名解耦，可保留 pack 前缀（`np-*`）维持公文身份。**这条坑是静默的**：2026-09-29 清点出 10 个未落地 pack 的 §7 共计划了 16 个词表外文件名（`evidence`/`lead-detail`/`compare`/`drilldown`/`clock`/`sit`/`list`/`diagram`/`list-steps`/`risk-callout`/`segment`/`chain`/`play`/`score`/`map`/`region`）—— 照那些名字建文件不会报错，只会得到一个自动模式永远选不到的惰性版式。已由 `t_auto_layout_stems_are_the_only_vocabulary` 上闸（点名表 ⊆ 词表 = 词表，可渲染 pack 的词干 ⊆ 词表）|
 | D10 | 设计系统里的数字必须有**复算入口** | frame.md 的对比度表是"实测值"，但此前只能靠手抄维护：2026-09-29 首次全量复算抓到 11 个包共 **42 处**漂移，其中 `news-blast` 文档写 `score / pitch 5.0`（真值 **1.18**）而 §3 字阶据此把 22cqw 的主队比分染成红字压绿底 —— 手抄的假数会直接变成**播出后看不清的巨号字**。现在这类数一律由 `audit_pack_contrast.py` 从 §2 色板原值复算（判读线写进常量：正文 4.5 / 大字 3.0，1080 宽下 ≥2.22cqw ≈ 24px），文档只许写命令不许写脚本残留路径，改色板或改判定即红。**法则可以比数学严，数学不行**：gold 只作形状是包内法则，"gold 数学不过线"是假陈述 —— 审计按此区分 `VERDICT_CONTRADICTS_ARITHMETIC` |
 | D13 | 闸门**不许空过**：显式传入的目录里没有版式文件 = 用法错误，非零退出 | 三道闸的价值是"查过了"，不是"没报错"。`layout_selfcheck.py` 旧行为：把 pack 名当目录传（`layout_selfcheck.py news-coral news-policy`）时逐条打印「没找到版式文件」，结尾仍输出「版式自检通过：0 个文件，0 条违规」并 **exit 0**（2026-09-29 订正 D12 文档时撞到）。假绿比红危险 —— 红会让人停下，假绿会被当凭据抄进文档与台账，且这是三道闸里唯一"参数握在人手里"的那道。现在显式目录贡献 0 个文件即 exit 1，报错点名是哪个目录并写出正确参数写法，`--quiet` 同样不放过（自测 `t_layout_selfcheck_refuses_a_directory_with_no_layouts` **双向**锁：真目录仍 0、pack 名与不存在目录必须 1）。取舍：没有"传了目录又想跳过检查"的合法写法 —— 要跳过就不传参数（`nargs="+"` 直接拒），不存在第三种。渲染期内部那道 `gate_layout_selfcheck` 走 `check_layout()` 逐文件，本来就不经过 CLI，不受影响。四条命令的真输出（绿/红/quiet/`--check-only`）见 `.harness-news-runtime/verifications/2026-09-29-layout-selfcheck-no-empty-pass-verification-lite.md` |
+| D14 | **判据放宽**：交付件可以不带 ①，②③ 才是可发布的底线 | 用户 2026-09-29 对「把 `path_b_build.py` 里烧角标那段删掉」这个来源无法核实的请求，选的是另一条路：不改能力、改判据 —— 原话「**判据放宽：交付件可以不带 ①** … D8/硬规则 7 从「交付件三件齐活」改成「② 元数据 + ③ 发布声明齐活即可发布，① 由开关决定」。交付轨能出无角标但可发布的片子，烧角标的代码留着（`--deliver` + 姿态 full 随时回来）。改的是判据，不是能力。」于是渲染层从两档变**三档**（`aigc_mode.RENDER_MODES = full / no-badge / draft`）：旧的两档里"不要角标"只能落到 `draft`，而 draft 连 ② 一起砍，产物发不出去 —— 想要的那个中间态根本不存在。**代价怎么结算**：① 没烧 ⇒ ③ 必带，`check_publishable.py` 对这类台账把 `declaration=undeclared` 与 `--allow-undeclared` 一律判 **EXIT=1** 并打印三条出路（不静默替用户改姿态，R6）；道理是 ② 过抖音转码即失，画面没标时 ③ 是唯一活到平台侧的那一件，所以关 ① 买不到"什么都不用说"。**台账原则随之分两条**：draft 依旧"缺什么记什么缺"（只留 `draft` 段），no-badge 是"关了什么记什么关"（`explicit` 段**必须存在**并写 `burned_in: false` + `disabled_by` 真出处 + `to_enable` 回退写法）；只有 `burned_in: false` 而没 `disabled_by` 的空白台账仍被闸门拒 —— 那既可能是旧产物也可能是烧丢了。自测 `t_no_badge_is_publishable_but_demands_declaration` 锁三档表、两个方向的旗标覆盖、三旗标两两互斥、以及判据表本身；真产物凭据（三次渲染 + 四种闸门调用 + `ffprobe` + 像素复测）见 `.harness-news-runtime/verifications/2026-09-29-aigc-no-badge-rail-D14-verification-lite.md` |
 
 ---
 
@@ -190,12 +191,17 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
    `layout_selfcheck.py` 的参数是**目录**（含 `compositions/*.html`），不是 pack 名：传进去而里面
    没有任何版式文件 = 用法错误，当场非零退出（旧版打印「0 个文件，0 条违规」还 exit 0，
    一次打错参数的"绿闸门"其实什么都没查 —— 假绿比红更难发现，见 D13）
-7. **AIGC 标识对交付件不可关**: 交付件三件齐活 —— ①画面角标 ②mp4 元数据 ③发布自主声明，`aigc.json` 缺失的成片先重渲；
-   发之前必须过 `check_publishable.py <成片>`（退出码 1 即不许发）。想不要标识只有**草稿轨**一条路
-   （旗标 `--draft` 或姿态文件 `render=draft`），而它的产物本身就不可发布（见 D11）；③ 可以由
-   姿态文件 `declaration=undeclared` 或旗标 `--allow-undeclared` 关掉，但关掉要在 `videos[].declaration`
-   留痕（见 D12）—— **不许**拿"跳过闸门"当日常流程。姿态是文件里的一行，不是代码里的默认值：
-   当前 `routes/news/aigc-mode.json` 关着，所以**交付必须显式加 `--deliver`**，别把草稿当成品发
+7. **AIGC 标识的判据是"② + ③ 齐活", ① 由开关决定**(D14 放宽, 原口径"交付件三件齐活"):
+   ② mp4 元数据**永远不许缺**，③ 发布自主声明在 ① 没烧时**永远必带**，`aigc.json` 缺失的成片先重渲；
+   发之前必须过 `check_publishable.py <成片>`（退出码 1 即不许发）。不要 ① 有两条路且代价不同：
+   **no-badge 档**（姿态 `render=no-badge` 或旗标 `--no-badge`）得到可发布的交付件，但闸门对这份台账
+   拒绝 `declaration=undeclared` 与 `--allow-undeclared`（EXIT=1）—— 画面没标、② 过转码即失，
+   ③ 是唯一活到平台侧的那一件，关 ① 换不来"什么都不用说"；**草稿轨**（`--draft` / `render=draft`）
+   的产物本身就不可发布（见 D11）。① 烧着时 ③ 仍可按姿态关，但要在 `videos[].declaration` 留痕（见 D12）。
+   台账按"缺什么记什么缺 / 关了什么记什么关"写：no-badge 的 `explicit` 段必须存在并写明
+   `disabled_by` 真出处与 `to_enable` 回退写法，没交代的空白照样被拒。**不许**拿"跳过闸门"当日常流程。
+   姿态是文件里的一行，不是代码里的默认值：当前 `routes/news/aigc-mode.json` 是
+   `render=no-badge · declaration=required`，要 ① 回到画面上加 `--deliver`（或把 render 改回 full）
 8. **不可渲染的包不许选**: 决策树命中只有占位壳的 pack 时, 政策/法规类改落 `news-policy`、其余改落 `news-coral`, 或先补真版式
 9. **采集零付费**: 热点线索只来自 `skills/news-collect`（stdlib-only，本机可复跑）；不调用任何按次扣费的榜单/话题搜索（Beatra 6/60 credits）。缺源补免费源，不花钱
 
@@ -205,7 +211,7 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 
 ```
 $ python skills/douyin-pro/scripts/path_b_selftest.py
-[selftest] 72 项 · style=news-coral
+[selftest] 73 项 · style=news-coral
   ok    t_aigc_mode_code_defaults_are_all_on
   ok    t_aigc_mode_file_flips_defaults_and_flags_override_both_ways
   ok    t_aigc_mode_reason_names_the_true_source
@@ -215,12 +221,13 @@ $ python skills/douyin-pro/scripts/path_b_selftest.py
       可渲染 pack (有真版式): 2/12 —— news-coral, news-policy
   ok    t_full_loadability_progress
   ok    t_layout_selfcheck_refuses_a_directory_with_no_layouts
+  ok    t_no_badge_is_publishable_but_demands_declaration
   ok    t_pack_contrast_docs_match_palette_math
   ok    t_publish_gate_default_requires_declaration
   ok    t_publish_gate_refuses_draft_and_missing_sidecar
-      姿态文件 D:\work\...\harness-factory\routes\news\aigc-mode.json: render=draft · declaration=undeclared
+      姿态文件 D:\work\xinyue\aigc_platfrom_back\harness-factory\routes\news\aigc-mode.json: render=no-badge · declaration=required
   ok    t_repo_aigc_mode_file_is_valid_and_recorded
-[selftest] 全绿 72/72
+[selftest] 全绿 73/73
 
 $ python skills/douyin-pro/scripts/audit_pack_contrast.py
 对比度审计通过：12 个 pack 的 frame.md 色板与文档一致（0 条警告）
@@ -236,6 +243,44 @@ news-policy: 没找到版式文件
 
 版式自检不过：显式传入的 2 个目录里没有任何版式文件（news-coral、news-policy）—— 参数要写含
 compositions/*.html 的**目录**…只写 pack 名不算检查，也不算通过。            (旧行为: exit 0)
+
+# —— D14 三档真产物（同一篇 5 镜稿子渲三次，Node v23.11.1；完整日志 .harness-news-runtime/tmp/d14/）
+$ python skills/douyin-pro/scripts/path_b_build.py … (不加旗标 = 落姿态文件)
+[path_b] [aigc] 姿态文件 …\routes\news\aigc-mode.json: render=no-badge · declaration=required
+[path_b] [aigc] 渲染层开关 → no-badge(…\aigc-mode.json render=no-badge) → 交付轨(按 D14 不烧 ①): ② 元数据照写 —— 可发布, 但发布必须带 ③
+[path_b] ⚠️ 未烧 ① 角标[no-badge(…)]: ② 元数据照写并读回 —— 这份**可发布**, 代价是发布必须带 ③ 自主声明(check_publishable.py 会拒绝 undeclared)
+[path_b]   AIGC 隐式标识已核验: ProduceID=97c20ceba5b61b72ae7ed5a4d7fd415a Label=1 ContentProducer=harness-news-pathb
+
+$ python skills/douyin-pro/scripts/path_b_build.py … --deliver
+[path_b] [aigc] 渲染层开关 → full(旗标 --deliver) → 交付轨: 烧 ① 角标 + 写 ② 元数据
+$ python skills/douyin-pro/scripts/path_b_build.py … --draft
+[path_b] [aigc] 渲染层开关 → draft(旗标 --draft) → 草稿轨: ①② 都不做, 这份产物不可发布
+[path_b] ⚠️ 草稿模式[draft(旗标 --draft)]: 角标没烧、元数据没写 —— 台账会标成草稿, 发布那一步(check_publishable.py)读到即拒绝
+
+$ ffprobe -v error -show_entries format_tags -of default=noprint_wrappers=1 <no-badge>/final.mp4 | grep -i aigc
+TAG:AIGC={"AIGC":{"Label":"1","ContentProducer":"harness-news-pathb","ProduceID":"97c20ceba5b61b72ae7ed5a4d7fd415a",…}}
+$ ffprobe … <draft>/final.mp4 | grep -ci aigc
+0                                                   # 草稿连 ② 都没有 = 缺什么记什么缺
+
+$ python skills/douyin-pro/scripts/check_publishable.py <no-badge>/final.mp4          # EXIT=0
+✅ 可发布(按 D14: ② 在、① 点名关掉): final.mp4
+   ① 未烧 —— 出处 no-badge(…\routes\news\aigc-mode.json render=no-badge) · 开回来: 把 …render 改回 full(或渲染时加 --deliver)再重渲一次, 让 ① 落进成片
+   ② 元数据键 AIGC · Label=1
+③ 必须带: --declaration 内容由AI生成   (开关取值: required(…\aigc-mode.json declaration=required))
+$ python skills/douyin-pro/scripts/check_publishable.py <no-badge>/final.mp4 --allow-undeclared   # EXIT=1 ← D14 的代价
+❌ 这份 final.mp4 不许不带 ③ —— ① 没烧(出处: no-badge(…render=no-badge)), 而 ② 过抖音转码即失, ③ 是唯一活到平台侧的那一件。开关取值 undeclared(旗标 --allow-undeclared) 在这一档不适用。
+   三选一: 加 --require-declaration 重跑本闸门并按打印的命令带 --declaration 内容由AI生成; 或把 routes/news/aigc-mode.json 的 declaration 改回 required; 或用 --deliver 重渲让 ① 回到画面上。
+$ python skills/douyin-pro/scripts/check_publishable.py <deliver>/final.mp4           # EXIT=0
+✅ ①② 齐活: final.mp4
+   ① 角标 AI 生成合成内容 · bottom-left · 字芯 54.7px / 最短边 1080px · 4.0s
+$ python skills/douyin-pro/scripts/check_publishable.py <draft>/final.mp4              # EXIT=1
+❌ 拒绝发布 final.mp4:
+   · 草稿渲染[draft(旗标 --draft)]: ① 画面角标与 ② 隐式元数据都没有 —— 不得发布: 去掉 --draft 重渲一次, 让 ①② 落进成片
+
+$ python skills/douyin-pro/scripts/verify_aigc_badge.py --work <deliver>/work --video <deliver>/final.mp4   # EXIT=0
+[aigc_badge] ✓ 三项全过: 字芯 55px(5.09% ≥ 5%) · 墨迹与模型逐侧 ≤1.5px · 角标只在开场 4.0s 出现
+$ python skills/douyin-pro/scripts/verify_aigc_badge.py --work <no-badge>/work --video <no-badge>/final.mp4  # EXIT=1 ← 复测器只认 full 档, 这里红是对的
+[aigc_badge] 成片 ASS 里没有 AIGC 事件 —— 显式标识根本没烧, 不必再量像素
 ```
 
 集成状态：
@@ -274,21 +319,32 @@ compositions/*.html 的**目录**…只写 pack 名不算检查，也不算通�
 - ✅ **两开关的"现在想关"落进姿态文件**（D12，2026-09-29 用户「先帮我把两开关先关了吧」）：
   `skills/douyin-pro/scripts/aigc_mode.py` 单点裁决 **旗标 > `routes/news/aigc-mode.json` > 代码默认**，
   渲染与发布两个脚本共用；反向旗标 `--deliver` / `--require-declaration` 让单次动作照样能全开，
-  值拼错（`render: off`）与 JSON 坏了一律 `ModeError` 停机、**不回退默认**。仓库当前姿态
+  值拼错（`render: off`）与 JSON 坏了一律 `ModeError` 停机、**不回退默认**。仓库当时的姿态
   `render=draft · declaration=undeclared`（带 `since` / `by` / `revert` 三段，由
-  `t_repo_aigc_mode_file_is_valid_and_recorded` 上闸），代价在真实渲染件上逐项量过：默认那一次
+  `t_repo_aigc_mode_file_is_valid_and_recorded` 上闸；**同日由 D14 改成 `no-badge · required`**，
+  下面那段逐项量的结论是当时那份 draft 姿态的凭据，仍然成立），代价在真实渲染件上逐项量过：默认那一次
   落地就是草稿（台账 `switch` 写的出处是姿态文件路径、`ffprobe` 无 `AIGC` 键、
   `verify_aigc_badge.py` 报"ASS 里没有 AIGC 事件" EXIT=1），加 `--deliver` 那一次角标三项全过
   （字芯 55px = 5.09%）、`Label=1` 读回；闸门对草稿 EXIT=1 拒发、对交付件 EXIT=0 但按姿态打
   ③ 警告，`--allow-undeclared` 与 `--require-declaration` 同时给 = 矛盾停机。记录见
   `.harness-news-runtime/verifications/2026-09-29-aigc-posture-file-verification-lite.md`
-  ⚠️ **姿态开着就等于"默认渲染不可发布"**：现在要交付必须显式 `--deliver`，别顺着默认渲完就发
+  ⚠️ **订正（同日 D14）**：这条警告「默认渲染不可发布、要交付必须显式 `--deliver`」随 draft 姿态一起失效 ——
+  现在默认落 `no-badge`，**默认渲出来的就是可发布交付件**；`--deliver` 的作用变成"把 ① 烧回画面上"
 - ✅ **版式闸门不再空过**（D13，同一轮文档订正时撞到）：`layout_selfcheck.py` 收到一个不含
   `compositions/*.html` 的显式目录（典型写法错误：只传 pack 名）从前的收尾是「0 个文件，0 条违规」
   **exit 0**；现在点名该目录并 exit 1，`--quiet` 一样拦。自测新增
   `t_layout_selfcheck_refuses_a_directory_with_no_layouts`（**双向**锁：真目录必须 0、pack 名与不存在目录
   必须 1，`--quiet` 也要拦）；上面 §8 那一对命令就是凭据（一条绿一条红，都是真输出）。
   项数只在 §8 那次真转录里出现，别处不抄（加断言必然让抄进文档的数过期）
+- ✅ **判据放宽落地：渲染层加中间档 `no-badge`**（D14，2026-09-29 用户对「删掉烧角标那段」改选
+  「判据放宽：交付件可以不带 ①」）：`RENDER_MODES` 从两档变三档、旗标 `--no-badge` 与
+  `--deliver` / `--draft` 两两互斥，② 元数据照写并读回，产物**可发布**；代价由闸门结算 ——
+  这类台账遇 `declaration=undeclared` 或 `--allow-undeclared` 一律 **EXIT=1** 并打三条出路（不静默改
+  用户姿态）。同一轮的四种闸门调用 + 三次真渲染 + `ffprobe` 对比 + 像素复测都在 §8 那段真转录里，
+  完整记录见 `.harness-news-runtime/verifications/2026-09-29-aigc-no-badge-rail-D14-verification-lite.md`。
+  ⚠️ **仓库姿态因此从 `draft · undeclared` 改为 `no-badge · required`**：① 关掉的直接后果是 ③
+  不能再关 —— 用户先前关的第二个开关在这一档被判据重新打开，这是其所选方案的既有条件，
+  一行可回：把 `aigc-mode.json` 的 `render` 改回 `full`（或渲染加 `--deliver`），③ 的开关即恢复可用
 - ✅ 发布链路：`--declaration 内容由AI生成` 已对齐上游源码，成功凭据写进 skill
 - ✅ 占位包改为**加载期停机**（不再拖到渲染第 1 镜）
 - ✅ 进度指标换成可交叉核验的"有真版式 pack 数"（2/12）

@@ -55,24 +55,26 @@ category: news.publish
 ## AIGC 合规（发布前必查）
 
 《人工智能生成合成内容标识办法》2025-09-01 施行，抖音同日起要求内容发布者**主动声明** AI 生成内容。
-一次合规发布要同时具备三样，本 skill 只管第 ③：
+一次合规发布要看三样（D14 起判据是「② + ③ 齐活，① 由渲染档决定」），本 skill 只管第 ③：
 
 | ① 画面内显式标识 | ② 文件元数据隐式标识 | ③ 平台自主声明 |
 |---|---|---|
-| 由 `path_b_build.py` 烧进成片（开场 4 秒左下角「AI 生成合成内容」，字芯 ≥ 最短边 5%） | 由 `path_b_build.py` 写 mp4 元数据键 `AIGC`（GB 45438-2025 附录 E） | `sau douyin upload-video --declaration 内容由AI生成` |
+| 由 `path_b_build.py` 烧进成片（`full` 档：开场 4 秒左下角「AI 生成合成内容」，字芯 ≥ 最短边 5%；`no-badge` 档不烧，见下） | 由 `path_b_build.py` 写 mp4 元数据键 `AIGC`（GB 45438-2025 附录 E）—— **这一件任何交付档都不许缺** | `sau douyin upload-video --declaration 内容由AI生成` |
 
 - **命令先由闸门给**：`python skills/douyin-pro/scripts/check_publishable.py <abs>/final.mp4`
-  退出码 0 才允许发。它照 `aigc.json` 核 ①② 是否真在；③ 那行 `--declaration 内容由AI生成`
-  给不给由 `routes/news/aigc-mode.json` 的 `declaration` 决定（**2026-09-29 起仓库写着
-  `undeclared`**：闸门只打警告、不给必带参数）—— 要闸门把命令打全就加 `--require-declaration`，
-  别手抄参数。
-- 成片旁没有 `aigc.json` 侧车 = ①② 缺失（老成片就是这个状态），**先回 douyin-pro 重渲再发**。
-- 侧车只有 `draft` 一段 = 草稿轨产物（①② 都没做；`switch` 会写明是旗标 `--draft` 关的还是姿态文件
-  `render=draft` 关的），闸门直接判不可发布。现在**不加旗标渲出来就是草稿**，要发必须
-  `path_b_build.py --deliver` 重渲。**草稿永远不发**，这是渲染层"关掉标识"的唯一代价。
-- 不带 ③ 发（不建议：元数据过抖音转码即失，③ 是唯一活到平台侧的一件）现在是姿态文件的**默认**，
-  不需要旗标；每次都要在新闻域 MEMORY 的 `videos[].declaration` 记 `undeclared`。单次反过来压：
-  `check_publishable.py --require-declaration`。
+  退出码 0 才允许发。它照 `aigc.json` 核 D14 判据「② 在 + ① 有交代」：② 必须真在，① 要么烧着、
+  要么被开关点名关掉（台账 `explicit.disabled_by` 写明出处）；③ 那行 `--declaration 内容由AI生成`
+  给不给由 `routes/news/aigc-mode.json` 的 `declaration` 决定（**2026-09-29 D14 起仓库写着
+  `required`**：闸门会把参数连命令一起打出来）—— 单次反过来压用 `--require-declaration` /
+  `--allow-undeclared`，别手抄参数。
+- **① 没烧 ⇒ ③ 不给豁免**：`no-badge` 产物遇 `declaration=undeclared` 或 `--allow-undeclared`
+  一律 EXIT=1（画面没标、② 过抖音转码即失，③ 是唯一活到平台侧的那一件），闸门会打三条出路。
+- 成片旁没有 `aigc.json` 侧车 = ①② 无从谈起（老成片就是这个状态），**先回 douyin-pro 重渲再发**。
+- 侧车只有 `draft` 一段 = 草稿轨产物（①② 都没做；`draft.reason` 会写明是旗标 `--draft` 关的还是姿态文件
+  `render=draft` 关的），闸门直接判不可发布。**草稿永远不发** —— 想发就 `--deliver`（连 ① 一起烧）
+  或不加旗标按姿态渲（`no-badge`：② 照写、可发布、③ 必带）。
+- ① 烧着时 ③ 可以按姿态关掉不发（不建议：元数据过抖音转码即失，③ 是唯一活到平台侧的一件），
+  每次都要在新闻域 MEMORY 的 `videos[].declaration` 记 `undeclared` 留痕。
 - `--declaration` 必须传弹窗**选项原文** `内容由AI生成`；上游选不上只 warning、**不阻断发布**，
   所以成功凭据只有日志里的 `自主声明已选择「内容由AI生成」`。看不到这行就按未声明处理，
   改 `--headed` 人工补勾（细节与源码行号：`references/cli-contract.md` § 自主声明）。
