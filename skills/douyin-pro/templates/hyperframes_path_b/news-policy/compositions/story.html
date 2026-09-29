@@ -1,0 +1,187 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "POLICY"},
+    {"id": "ordinal", "type": "string", "label": "壁纸序号", "default": "02"},
+    {"id": "tone", "type": "string", "label": "地面明暗", "default": "light"},
+    {"id": "title", "type": "string", "label": "领句(作者标题行)", "default": "一条新规"},
+    {"id": "onscreen", "type": "string", "label": "屏句(唯一上屏整句, 不进配音)", "default": "标准全国统一了"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-policy · story — 中景陈述: 公文领句 + 烫金尺 + 屏句, 双地面(paper / cobalt)逐镜翻转
+           地面翻转是发射器给的(ctx.prev_ground_tone, 见 path_b_build._tone), 版式只认 tone 变量:
+           light → paper #f5efe3, dark → cobalt #1f3a68 —— 三个地面的登记与归明归暗理由见
+           path_b_build.GROUND_TONE_BY_HEX 与本 pack frame.md §2.1(公文系统不用"黑底"作暗面)。
+           文字色只走实测过的那几档(对各自地面):
+             light: 领句 cobalt 9.84 / 屏句 gray 4.65(3.8cqw=41px 属大字, AA-large 3.0) / 根色 ink 15.20
+             dark : 领句 paper 9.84 / 屏句 rule #c9c0aa 6.23 / 眉标片反相(paper 底 + cobalt 字)
+           几何(1cqw=10.8px / 1cqh=19.2px): 眉标片 top 17cqh、片高≈3.8cqh → 下沿 20.8cqh, 与 hook 同一套;
+           正文区 `inset: 24cqh 7cqw 20cqh 7cqw` → 区高 56cqh、盒宽 86cqw。
+           内容最坏高度 = 领句 8.6cqw×1.22×3行(17.7cqh) + 尺 0.55cqh + 屏句 3.8cqw×1.5×2行(6.4cqh)
+           + 两个 gap 3cqh(6) = 30.65cqh; 居中后上下各余 12.68cqh, 漂移 yPercent -3 吃 1.7cqh
+           → 距字幕禁入区(底 20cqh)整块余量(法则 1)。
+           判据 4(每镜至少一处非纯文字帧)由序号水印、眉标片、烫金尺三处形状承担。 */
+        @font-face {
+          font-family: "HF Serif CJK";
+          src:
+            local("Noto Serif SC"),
+            local("Source Han Serif SC"),
+            local("SimSun"),
+            local("Noto Serif CJK SC"),
+            local("Songti SC"),
+            local("思源宋体");
+          font-weight: 100 900;
+        }
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #f5efe3;
+          color: #1a1a1a;
+          font-family: "HF Serif CJK", serif;
+        }
+        #root[data-tone="dark"] {
+          background: #1f3a68;
+          color: #f5efe3;
+        }
+        /* 壁纸序号: 衬线巨号做"卷宗页码", 必须整字含在画布内(不出血)。
+           34cqw(367px) 两字宽 ≈28cqw, 入场 scale 1.14 → 31.9cqw, 右沿 5cqw ⇒ 左沿仍在画内。 */
+        .ps-wall {
+          position: absolute;
+          top: 3cqh;
+          right: 5cqw;
+          font-size: 34cqw;
+          font-weight: 700;
+          line-height: 0.8;
+          color: rgba(31, 58, 104, 0.12);
+          pointer-events: none;
+        }
+        #root[data-tone="dark"] .ps-wall {
+          color: rgba(245, 239, 227, 0.12);
+        }
+        .ps-eb {
+          position: absolute;
+          left: 7cqw;
+          top: 17cqh;
+          background: #1f3a68;
+          color: #f5efe3;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.6cqw;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          padding: 0.9cqh 1.8cqw;
+          transform-origin: 0% 50%;
+        }
+        /* 暗地面时片子反相 —— 钴蓝片压在钴蓝地上会整块消失, 这是公文 pack 唯一的翻转特例 */
+        #root[data-tone="dark"] .ps-eb {
+          background: #f5efe3;
+          color: #1f3a68;
+        }
+        .ps-field {
+          position: absolute;
+          inset: 24cqh 7cqw 20cqh 7cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3cqh;
+        }
+        .ps-ttl {
+          font-size: var(--fit-ttl);
+          font-weight: 700;
+          line-height: 1.22;
+          color: #1f3a68;
+          max-width: 86cqw;
+        }
+        #root[data-tone="dark"] .ps-ttl {
+          color: #f5efe3;
+        }
+        .ps-rule {
+          width: 26cqw;
+          height: 0.55cqh;
+          background: #b8923e;
+          transform-origin: 0% 50%;
+        }
+        .ps-scr {
+          font-family: "HF CJK", sans-serif;
+          font-size: var(--fit-scr);
+          font-weight: 400;
+          line-height: 1.5;
+          color: #6b6b6b;
+          max-width: 86cqw;
+        }
+        #root[data-tone="dark"] .ps-scr {
+          color: #c9c0aa;
+        }
+      </style>
+
+      <div id="root" data-composition-id="np-story" data-width="1080" data-height="1920">
+        <div class="ps-wall" id="ps-wall" data-layout-ignore="true" data-var-text="ordinal">02</div>
+        <div class="ps-eb" id="ps-eb" data-var-text="kicker">POLICY</div>
+        <div class="ps-field" id="ps-field">
+          <div class="ps-ttl" id="ps-ttl" data-var-text="title">一条新规</div>
+          <div class="ps-rule" id="ps-rule"></div>
+          <div class="ps-scr" id="ps-scr" data-var-text="onscreen">标准全国统一了</div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const TONE_LIGHT = "light";
+        const TONE_DARK = "dark";
+        /* 预算与法则同 frame.md §5: 公文型漂移 0.7 起步(比 coral 的 0.6 更稳, 读者要认字不要看热闹) */
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.7;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+
+        /* 自适应字号: 中文按 1em 宽估行数, 超预算行就整体缩(下限 70%)。
+           子合成必须自含(运行时只克隆 <template>), 故与其它 pack 各存一份(README §7 已登记)。 */
+        const BOX_CQW = 86;
+        function fitCqw(text, baseCqw, maxLines) {
+          const perLine = Math.max(1, Math.floor(BOX_CQW / baseCqw));
+          const lines = Math.ceil(String(text || "").length / perLine);
+          if (lines <= maxLines) return baseCqw;
+          return Math.max((baseCqw * maxLines) / lines, baseCqw * 0.7);
+        }
+        const root = document.getElementById("root");
+        const tone = String(vars.tone || TONE_LIGHT).toLowerCase();
+        root.dataset.tone = tone === TONE_DARK ? TONE_DARK : TONE_LIGHT;
+        /* 领句 8.6cqw ⇒ 一行 10 字, 3 行封顶; 屏句 3.8cqw ⇒ 一行 22 字, 2 行封顶
+           (发射器 ONSCREEN_MAX_CHARS=16 从另一头卡同一个约束) */
+        root.style.setProperty("--fit-ttl", fitCqw(vars.title, 8.6, 3) + "cqw");
+        root.style.setProperty("--fit-scr", fitCqw(vars.onscreen, 3.8, 2) + "cqw");
+
+        const tl = gsap.timeline({ paused: true });
+        // 水印是装饰层(无 background) → 允许 opacity + scale
+        tl.fromTo("#ps-wall", { opacity: 0, scale: 1.14 }, { opacity: 1, scale: 1, duration: 1.1, ease: "power2.out" }, 0);
+        // 片块自带 background → 只 scaleX 擦入(法则 7: 半透明片底会把有效底色混掉)
+        tl.fromTo("#ps-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: "power2.out" }, 0.28);
+        tl.fromTo("#ps-ttl", { opacity: 0, y: 44 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.42);
+        tl.fromTo("#ps-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 0.68);
+        tl.fromTo("#ps-scr", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.5 }, 0.86);
+        tl.to("#ps-field", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["np-story"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

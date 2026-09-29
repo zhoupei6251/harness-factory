@@ -1,4 +1,7 @@
-"""news-coral 版式自检 —— 在 hyperframes check / render 之前拦住发射器看不见的结构缺陷。
+"""Path B 版式自检 —— 在 hyperframes check / render 之前拦住发射器看不见的结构缺陷。
+
+（对每个 pack 通用: 参数就是含 ``compositions/*.html`` 的版式目录, 现已覆盖
+news-coral 与 news-policy —— 规则本身不认包名, 只认契约与不变量。）
 
 为什么要这个脚本（每条不变量都对应一次真实事故，不是想象中的规则）：
 
@@ -363,7 +366,7 @@ def discover_layouts(directory: Path) -> list[Path]:
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):  # Windows 控制台默认 cp936，中文说明会变问号
         sys.stdout.reconfigure(encoding="utf-8")
-    parser = argparse.ArgumentParser(description="news-coral 版式结构自检")
+    parser = argparse.ArgumentParser(description="Path B 版式结构自检（逐 pack 目录跑）")
     parser.add_argument("directories", nargs="+", type=Path, help="含 compositions/*.html 的版式目录")
     parser.add_argument("--quiet", action="store_true", help="只在有违规时输出")
     args = parser.parse_args(argv)

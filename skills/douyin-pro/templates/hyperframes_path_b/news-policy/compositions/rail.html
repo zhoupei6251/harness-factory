@@ -1,0 +1,192 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "TIMELINE"},
+    {"id": "title", "type": "string", "label": "小标题", "default": "政策三步走"},
+    {"id": "ordinal", "type": "string", "label": "壁纸序号", "default": "03"},
+    {"id": "item1Label", "type": "string", "label": "第1节点事件", "default": "征求意见"},
+    {"id": "item1Value", "type": "string", "label": "第1节点日期", "default": "2026.03"},
+    {"id": "item2Label", "type": "string", "label": "第2节点事件", "default": "正式发布"},
+    {"id": "item2Value", "type": "string", "label": "第2节点日期", "default": "2026.07"},
+    {"id": "item3Label", "type": "string", "label": "第3节点事件", "default": "全面施行"},
+    {"id": "item3Value", "type": "string", "label": "第3节点日期", "default": "2026.10"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-policy · rail — 政策时间线: 钴蓝脊线 + 三节点(事件/日期成对)
+           这一版式承担 frame.md §6 里原计划叫 `timeline` 的形态: 发射器按**文件名词干**选版式,
+           候选清单写死在 choose_layout 里(hook / closer 首尾 + story / stat / quote / catalog / rail),
+           词汇表没有 timeline / summary / points 这些名字, 所以公文时间线一律**写成 rail.html**,
+           语义靠 label=事件、value=日期天然成对(法则 5); 原计划的 summary 落 story.html,
+           points 落 catalog.html —— 名字映射在 frame.md §6 记全, 别让人再猜一遍。
+           ⚠ 日期必须 ≤8 字: 发射器 RAIL_VALUE_MAX_CHARS=8, "2026年10月1日"(11 字)会让整个版式
+             不可选(自动模式会退回 closer)。写 "2026.10" / "10月1日" 这种短形。
+           对比(实测, 对 paper #F5EFE3, 见 frame.md §2.1): 标题/日期 cobalt 9.84 /
+           事件 ink 15.20 / 节点号 gray 4.65(3.4cqw=37px 属大字, AA-large 3.0) —— 灰档只给配角。
+           几何: 脊线 `top 34cqh / bottom 20cqh`(法则 1 的下界, 20cqh 是允许边界),
+           行区 `inset: 34cqh 7cqw 20cqh 12cqw` → 高 44cqh(845px);
+           最坏一行 = 事件 4.4cqw×1.2(57px) + 内 gap + 行间 padding 1.8cqh(35px) ≈ 95px,
+           三行 285px ≪ 845px → 漂移 yPercent -3(25px) 后仍远在字幕禁入区之上。
+           脊线/尺线有 background → scaleY/scaleX 擦入; 行区无 background → 允许整行淡入。 */
+        @font-face {
+          font-family: "HF Serif CJK";
+          src:
+            local("Noto Serif SC"),
+            local("Source Han Serif SC"),
+            local("SimSun"),
+            local("Noto Serif CJK SC"),
+            local("Songti SC"),
+            local("思源宋体");
+          font-weight: 100 900;
+        }
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #f5efe3;
+          color: #1a1a1a;
+          font-family: "HF Serif CJK", serif;
+        }
+        .pr-wall {
+          position: absolute;
+          top: 3cqh;
+          right: 5cqw;
+          font-size: 24cqw;
+          font-weight: 700;
+          line-height: 0.8;
+          color: rgba(31, 58, 104, 0.12);
+          pointer-events: none;
+        }
+        .pr-head {
+          position: absolute;
+          inset: 14cqh 7cqw auto 7cqw;
+          display: flex;
+          flex-direction: column;
+          gap: 1.6cqh;
+        }
+        .pr-eb {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.6cqw;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          color: #6b6b6b;
+        }
+        .pr-ttl {
+          font-size: 8.2cqw;
+          font-weight: 700;
+          line-height: 1.2;
+          color: #1f3a68;
+          max-width: 74cqw;
+        }
+        .pr-spine {
+          position: absolute;
+          left: 7cqw;
+          top: 34cqh;
+          bottom: 20cqh;
+          width: 0.9cqw;
+          background: #1f3a68;
+          transform-origin: 50% 0%;
+        }
+        .pr-rows {
+          position: absolute;
+          inset: 34cqh 7cqw 20cqh 12cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3.4cqh;
+        }
+        .pr-row {
+          display: flex;
+          align-items: baseline;
+          gap: 2.4cqw;
+          padding-bottom: 1.8cqh;
+          border-bottom: 0.2cqw solid rgba(31, 58, 104, 0.2);
+        }
+        .pr-no {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 3.4cqw;
+          font-weight: 800;
+          color: #6b6b6b;
+        }
+        .pr-lb {
+          font-size: 4.4cqw;
+          font-weight: 700;
+          flex: 1;
+        }
+        .pr-vl {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 3.6cqw;
+          font-weight: 800;
+          color: #1f3a68;
+          text-align: right;
+          max-width: 40cqw;
+        }
+      </style>
+
+      <div id="root" data-composition-id="np-rail" data-width="1080" data-height="1920">
+        <div class="pr-wall" id="pr-wall" data-layout-ignore="true" data-var-text="ordinal">03</div>
+        <div class="pr-head" id="pr-head">
+          <div class="pr-eb" id="pr-eb" data-var-text="kicker">TIMELINE</div>
+          <div class="pr-ttl" id="pr-ttl" data-var-text="title">政策三步走</div>
+        </div>
+        <div class="pr-spine" id="pr-spine"></div>
+        <div class="pr-rows" id="pr-rows">
+          <div class="pr-row" id="pr-r1">
+            <div class="pr-no">01</div>
+            <div class="pr-lb" data-var-text="item1Label">征求意见</div>
+            <div class="pr-vl" data-var-text="item1Value">2026.03</div>
+          </div>
+          <div class="pr-row" id="pr-r2">
+            <div class="pr-no">02</div>
+            <div class="pr-lb" data-var-text="item2Label">正式发布</div>
+            <div class="pr-vl" data-var-text="item2Value">2026.07</div>
+          </div>
+          <div class="pr-row" id="pr-r3">
+            <div class="pr-no">03</div>
+            <div class="pr-lb" data-var-text="item3Label">全面施行</div>
+            <div class="pr-vl" data-var-text="item3Value">2026.10</div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.7;
+        const STAGGER = 0.16;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo("#pr-wall", { opacity: 0, scale: 1.14 }, { opacity: 1, scale: 1, duration: 1.1, ease: "power2.out" }, 0);
+        tl.fromTo("#pr-eb", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.35 }, 0.15);
+        tl.fromTo("#pr-ttl", { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+        tl.fromTo("#pr-spine", { scaleY: 0 }, { scaleY: 1, duration: 0.8, ease: "power2.out" }, 0.55);
+        tl.fromTo("#pr-r1", { opacity: 0, x: 34 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7);
+        tl.fromTo("#pr-r2", { opacity: 0, x: 34 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7 + STAGGER);
+        tl.fromTo("#pr-r3", { opacity: 0, x: 34 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7 + STAGGER * 2);
+        tl.to("#pr-rows", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#pr-head", { yPercent: -2, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["np-rail"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

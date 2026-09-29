@@ -1,0 +1,185 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "新规"},
+    {"id": "headTop", "type": "string", "label": "公文标题第一行", "default": "标题第一行"},
+    {"id": "headBottomLead", "type": "string", "label": "公文标题第二行前段", "default": "第二行"},
+    {"id": "headAccent", "type": "string", "label": "公文标题强调段", "default": "施行"},
+    {"id": "support", "type": "string", "label": "施行日期/整句屏上位", "default": "2026年10月1日施行"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-policy · hook — 首镜"红头文件": 公文蓝细双书挡 + 衬线大标题 + 烫金印章形 + 施行日期
+           这一版式的全部色彩决定都来自 frame.md §2.1 的实测对比度(单位: 对 paper #F5EFE3):
+           · cobalt 9.84 / ink 15.20 / gray 4.65(2.6cqw=28px 属大字, AA-large 3.0) —— 文字只走这三档。
+           · gold 2.54 数学上过不了, crimson 4.75 虽然够大字但按 §2 强制规则仍只作形状 ——
+             所以两者只出现在印章环与发丝线上, 这正是 frame.md"gold/crimson 永远只作文字以外元素"的来处。
+           带 background 的面一律 scaleX 擦入、禁止 opacity(法则 7 + layout_selfcheck 不变量 5:
+           半透明的片底会与地面混色, 对比取样直接掉到 3:1 以下)。纯文字才允许淡入。
+           几何(1cqw=10.8px / 1cqh=19.2px, 画布 1080×1920):
+             眉标片 top 6cqh; 双书挡 12cqh(粗 0.9cqh) + 13.6cqh(烫金 0.35cqh);
+             正文区 `inset: 20cqh 7cqw 20cqh 7cqw` → 区高 60cqh(1152px)、盒宽 86cqw。
+             内容最坏高度 = 标题 9cqw×1.18×3行(343px) + gap 3cqh(58) + 施行日期 3.6cqw×1.5×2行(117)
+             = 518px ≪ 1152px → 漂移 yPercent -2.4 只吃掉 27px, 距字幕禁入区仍有一整块余量(法则 1)。
+           施行日期落在 `support`: 发射器只从**屏句**取材(见 path_b_build._onscreen_phrase),
+           所以脚本第 1 镜必须写一行 `屏: 2026年10月1日施行` —— 日期是事实, 不许版式自己编。 */
+        @font-face {
+          font-family: "HF Serif CJK";
+          src:
+            local("Noto Serif SC"),
+            local("Source Han Serif SC"),
+            local("SimSun"),
+            local("Noto Serif CJK SC"),
+            local("Songti SC"),
+            local("思源宋体");
+          font-weight: 100 900;
+        }
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #f5efe3;
+          color: #1a1a1a;
+          font-family: "HF Serif CJK", serif;
+        }
+        /* 公文纸纹: 只在 background 里用 px(纹理尺度不参与排版, 见 layout_selfcheck 例外表) */
+        #root::after {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background-image: repeating-linear-gradient(
+            0deg,
+            transparent 0 38px,
+            rgba(31, 58, 104, 0.035) 38px 39px
+          );
+          pointer-events: none;
+        }
+        .pk-eb {
+          position: absolute;
+          left: 7cqw;
+          top: 6cqh;
+          background: #1f3a68;
+          color: #f5efe3;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.6cqw;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          padding: 0.9cqh 1.8cqw;
+          transform-origin: 0% 50%;
+        }
+        .pk-rule {
+          position: absolute;
+          left: 7cqw;
+          right: 7cqw;
+          top: 12cqh;
+          height: 0.9cqh;
+          background: #1f3a68;
+          transform-origin: 0% 50%;
+        }
+        .pk-gold-rule {
+          position: absolute;
+          left: 7cqw;
+          right: 7cqw;
+          top: 13.6cqh;
+          height: 0.35cqh;
+          background: #b8923e;
+          transform-origin: 0% 50%;
+        }
+        .pk-seal {
+          position: absolute;
+          right: 9cqw;
+          top: 17cqh;
+          width: 15cqw;
+          height: 15cqw;
+          border: 0.55cqw solid #b8923e;
+          border-radius: 50%;
+          pointer-events: none;
+        }
+        .pk-field {
+          position: absolute;
+          inset: 20cqh 7cqw 20cqh 7cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3cqh;
+        }
+        .pk-hd {
+          font-size: 9cqw;
+          font-weight: 700;
+          line-height: 1.18;
+          color: #1f3a68;
+          max-width: 86cqw;
+        }
+        .pk-ac {
+          display: inline-block;
+          background: #1f3a68;
+          color: #f5efe3;
+          padding: 0 1.2cqw;
+          transform-origin: 0% 50%;
+        }
+        .pk-sup {
+          font-family: "HF CJK", sans-serif;
+          font-size: 3.6cqw;
+          font-weight: 400;
+          line-height: 1.5;
+          color: #1a1a1a;
+          max-width: 74cqw;
+        }
+      </style>
+
+      <div id="root" data-composition-id="np-hook" data-width="1080" data-height="1920">
+        <div class="pk-seal" id="pk-seal" data-layout-ignore="true"></div>
+        <div class="pk-eb" id="pk-eb" data-var-text="kicker">新规</div>
+        <div class="pk-rule" id="pk-rule"></div>
+        <div class="pk-gold-rule" id="pk-gold-rule"></div>
+        <div class="pk-field" id="pk-field">
+          <div class="pk-hd">
+            <div id="pk-l1" data-var-text="headTop">标题第一行</div>
+            <div><span id="pk-l2" data-var-text="headBottomLead">第二行</span><span class="pk-ac" id="pk-ac" data-var-text="headAccent">施行</span></div>
+          </div>
+          <div class="pk-sup" id="pk-sup" data-var-text="support">2026年10月1日施行</div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.7;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        // 入场次序 = 公文的读序: 眉标 → 双书挡 → 标题两行 → 强调片 → 施行日期
+        tl.fromTo("#pk-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.1);
+        tl.fromTo("#pk-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.55, ease: "power2.out" }, 0.28);
+        tl.fromTo("#pk-gold-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "power2.out" }, 0.5);
+        tl.fromTo("#pk-l1", { opacity: 0, y: 52 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.55);
+        tl.fromTo("#pk-l2", { opacity: 0, y: 52 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.72);
+        tl.fromTo("#pk-ac", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 0.9);
+        tl.fromTo("#pk-sup", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45 }, 1.12);
+        // 呼吸: 入场压进 INTRO_END, 剩下的整段匀速 —— 公文型漂移 0.7 起步(frame.md §5)
+        tl.to("#pk-field", { yPercent: -2.4, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#pk-seal", { yPercent: -9, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["np-hook"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

@@ -225,6 +225,11 @@ GROUND_TONE_BY_HEX = {
     "#f5f0e8": TONE_LIGHT,   # cream 主地面
     "#e8e0d4": TONE_LIGHT,   # cream-dark 引用块地面
     "#1a1a1a": TONE_DARK,    # ink 地面
+    # news-policy (frame.md §2): 米白公文纸两档都归明, 暗地面走公文蓝而不是黑 ——
+    # 公文系统里没有"黑底"这一层, 翻面靠 cobalt #1F3A68(纸字在其上 9.84, 见 frame.md §2.1)。
+    "#f5efe3": TONE_LIGHT,   # paper 主地面
+    "#e8dfcb": TONE_LIGHT,   # paper-dark 卡衬地面(条目卡底)
+    "#1f3a68": TONE_DARK,    # cobalt 地面(暗面翻面 + closer 书挡)
 }
 #: 色板里出现过的地面明暗集合, 用来校验可变地面版式填出来的值合法。
 GROUND_TONES = frozenset(GROUND_TONE_BY_HEX.values())

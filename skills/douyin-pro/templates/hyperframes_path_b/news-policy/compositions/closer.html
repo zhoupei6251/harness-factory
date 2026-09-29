@@ -1,0 +1,162 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "办理"},
+    {"id": "cta", "type": "string", "label": "行动指令前段", "default": "去查你的"},
+    {"id": "ctaAccent", "type": "string", "label": "行动指令强调", "default": "缴费记录"},
+    {"id": "channel", "type": "string", "label": "频道/来源行", "default": "政策来源：人社部官网"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-policy · closer — 尾镜: 与 hook 成对的书挡(同位双书挡 + 印章环), 地面翻到钴蓝暗面
+           书挡几何与 hook 逐项对齐(眉标片 6cqh / 双书挡 12cqh+13.6cqh / 印章 top 17cqh /
+           正文区 inset 20cqh 7cqw 20cqh 7cqw) —— 首尾同一套坐标, 观众才读得出"这是一份文件"。
+           颜色(实测对比, 地面 cobalt #1F3A68, 见 frame.md §2.1):
+             paper #F5EFE3 9.84(CTA 主体) / rule #C9C0AA 6.23(来源行, 3.4cqw=37px 属大字)
+             gold #B8923E 只当形状; gold 片 + cobalt-dark #142B4F 字 = 4.85(8.6cqw=93px 大字, AA-large 3.0)
+             —— 反过来把烫金当文字直接压在钴蓝地上只有 3.87, 所以强调片是"金底深字"而不是"金字"。
+           片子/书挡自带 background → 一律 scaleX/scaleY 擦入(法则 7); 纯文字才淡入。 */
+        @font-face {
+          font-family: "HF Serif CJK";
+          src:
+            local("Noto Serif SC"),
+            local("Source Han Serif SC"),
+            local("SimSun"),
+            local("Noto Serif CJK SC"),
+            local("Songti SC"),
+            local("思源宋体");
+          font-weight: 100 900;
+        }
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #1f3a68;
+          color: #f5efe3;
+          font-family: "HF Serif CJK", serif;
+        }
+        .pf-eb {
+          position: absolute;
+          left: 7cqw;
+          top: 6cqh;
+          background: #f5efe3;
+          color: #1f3a68;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.6cqw;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          padding: 0.9cqh 1.8cqw;
+          transform-origin: 0% 50%;
+        }
+        .pf-rule {
+          position: absolute;
+          left: 7cqw;
+          right: 7cqw;
+          top: 12cqh;
+          height: 0.9cqh;
+          background: #f5efe3;
+          transform-origin: 0% 50%;
+        }
+        .pf-goldrule {
+          position: absolute;
+          left: 7cqw;
+          right: 7cqw;
+          top: 13.6cqh;
+          height: 0.35cqh;
+          background: #b8923e;
+          transform-origin: 0% 50%;
+        }
+        .pf-seal {
+          position: absolute;
+          right: 9cqw;
+          top: 17cqh;
+          width: 15cqw;
+          height: 15cqw;
+          border: 0.55cqw solid #b8923e;
+          border-radius: 50%;
+          pointer-events: none;
+        }
+        .pf-field {
+          position: absolute;
+          inset: 20cqh 7cqw 20cqh 7cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3cqh;
+        }
+        .pf-cta {
+          font-size: 8.6cqw;
+          font-weight: 700;
+          line-height: 1.22;
+          max-width: 86cqw;
+        }
+        .pf-ac {
+          display: inline-block;
+          background: #b8923e;
+          color: #142b4f;
+          padding: 0 1.2cqw;
+          transform-origin: 0% 50%;
+        }
+        .pf-ch {
+          font-family: "HF CJK", sans-serif;
+          font-size: 3.4cqw;
+          font-weight: 400;
+          line-height: 1.5;
+          color: #c9c0aa;
+          max-width: 80cqw;
+        }
+      </style>
+
+      <div id="root" data-composition-id="np-closer" data-width="1080" data-height="1920">
+        <div class="pf-seal" id="pf-seal" data-layout-ignore="true"></div>
+        <div class="pf-eb" id="pf-eb" data-var-text="kicker">办理</div>
+        <div class="pf-rule" id="pf-rule"></div>
+        <div class="pf-goldrule" id="pf-goldrule"></div>
+        <div class="pf-field" id="pf-field">
+          <div class="pf-cta">
+            <span id="pf-cta-t" data-var-text="cta">去查你的</span><span class="pf-ac" id="pf-ac" data-var-text="ctaAccent">缴费记录</span>
+          </div>
+          <div class="pf-ch" id="pf-ch" data-var-text="channel">政策来源：人社部官网</div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.7;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        // 收束次序 = 与首镜同构, 但更快(尾镜读者已知系统, 不该重新表演一遍)
+        tl.fromTo("#pf-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: "power2.out" }, 0.08);
+        tl.fromTo("#pf-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, 0.22);
+        tl.fromTo("#pf-goldrule", { scaleX: 0 }, { scaleX: 1, duration: 0.55, ease: "power2.out" }, 0.4);
+        tl.fromTo("#pf-cta-t", { opacity: 0, y: 48 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.5);
+        tl.fromTo("#pf-ac", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, 0.8);
+        tl.fromTo("#pf-ch", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.45 }, 1.05);
+        tl.to("#pf-field", { yPercent: -2.4, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#pf-seal", { yPercent: -9, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["np-closer"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

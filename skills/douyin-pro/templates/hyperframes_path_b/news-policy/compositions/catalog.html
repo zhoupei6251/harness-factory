@@ -1,0 +1,204 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "条文"},
+    {"id": "title", "type": "string", "label": "小标题", "default": "三条要点"},
+    {"id": "step1Label", "type": "string", "label": "第1条标题", "default": "第一条"},
+    {"id": "step1Body", "type": "string", "label": "第1条说明", "default": "说明一"},
+    {"id": "step2Label", "type": "string", "label": "第2条标题", "default": "第二条"},
+    {"id": "step2Body", "type": "string", "label": "第2条说明", "default": "说明二"},
+    {"id": "step3Label", "type": "string", "label": "第3条标题", "default": "第三条"},
+    {"id": "step3Body", "type": "string", "label": "第3条说明", "default": "说明三"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-policy · catalog — 条文要点: 纸深色卡衬 + 钴蓝序号片 + 三行逐条落
+           地面用 paper-dark #E8DFCB(frame.md §2 的"卡衬"档, 已按归明登记进
+           path_b_build.GROUND_TONE_BY_HEX): 与 hook/story 的 paper 相差一档, 读作"翻页到条文部分"。
+           对比(实测, 见 frame.md §2.1, 对 paper-dark #E8DFCB): 序号片 cobalt 底 + paper 字 9.84 /
+           小标题与条文说明 ink 13.13 / 条目标题 cobalt 8.51 / 发丝线 rgba(cobalt,.22) 只作形状。
+           这一版式**不出现烫金文字**: gold 对 paper-dark 只有 2.20(对 paper 2.54) —— 它只能当尺线。
+           行区几何是算出来的: 顶 42cqh / 底 20cqh(法则 1 字幕禁入区) → 高 38cqh(730px);
+           最坏一行 = 条目标题 4.8cqw×1.2(62px) + gap 0.9cqh(17) + 说明 3.4cqw×1.45×2行(106) = 185px,
+           加行间 2.6cqh+发丝线(52) → 前两行 237px ×2 + 末行 185px = 659px < 730px。
+           "说明"能算成 2 行是前提: 发射器用 ROW_BODY_MAX_CHARS=42 卡取材(3.4cqw 在 74cqw 盒里
+           一行 21 字), 超过就整条版式拒收 —— 与 news-coral/catalog 同一条常量, 同一套算术。
+           逐行动画只碰"子元素": 序号片自带 background, 若整行做 opacity 淡入, 半透明的钴蓝片
+           会与米白地混成灰蓝(纸字在其上掉到 3:1 以下), 所以片走 scaleX、文字走 opacity(法则 7)。 */
+        @font-face {
+          font-family: "HF Serif CJK";
+          src:
+            local("Noto Serif SC"),
+            local("Source Han Serif SC"),
+            local("SimSun"),
+            local("Noto Serif CJK SC"),
+            local("Songti SC"),
+            local("思源宋体");
+          font-weight: 100 900;
+        }
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #e8dfcb;
+          color: #1a1a1a;
+          font-family: "HF Serif CJK", serif;
+        }
+        .pd-head {
+          position: absolute;
+          inset: 12cqh 7cqw auto 7cqw;
+          display: flex;
+          flex-direction: column;
+          gap: 1.6cqh;
+        }
+        .pd-eb {
+          align-self: flex-start;
+          background: #1f3a68;
+          color: #f5efe3;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.6cqw;
+          font-weight: 700;
+          letter-spacing: 0.18em;
+          padding: 0.9cqh 1.8cqw;
+          transform-origin: 0% 50%;
+        }
+        .pd-ttl {
+          font-size: 8.4cqw;
+          font-weight: 700;
+          line-height: 1.2;
+          max-width: 80cqw;
+        }
+        .pd-rule {
+          position: absolute;
+          left: 7cqw;
+          right: 7cqw;
+          top: 38cqh;
+          height: 0.55cqh;
+          background: #b8923e;
+          transform-origin: 0% 50%;
+        }
+        .pd-rows {
+          position: absolute;
+          inset: 42cqh 7cqw 20cqh 7cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        .pd-row {
+          display: flex;
+          align-items: flex-start;
+          gap: 3cqw;
+          padding-bottom: 2.6cqh;
+          border-bottom: 0.2cqw solid rgba(31, 58, 104, 0.22);
+        }
+        .pd-row:last-child {
+          border-bottom: 0;
+          padding-bottom: 0;
+        }
+        /* 序号片: 钴蓝面 + 纸白字, 本 pack 唯一合法的"文字压在强调色上"写法 */
+        .pd-no {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 5.2cqw;
+          font-weight: 800;
+          line-height: 1;
+          background: #1f3a68;
+          color: #f5efe3;
+          padding: 0.6cqh 1.2cqw;
+          transform-origin: 0% 50%;
+        }
+        .pd-txt {
+          display: flex;
+          flex-direction: column;
+          gap: 0.9cqh;
+          max-width: 74cqw;
+        }
+        .pd-lb {
+          font-size: 4.8cqw;
+          font-weight: 700;
+          line-height: 1.2;
+          color: #1f3a68;
+        }
+        .pd-bd {
+          font-family: "HF CJK", sans-serif;
+          font-size: 3.4cqw;
+          font-weight: 400;
+          line-height: 1.45;
+          color: #1a1a1a;
+        }
+      </style>
+
+      <div id="root" data-composition-id="np-catalog" data-width="1080" data-height="1920">
+        <div class="pd-head" id="pd-head">
+          <div class="pd-eb" id="pd-eb" data-var-text="kicker">条文</div>
+          <div class="pd-ttl" id="pd-ttl" data-var-text="title">三条要点</div>
+        </div>
+        <div class="pd-rule" id="pd-rule"></div>
+        <div class="pd-rows" id="pd-rows">
+          <div class="pd-row">
+            <div class="pd-no" id="pd-n1">01</div>
+            <div class="pd-txt" id="pd-t1">
+              <div class="pd-lb" data-var-text="step1Label">第一条</div>
+              <div class="pd-bd" data-var-text="step1Body">说明一</div>
+            </div>
+          </div>
+          <div class="pd-row">
+            <div class="pd-no" id="pd-n2">02</div>
+            <div class="pd-txt" id="pd-t2">
+              <div class="pd-lb" data-var-text="step2Label">第二条</div>
+              <div class="pd-bd" data-var-text="step2Body">说明二</div>
+            </div>
+          </div>
+          <div class="pd-row">
+            <div class="pd-no" id="pd-n3">03</div>
+            <div class="pd-txt" id="pd-t3">
+              <div class="pd-lb" data-var-text="step3Label">第三条</div>
+              <div class="pd-bd" data-var-text="step3Body">说明三</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.7;
+        const STAGGER = 0.24;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        // 眉标片/尺线/序号片都有 background → scaleX; 文字层 → opacity + x(两者不同元素, 互不污染)
+        tl.fromTo("#pd-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.15);
+        tl.fromTo("#pd-ttl", { opacity: 0, y: 48 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+        tl.fromTo("#pd-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.65, ease: "power2.out" }, 0.55);
+        tl.fromTo("#pd-n1", { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: "power2.out" }, 0.75);
+        tl.fromTo("#pd-t1", { opacity: 0, x: 36 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.85);
+        tl.fromTo("#pd-n2", { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: "power2.out" }, 0.75 + STAGGER);
+        tl.fromTo("#pd-t2", { opacity: 0, x: 36 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.85 + STAGGER);
+        tl.fromTo("#pd-n3", { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: "power2.out" }, 0.75 + STAGGER * 2);
+        tl.fromTo("#pd-t3", { opacity: 0, x: 36 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.85 + STAGGER * 2);
+        tl.to("#pd-rows", { yPercent: -3.2, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#pd-head", { yPercent: -2, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["np-catalog"] = tl;
+      </script>
+    </template>
+  </body>
+</html>
