@@ -28,6 +28,9 @@
            points 落 catalog.html —— 名字映射在 frame.md §6 记全, 别让人再猜一遍。
            ⚠ 日期必须 ≤8 字: 发射器 RAIL_VALUE_MAX_CHARS=8, "2026年10月1日"(11 字)会让整个版式
              不可选(自动模式会退回 closer)。写 "2026.10" / "10月1日" 这种短形。
+           ⚠ 小节标题 ≤10 字: head 从 14cqh 起、行区从 34cqh 起, 而 8.4cqw×1.2 三行就是 30cqh ——
+             标题写满 18 字(发射器 TITLE_LINE_MAX_CHARS 的上限)就会压到脊线。这一位是"小节标签"
+             ("政策三步走"), 不是整句; 整句请走 story。catalog 同一套几何, 同一条约束(见各自文件头)。
            对比(实测, 对 paper #F5EFE3, 见 frame.md §2.1): 标题/日期 cobalt 9.84 /
            事件 ink 15.20 / 节点号 gray 4.65(3.4cqw=37px 属大字, AA-large 3.0) —— 灰档只给配角。
            几何: 脊线 `top 34cqh / bottom 20cqh`(法则 1 的下界, 20cqh 是允许边界),
@@ -90,7 +93,7 @@
           color: #6b6b6b;
         }
         .pr-ttl {
-          font-size: 8.2cqw;
+          font-size: 8.4cqw;
           font-weight: 700;
           line-height: 1.2;
           color: #1f3a68;

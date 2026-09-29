@@ -111,8 +111,10 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 - `compositions/*.html`: 实际版式（hook / closer / 内容卡 …）
 
 **当前状态**（自检 `t_full_loadability_progress` 实时报告——名字沿用，口径已改成"有真版式"而不是"能加载不抛"，后者在 12/12 放好占位壳后就是饱和指标）：
-- `news-coral`: 完整（7 个 composition）—— **当前唯一可渲染的包**（`可渲染 pack (有真版式): 1/12`）
-- 其余 11 个: frame.md + host.html + 只有 `placeholder.html`（占位壳，**不参与版式选择**）
+- `news-coral`: 完整（7 个真 composition）
+- `news-policy`: 完整（5 个真 composition：hook / story / catalog / rail / closer；`quote` 被该包法则 4 排除、`stat` 归 `news-stat`，刻意不 author）
+- 上面两包即 `可渲染 pack (有真版式): 2/12 —— news-coral, news-policy`
+- 其余 10 个: frame.md + host.html + 只有 `placeholder.html`（占位壳，**不参与版式选择**）
 - 只有占位壳的包在 `load_style_pack` **加载阶段**停机并点名可渲染替代，不会拖到渲染第 1 镜
 - 后续 composition 一个个补；补完一个（并删除 placeholder.html），可渲染计数递增
 
@@ -129,6 +131,7 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 | D6 | 屏句 ≠ 配音 | `onscreen:` 行单独成屏上屏上整句，配音未授权走正文；这条结构保证来自 path_b_build.py 的 `check_onscreen` 闸门 |
 | D7 | placeholder 不参与选择 | 11 个新 pack 的 placeholder composition 被 `load_style_pack` **直接跳过**；只剩占位壳的包视为不可渲染，在加载阶段停机点名替代包（2026-09-29 审计后收紧，旧口径"只是让加载通过"会误导到渲染期才崩）|
 | D8 | AIGC 标识三件套不可关 | 显式角标（字芯 ≥ 最短边 5%、贯穿全片）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ 发布时 `--declaration 内容由AI生成`；①② 由发射器无条件产出并读回核验，缺侧车的老成片一律重渲 |
+| D9 | 版式名只认**文件名词干** | `choose_layout` 的候选清单写死在发射器里（hook / closer / story / stat / quote / catalog / rail）；pack 自己起的名字（news-policy 原计划的 `summary` / `points` / `timeline`）**不能**当文件名 —— 只能按语义落到 canonical 文件名，映射在 pack 的 frame.md §6 记全，别让人再猜一遍。composition id 由 `MOUNT_TPL` 与文件名解耦，可保留 pack 前缀（`np-*`）维持公文身份 |
 
 ---
 
@@ -159,7 +162,7 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 5. **Path B only**: 不要传 `--template` 之外的渲染选项；不要尝试 Path A
 6. **12 pack 自检**: 任何新加的 pack 必须先有 frame.md 才能 commit；通过 `path_b_selftest.py` 58 项
 7. **AIGC 标识不可关**: ①画面角标 ②mp4 元数据 ③发布自主声明 三件齐活；`aigc.json` 缺失的成片先重渲
-8. **不可渲染的包不许选**: 决策树命中只有占位壳的 pack 时, 改落 `news-coral` 或先补真版式
+8. **不可渲染的包不许选**: 决策树命中只有占位壳的 pack 时, 政策/法规类改落 `news-policy`、其余改落 `news-coral`, 或先补真版式
 9. **采集零付费**: 热点线索只来自 `skills/news-collect`（stdlib-only，本机可复跑）；不调用任何按次扣费的榜单/话题搜索（Beatra 6/60 credits）。缺源补免费源，不花钱
 
 ---
@@ -170,7 +173,7 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 $ python skills/douyin-pro/scripts/path_b_selftest.py
 [selftest] 58 项 · style=news-coral
   ok    t_full_loadability_progress
-      可渲染 pack (有真版式): 1/12 —— news-coral
+      可渲染 pack (有真版式): 2/12 —— news-coral, news-policy
   ...
 [selftest] 全绿 58/58
 ```
@@ -180,8 +183,9 @@ $ python skills/douyin-pro/scripts/path_b_selftest.py
 - ✅ AIGC 标识落地：画面角标（字芯 62px ≥ 最短边 5%、贯穿全片）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ `aigc.json` 侧车 + 读回核验（读不回即拒绝交付）
 - ✅ 发布链路：`--declaration 内容由AI生成` 已对齐上游源码，成功凭据写进 skill
 - ✅ 占位包改为**加载期停机**（不再拖到渲染第 1 镜）
-- ✅ 进度指标换成可交叉核验的"有真版式 pack 数"（1/12）
-- ⏳ 11 pack 的真 composition（一个个补）
+- ✅ 进度指标换成可交叉核验的"有真版式 pack 数"（2/12）
+- ✅ `news-policy` 5 个真版式落地（占位壳已删），五镜探针过 `--check-only` 门禁（记录见 `.harness-news-runtime/verifications/2026-09-29-news-policy-layouts-verification-lite.md`）
+- ⏳ 10 pack 的真 composition（一个个补）
 - ✅ t001 已按 v003 脚本重渲为 `videos/t001-v4/`（标识三件套 + 三处独立核验通过）；v001/v002/v003 保留为历史
 - ⏳ 发布前定 `--aigc-producer` 真实主体名（现在是默认值 harness-news-pathb）
 - ⏳ 抖音账号未登录 → 发布这一步只能交用户手动完成

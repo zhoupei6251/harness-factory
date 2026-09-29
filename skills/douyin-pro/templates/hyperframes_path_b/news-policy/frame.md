@@ -32,34 +32,56 @@
 | `gold` | `#B8923E` | 烫金（印章形 + 关键日期，**只作形状**）|
 | `crimson` | `#C0392B` | 极少数用法（生效日期 / 强制字，**只作形状**）|
 
-### 2.1 对比度
+### 2.1 对比度（实测值，2026-09-29）
+
+按 WCAG 2.x 相对亮度公式对 §2 的 token 原值直接算（复算脚本
+`.harness-news-runtime/tmp/contrast_policy.py`，输出与结果记录在
+`.harness-news-runtime/verifications/2026-09-29-news-policy-layouts-verification-lite.md`）。
+判读线：正文 4.5:1，大字 3:1（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.3cqw 即算大字）。
 
 | 组合 | 比值 | 判定 |
 |---|---|---|
-| ink / paper | 12.6 | ✓ |
-| cobalt / paper | 9.5 | ✓ |
-| gray / paper | 4.7 | ✓ 大字号 |
-| cobalt / paper-dark | 8.0 | ✓ |
+| ink / paper | 15.20 | ✓ 正文主力 |
+| cobalt / paper | 9.84 | ✓ 标题、序号、强调字 |
+| gray / paper | 4.65 | ✓ 大字档 —— 只给眉标/节点号这类配角 |
+| cobalt / paper-dark | 8.51 | ✓ 条目标题 |
+| ink / paper-dark | 13.13 | ✓ 条文说明 |
+| paper / cobalt（暗面）| 9.84 | ✓ closer 地面、story `data-tone="dark"` |
+| rule / cobalt | 6.23 | ✓ 来源行（3.4cqw 属大字）|
+| cobalt-dark 字 / gold 片 | 4.85 | ✓ 强调片的正确写法是**金底深字** |
+| gold / paper | 2.54 | ✗ 只作形状（印章环、发丝尺线）|
+| gold / paper-dark | 2.20 | ✗ 只作形状 |
+| gold / cobalt | 3.87 | 过大字线(3.0)、不过正文线(4.5) —— 但按下面的强制规则**只作形状**，金字改金片 |
+| crimson / paper | 4.75 | 数学上够大字，但仍按下面的强制规则**只作形状** |
+| paper / paper-dark | 1.16 | ✗ 两级米白之间不做文字分层，只用来换地面 |
 
 > **强制规则**：gold 和 crimson 永远只作形状（印章、日期戳、横线），不作文字。
 > 公文蓝 cobalt 可以染标题、序号、关键强调字。
+> 补一条实测出来的细则：**要强调"日期/关键词"就贴片（金底 + cobalt-dark 字 4.85），
+> 不要染金字（3.87 只过大字线、正文档也不过，且 gold 按上条规则一律不作文字）** —— `hook` 的 `.pk-ac`、`closer` 的 `.pf-ac` 都是这么写的。
 
 ---
 
-## 3. 字阶
+## 3. 字阶（与已发射的 5 个 composition 一致）
 
 | 位 | 字体 | 字号 | 字重 | 其他 |
 |---|---|---|---|---|
-| 眉标 | `"JetBrains Mono", monospace` | 2.6cqw | 700 | "新规 / 政策 / 官方" 字样 |
-| 公文标题 | `"HF Serif CJK", serif` | 8cqw | 700 | cobalt，line-height 1.18 |
-| 施行日期 | `"HF Serif CJK"` | 12cqw | 900 | cobalt，年/月/日走 gold 印章底 |
-| 条目 | `"HF Serif CJK"` | 4.4cqw | 700 | 序号 cobalt |
-| 条文说明 | `"HF CJK", sans-serif` | 3.4cqw | 400 | ink |
-| 时间线节点 | `"JetBrains Mono"` | 3.6cqw | 800 | cobalt |
-| 屏句 | `"HF Serif CJK"` | 4.4cqw | 400 | 88cqw 盒两行封顶 |
+| 眉标 | `"JetBrains Mono", monospace` | 2.6cqw | 700 | 钴蓝片 + 纸白字；暗面整片反相 |
+| 公文标题（hook）| `"HF Serif CJK", serif` | 9cqw | 700 | cobalt，line-height 1.18；`split_headline` 切两行 + 强调片 |
+| 小节标题（catalog / rail）| `"HF Serif CJK"` | 8.4cqw | 700 | cobalt，**脚本侧 ≤10 字**（三行会压到尺线/脊线，见 §6）|
+| 领句（story）| `"HF Serif CJK"` | 8.6cqw | 700 | `fitCqw` 3 行封顶，作者没写标题就不选 story |
+| 辅助行（hook 的 `support`）| `"HF CJK", sans-serif` | 3.6cqw | 400 | ink —— 取材处 = 屏句（见下方订正）|
+| 条目 | `"HF Serif CJK"` | 4.4cqw | 700 | 序号 cobalt 片 |
+| 条文说明 | `"HF CJK", sans-serif` | 3.4cqw | 400 | ink，`ROW_BODY_MAX_CHARS=42` 两行封顶 |
+| 时间线节点 | `"JetBrains Mono"` | 3.6cqw | 800 | cobalt，`RAIL_VALUE_MAX_CHARS=8`（日期走短形）|
+| 屏句（story）| `"HF CJK"` | 4.4cqw | 400 | 86cqw 盒两行封顶，light 走 gray / dark 走 rule |
 
 - 公文型必须有衬线（公文 = 庄重）；正文说明可以无衬线（小字 = 可读）
 - 拉丁显示族写裸族名。中文族由每个版式自带 `@font-face` + `local()` 六连。
+- **订正（2026-09-29 落地时）**：原计划"施行日期 12cqw 900 + gold 印章底"没有落地。
+  原因是发射器没有"只取日期"的取材处 —— hook 的这一位由 `_onscreen_phrase`（整条屏句）
+  填充，12cqw 在 16 字屏句下必然溢出，而日期也不是独立变量。现在写成 3.6cqw 辅助行，
+  **日期要上屏就让脚本在屏句里写全**（`屏: 2026年10月1日施行`），版式不自己编日期。
 
 ---
 
@@ -67,6 +89,8 @@
 
 1. **内容只占顶部 80%**：底部 20cqh 留给字幕。
 2. **首镜必出现公文标题 + 施行日期**：发布机关 + 施行日期 + "新规"红/金印章 = 一眼认出"这是政策"。
+   落地方式：标题走 `title`（`split_headline` 两行 + 金片强调），**施行日期写在屏句里**
+   （`屏: 2026年10月1日施行` → hook 的 `support` 位）；版式不许自己生成日期（§3 订正）。
 3. **每条政策用 bullet 落点**：政策清单（编号 + 一句话 + 适用对象），每条 ≤8 秒。
 4. **禁止"故事化叙事"**：不上引文、不上屏句的诗化表述（政策类只看事实）。
 5. **时间线节点必成对**：所有 timeline 节点必须带日期 + 事件描述，缺一即拒收。
@@ -86,33 +110,62 @@ driftDur   = max(MIN_DRIFT, slot - driftStart)
 
 ---
 
-## 6. 地面清单与计划版式
+## 6. 地面清单与已落地版式
 
-| layout | 地面 | 文字色 | cobalt / gold 的出场方式 |
-|---|---|---|---|
-| `hook`（公文发布）| paper | ink / cobalt | 顶部 cobalt 横线（书挡）+ gold 印章 |
-| `summary`（核心摘要）| paper | ink | 序号 cobalt + 条目 ink |
-| `points`（关键变化）| paper-dark | ink | 编号 cobalt 方块 + 变化说明 ink |
-| `timeline`（施行节点）| paper | ink | 时间线 cobalt 主轴 + 节点圆点 |
-| `closer`（末镜）| paper | ink / cobalt | 顶部 cobalt 书挡 + gold 末印 |
+发射器只认**文件名词干**（候选清单写死在 `path_b_build.choose_layout`：
+`hook / story / stat / quote / catalog / rail / closer`）。本 pack 原计划的
+`summary / points / timeline` 三个名字不在词汇表里，因此**按语义写成 canonical 文件名**，
+composition id 统一 `np-*` 前缀保留公文身份：
 
-**单地面 pack**：90% 时间在 paper 上；条目卡切 paper-dark 做二级层；hook / closer 用 cobalt + gold 双书挡。
+| 计划名 | 实际文件 | composition id | 地面 | 文字色 | cobalt / gold 的出场方式 |
+|---|---|---|---|---|---|
+| `hook` | `hook.html` | `np-hook` | paper | ink / cobalt | 顶部 cobalt 粗尺 + gold 细尺（双书挡）+ gold 印章环；标题强调走金片 |
+| `summary` | `story.html` | `np-story` | paper ⇄ cobalt（`tone` 逐镜翻转）| ink / cobalt / paper | 序号水印 + cobalt 眉标片（暗面反相）+ gold 尺线 |
+| `points` | `catalog.html` | `np-catalog` | paper-dark | ink / cobalt | cobalt 序号片 + 纸白字；gold 只作尺线 |
+| `timeline` | `rail.html` | `np-rail` | paper | ink / cobalt / gray | cobalt 主脊 + 节点日期 cobalt；gold 不出场 |
+| `closer` | `closer.html` | `np-closer` | **cobalt（暗面）** | paper / rule | paper 双书挡（与 hook 同位反相）+ gold 末印环 + 金片 CTA |
+| — | 未 author | — | — | — | `quote`（法则 4 政策类不上引文）、`stat`（数字型归 `news-stat` pack）|
+
+**地面登记**（`path_b_build.GROUND_TONE_BY_HEX`，未登记的地面装包直接停机）：
+
+| hex | 归 | 用在 |
+|---|---|---|
+| `#F5EFE3` paper | light | hook / story(light) / rail |
+| `#E8DFCB` paper-dark | light | catalog |
+| `#1F3A68` cobalt | dark | story(dark) / closer |
+
+- **双地面翻转**：story 的明暗由发射器给（`_tone` 相对上一镜翻转），版式只认 `tone` 变量；
+  公文系统不用黑底作暗面 —— 翻面走 cobalt，这样"暗面"仍然是同一份文件的一部分。
+- **写屏算术（脚本侧必须知道的三条）**：
+  1. 小节标题（catalog / rail）≤10 字 —— 三行 8.4cqw×1.2 = 30cqh 会压到 38cqh 的尺线（catalog）
+     或 34cqh 的脊线起点（rail）。这一位是"小节标签"，整句走 story。
+  2. rail 的 `value`（日期）≤8 字（`RAIL_VALUE_MAX_CHARS`）——`"2026年10月1日"` 11 字会让
+     整个 rail 在自动模式不可选，写 `2026.10` / `10月1日`。
+  3. 屏句 5–16 字（`ONSCREEN_MIN/MAX_CHARS`），且屏句是 hook `support`、story `onscreen`、
+     closer `cta/ctaAccent` **唯一**的取材处 —— 日期、行动指令要上屏就必须写在屏句里，
+     closer 的强调段只能落在作者点的 `｜` 上。
+- 法则 4「政策类只看事实」在 closer 的体现：`channel` 走 `--source`/`source` 键（归属只能来自数据）。
 
 ---
 
-## 7. 计划 composition 文件
+## 7. composition 清单（已落地）
 
 ```
 news-policy/
 ├── frame.md
 ├── host.html
 └── compositions/
-    ├── hook.html      nc-policy-hook     公文发布 + gold 印章
-    ├── summary.html   nc-policy-summary  核心摘要
-    ├── points.html    nc-policy-points   关键变化 bullet
-    ├── timeline.html  nc-policy-timeline 施行节点时间线
-    └── closer.html    nc-policy-closer   末镜 + gold 末印
+    ├── hook.html     np-hook     红头文件: 双书挡 + gold 印章环 + 标题金片
+    ├── story.html    np-story    领句 + 烫金尺 + 屏句, paper ⇄ cobalt 翻转
+    ├── catalog.html  np-catalog  三条要点: paper-dark 卡衬 + cobalt 序号片 + 逐行落
+    ├── rail.html     np-rail     政策时间线: cobalt 主脊 + 事件/日期成对三节点
+    └── closer.html   np-closer   尾镜书挡(与 hook 同位反相) + 金片 CTA + 来源行
 ```
+
+`placeholder.html` 已删除（占位壳既不进版式选择也不进可渲染计数，留着只会误导）。
+本 pack 现在**可渲染**：`path_b_build.ready_packs()` = `['news-coral', 'news-policy']`。
+每个文件的契约（`data-composition-variables`）就是上表的变量集，新增版式前先确认
+`choose_layout` 认这个名字（§6 第一段的词汇表限制）。
 
 ---
 

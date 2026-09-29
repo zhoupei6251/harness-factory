@@ -21,12 +21,13 @@
            light → paper #f5efe3, dark → cobalt #1f3a68 —— 三个地面的登记与归明归暗理由见
            path_b_build.GROUND_TONE_BY_HEX 与本 pack frame.md §2.1(公文系统不用"黑底"作暗面)。
            文字色只走实测过的那几档(对各自地面):
-             light: 领句 cobalt 9.84 / 屏句 gray 4.65(3.8cqw=41px 属大字, AA-large 3.0) / 根色 ink 15.20
+             light: 领句 cobalt 9.84 / 屏句 gray 4.65(4.4cqw=47px 属大字, AA-large 3.0) / 根色 ink 15.20
              dark : 领句 paper 9.84 / 屏句 rule #c9c0aa 6.23 / 眉标片反相(paper 底 + cobalt 字)
+           字号一律取 frame.md §3 的字阶(领句档 = 公文标题 9cqw 的下一档, 屏句 4.4cqw)。
            几何(1cqw=10.8px / 1cqh=19.2px): 眉标片 top 17cqh、片高≈3.8cqh → 下沿 20.8cqh, 与 hook 同一套;
            正文区 `inset: 24cqh 7cqw 20cqh 7cqw` → 区高 56cqh、盒宽 86cqw。
-           内容最坏高度 = 领句 8.6cqw×1.22×3行(17.7cqh) + 尺 0.55cqh + 屏句 3.8cqw×1.5×2行(6.4cqh)
-           + 两个 gap 3cqh(6) = 30.65cqh; 居中后上下各余 12.68cqh, 漂移 yPercent -3 吃 1.7cqh
+           内容最坏高度 = 领句 8.6cqw×1.22×3行(17.7cqh) + 尺 0.55cqh + 屏句 4.4cqw×1.5×2行(7.4cqh)
+           + 两个 gap 3cqh(6) = 31.7cqh; 居中后上下各余 12.15cqh, 漂移 yPercent -3 吃 1.7cqh
            → 距字幕禁入区(底 20cqh)整块余量(法则 1)。
            判据 4(每镜至少一处非纯文字帧)由序号水印、眉标片、烫金尺三处形状承担。 */
         @font-face {
@@ -166,10 +167,10 @@
         const root = document.getElementById("root");
         const tone = String(vars.tone || TONE_LIGHT).toLowerCase();
         root.dataset.tone = tone === TONE_DARK ? TONE_DARK : TONE_LIGHT;
-        /* 领句 8.6cqw ⇒ 一行 10 字, 3 行封顶; 屏句 3.8cqw ⇒ 一行 22 字, 2 行封顶
+        /* 领句 8.6cqw ⇒ 一行 10 字, 3 行封顶; 屏句 4.4cqw ⇒ 一行 19 字, 2 行封顶
            (发射器 ONSCREEN_MAX_CHARS=16 从另一头卡同一个约束) */
         root.style.setProperty("--fit-ttl", fitCqw(vars.title, 8.6, 3) + "cqw");
-        root.style.setProperty("--fit-scr", fitCqw(vars.onscreen, 3.8, 2) + "cqw");
+        root.style.setProperty("--fit-scr", fitCqw(vars.onscreen, 4.4, 2) + "cqw");
 
         const tl = gsap.timeline({ paused: true });
         // 水印是装饰层(无 background) → 允许 opacity + scale

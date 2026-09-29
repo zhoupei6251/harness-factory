@@ -76,9 +76,12 @@ feedx 三个源新鲜度从「当天」到「9 个月前」都有 → 按 `feed_
 回填 MEMORY `videos[].template: <pack_name>`。
 
 **当前进度**（12 pack = frame.md / host.html / compositions/*.html 三层齐全度）：
-- `news-coral`: 完整（7 个真 composition）—— **当前唯一可渲染的包**
-- 其余 11 个: frame.md + host.html + 只有 `placeholder.html`（占位壳，**不参与选择**）
-- ⚠️ 决策树命中不可渲染的包时：改落 `news-coral`，或按该包 frame.md 契约补真 composition。
+- `news-coral`: 完整（7 个真 composition）
+- `news-policy`: 完整（5 个真 composition：hook / story / catalog / rail / closer）
+- 上面两包即自检报告的 `可渲染 pack (有真版式): 2/12 —— news-coral, news-policy`
+- 其余 10 个: frame.md + host.html + 只有 `placeholder.html`（占位壳，**不参与选择**）
+- ⚠️ 决策树命中不可渲染的包时：政策/法规/通知类改落 `news-policy`，其余改落 `news-coral`，
+  或按该包 frame.md 契约补真 composition。
   `load_style_pack` 会在**加载阶段**就停机并点名可渲染替代（不会等到渲染第 1 镜）
 - 校验：`python skills/douyin-pro/scripts/path_b_selftest.py` → `可渲染 pack (有真版式): X/12`
 

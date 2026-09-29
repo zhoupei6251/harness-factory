@@ -26,10 +26,13 @@
            小标题与条文说明 ink 13.13 / 条目标题 cobalt 8.51 / 发丝线 rgba(cobalt,.22) 只作形状。
            这一版式**不出现烫金文字**: gold 对 paper-dark 只有 2.20(对 paper 2.54) —— 它只能当尺线。
            行区几何是算出来的: 顶 42cqh / 底 20cqh(法则 1 字幕禁入区) → 高 38cqh(730px);
-           最坏一行 = 条目标题 4.8cqw×1.2(62px) + gap 0.9cqh(17) + 说明 3.4cqw×1.45×2行(106) = 185px,
-           加行间 2.6cqh+发丝线(52) → 前两行 237px ×2 + 末行 185px = 659px < 730px。
+           最坏一行 = 条目标题 4.4cqw×1.2(57px) + gap 0.9cqh(17) + 说明 3.4cqw×1.45×2行(106) = 180px,
+           加行间 2.6cqh+发丝线(52) → 前两行 232px ×2 + 末行 180px = 644px < 730px。
            "说明"能算成 2 行是前提: 发射器用 ROW_BODY_MAX_CHARS=42 卡取材(3.4cqw 在 74cqw 盒里
            一行 21 字), 超过就整条版式拒收 —— 与 news-coral/catalog 同一条常量, 同一套算术。
+           ⚠ 小节标题 ≤10 字: head 从 12cqh 起、尺线在 38cqh, 8.4cqw×1.2 两行(20.2cqh)就到 32cqh;
+             写满 18 字(TITLE_LINE_MAX_CHARS 上限)就是三行 42cqh, 会压到尺线。这一位是"小节标签"
+             ("三条要点"), 整句请走 story —— rail 同一套几何, 同一条约束。
            逐行动画只碰"子元素": 序号片自带 background, 若整行做 opacity 淡入, 半透明的钴蓝片
            会与米白地混成灰蓝(纸字在其上掉到 3:1 以下), 所以片走 scaleX、文字走 opacity(法则 7)。 */
         @font-face {
@@ -131,7 +134,7 @@
           max-width: 74cqw;
         }
         .pd-lb {
-          font-size: 4.8cqw;
+          font-size: 4.4cqw;
           font-weight: 700;
           line-height: 1.2;
           color: #1f3a68;
