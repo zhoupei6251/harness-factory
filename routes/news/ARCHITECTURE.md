@@ -65,13 +65,15 @@ skills/douyin-pro/                   ← 渲染器 (Path B)
 ├── scripts/
 │   ├── path_b_build.py             ← 9 步发射器 (解析→配音→发射→自检→门禁→渲染→动量→烧字幕+AIGC→联络表)
 │   ├── layout_selfcheck.py          ← 17 条结构不变量 (渲前拦截)
-│   ├── path_b_selftest.py           ← 58 项纯函数断言 (含 12 pack 加载 + AIGC 标识合规)
+│   ├── audit_pack_contrast.py       ← frame.md 色板与对比度表复算 (文档里的"实测值"不许手抄)
+│   ├── path_b_selftest.py           ← 61 项纯函数断言 (12 pack 加载 + AIGC 合规 + 词表 + 上面两闸门的负例)
 │   ├── commons_media.py             ← 图片层 (path B 当前未启用, 留作图片型模板扩展)
 │   └── install_path_b_deps.py       ← 依赖一键装
 ├── templates/hyperframes_path_b/   ← 12 个节目包
 │   ├── news-coral/                  ← 完整 (frame + host + 7 compositions)
+│   ├── news-policy/                 ← 完整 (frame + host + 5 compositions)
 │   ├── news-ink/                    ← frame + host + placeholder (待补 composition)
-│   ├── ... (10 more)
+│   ├── ... (9 more)
 │   └── <12 包>/frame.md             ← token 与版面法则 (唯一事实源)
 └── skills/video-render-engine/        ← 配音×渲染 详解（douyin-pro **内部**子模块，
                                          全路径 skills/douyin-pro/skills/video-render-engine/，
@@ -131,7 +133,8 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 | D6 | 屏句 ≠ 配音 | `onscreen:` 行单独成屏上屏上整句，配音未授权走正文；这条结构保证来自 path_b_build.py 的 `check_onscreen` 闸门 |
 | D7 | placeholder 不参与选择 | 11 个新 pack 的 placeholder composition 被 `load_style_pack` **直接跳过**；只剩占位壳的包视为不可渲染，在加载阶段停机点名替代包（2026-09-29 审计后收紧，旧口径"只是让加载通过"会误导到渲染期才崩）|
 | D8 | AIGC 标识三件套不可关 | 显式角标（字芯 ≥ 最短边 5%、贯穿全片）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ 发布时 `--declaration 内容由AI生成`；①② 由发射器无条件产出并读回核验，缺侧车的老成片一律重渲 |
-| D9 | 版式名只认**文件名词干** | `choose_layout` 的候选清单写死在发射器里（hook / closer / story / stat / quote / catalog / rail）；pack 自己起的名字（news-policy 原计划的 `summary` / `points` / `timeline`）**不能**当文件名 —— 只能按语义落到 canonical 文件名，映射在 pack 的 frame.md §6 记全，别让人再猜一遍。composition id 由 `MOUNT_TPL` 与文件名解耦，可保留 pack 前缀（`np-*`）维持公文身份 |
+| D9 | 版式名只认**文件名词干** | 自动选版的词表是 `path_b_build.AUTO_LAYOUT_STEMS`（`hook / closer / story / stat / quote / catalog / rail`，元组顺序即兜底顺序）；pack 自己起的名字**不能**进自动候选 —— 只能按语义落到 canonical 文件名，映射在 pack 的 frame.md §6 记全，别让人再猜一遍。composition id 由 `MOUNT_TPL` 与文件名解耦，可保留 pack 前缀（`np-*`）维持公文身份。**这条坑是静默的**：2026-09-29 清点出 10 个未落地 pack 的 §7 共计划了 16 个词表外文件名（`evidence`/`lead-detail`/`compare`/`drilldown`/`clock`/`sit`/`list`/`diagram`/`list-steps`/`risk-callout`/`segment`/`chain`/`play`/`score`/`map`/`region`）—— 照那些名字建文件不会报错，只会得到一个自动模式永远选不到的惰性版式。已由 `t_auto_layout_stems_are_the_only_vocabulary` 上闸（点名表 ⊆ 词表 = 词表，可渲染 pack 的词干 ⊆ 词表）|
+| D10 | 设计系统里的数字必须有**复算入口** | frame.md 的对比度表是"实测值"，但此前只能靠手抄维护：2026-09-29 首次全量复算抓到 11 个包共 **42 处**漂移，其中 `news-blast` 文档写 `score / pitch 5.0`（真值 **1.18**）而 §3 字阶据此把 22cqw 的主队比分染成红字压绿底 —— 手抄的假数会直接变成**播出后看不清的巨号字**。现在这类数一律由 `audit_pack_contrast.py` 从 §2 色板原值复算（判读线写进常量：正文 4.5 / 大字 3.0，1080 宽下 ≥2.22cqw ≈ 24px），文档只许写命令不许写脚本残留路径，改色板或改判定即红。**法则可以比数学严，数学不行**：gold 只作形状是包内法则，"gold 数学不过线"是假陈述 —— 审计按此区分 `VERDICT_CONTRADICTS_ARITHMETIC` |
 
 ---
 
@@ -151,6 +154,14 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 
 **禁止写 `.ai-runtime-artifacts/`** — 那是 code 路由的运行时域 (news-workflow/SKILL.md 硬性规则 4 已说明)。
 
+`verifications/` 默认随目录一起被忽略，这是一处**已知张力**：验证记录是"这件事真做过"的证据，
+证据却在 git 外，换机器即等于没做过（2026-09-29 的 `tmp/contrast_policy.py` 就是活例 —— 复算脚本
+落在忽略目录里，frame.md 只能指向一个 clone 后不存在的路径）。口径：
+- **一次性**的跑动产物（草稿、日志、临时脚本）留在忽略目录，不进仓库；
+- **契约证据**（能否证文档数字的脚本、判定基线、验证单）不许依赖 gitignore —— 脚本一律落到
+  `skills/douyin-pro/scripts/` 受版本管理，文档只写仓库内命令；确有留存价值的验证单用
+  `git add -f` 显式拉进版本管理，而不是让文档指向忽略路径。
+
 ---
 
 ## 7. 整合后的硬性规则 (新闻域)
@@ -160,7 +171,9 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 3. **模板决策先于脚本**: 不知道选哪个模板就不开始写脚本
 4. **产物写 `.harness-news-runtime/`**: 不写 `.ai-runtime-artifacts/` (那是 code 域)
 5. **Path B only**: 不要传 `--template` 之外的渲染选项；不要尝试 Path A
-6. **12 pack 自检**: 任何新加的 pack 必须先有 frame.md 才能 commit；通过 `path_b_selftest.py` 58 项
+6. **12 pack 自检**: 任何新加的 pack 必须先有 frame.md 才能 commit；三道闸全绿才算过 ——
+   `path_b_selftest.py`(61 项) + `layout_selfcheck.py <pack…>`(17 条结构不变量) +
+   `audit_pack_contrast.py`(色板复算, 见 D10)。新 pack 的名字必须落 `AUTO_LAYOUT_STEMS`(见 D9)
 7. **AIGC 标识不可关**: ①画面角标 ②mp4 元数据 ③发布自主声明 三件齐活；`aigc.json` 缺失的成片先重渲
 8. **不可渲染的包不许选**: 决策树命中只有占位壳的 pack 时, 政策/法规类改落 `news-policy`、其余改落 `news-coral`, 或先补真版式
 9. **采集零付费**: 热点线索只来自 `skills/news-collect`（stdlib-only，本机可复跑）；不调用任何按次扣费的榜单/话题搜索（Beatra 6/60 credits）。缺源补免费源，不花钱
@@ -171,15 +184,27 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 
 ```
 $ python skills/douyin-pro/scripts/path_b_selftest.py
-[selftest] 58 项 · style=news-coral
+[selftest] 61 项 · style=news-coral
   ok    t_full_loadability_progress
       可渲染 pack (有真版式): 2/12 —— news-coral, news-policy
-  ...
-[selftest] 全绿 58/58
+  ok    t_pack_contrast_docs_match_palette_math
+  ok    t_auto_layout_stems_are_the_only_vocabulary
+[selftest] 全绿 61/61
+
+$ python skills/douyin-pro/scripts/audit_pack_contrast.py
+对比度审计通过：12 个 pack 的 frame.md 色板与文档一致（0 条警告）
+
+$ python skills/douyin-pro/scripts/layout_selfcheck.py \
+    skills/douyin-pro/templates/hyperframes_path_b/news-coral \
+    skills/douyin-pro/templates/hyperframes_path_b/news-policy
+版式自检通过：12 个文件，0 条违规
 ```
 
 集成状态：
 - ✅ 12 pack frame.md (token 面) + host.html
+- ✅ **色板复算闸门** `audit_pack_contrast.py`（D10）：11 个包 42 处手抄假数全部订正为算术值，含 `news-blast` 那条会播出 1.18:1 巨号红字的设计错误（改判为 white 数字 + score 下划条形状）。基线 42 与负例 EXIT=1 的复现命令见 `.harness-news-runtime/verifications/2026-09-29-contrast-audit-and-stem-gate-verification-lite.md`
+- ✅ `AUTO_LAYOUT_STEMS` 上闸（D9）：词表从 `choose_layout` 的散装字面量收成单一常量，并锁定"点名表 = 词表 / 可渲染 pack ⊆ 词表"
+- ✅ 验证记录的留存口径写进 §6（契约证据进 `scripts/` 受版本管理，文档不再指向 gitignore 路径）
 - ✅ AIGC 标识落地：画面角标（字芯 62px ≥ 最短边 5%、贯穿全片）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ `aigc.json` 侧车 + 读回核验（读不回即拒绝交付）
 - ✅ 发布链路：`--declaration 内容由AI生成` 已对齐上游源码，成功凭据写进 skill
 - ✅ 占位包改为**加载期停机**（不再拖到渲染第 1 镜）
@@ -195,7 +220,7 @@ $ python skills/douyin-pro/scripts/path_b_selftest.py
 ## 9. 下一步建议 (按 ROI 排序)
 
 1. ~~按 v003 脚本重渲 t001~~ ✅ 已做（`videos/t001-v4/`，59.3s / 1.97MB，标识三件套 + 三处独立核验通过）。剩下一件人定的事：**发布前把 `--aigc-producer` 换成真实主体名**再渲一次（现在是默认值）
-2. **补 1-2 个高 ROI 包的 composition**：`news-policy` + `news-stat`（视觉差异最大，且新闻域真会命中）；补完删掉 `placeholder.html`，可渲染计数自然涨
+2. **补 1-2 个高 ROI 包的 composition**：`news-policy` ✅ 已落地，下一个是 `news-stat`（视觉差异最大，且新闻域真会命中）。**动手前先按 D9 把该包 frame.md §7 的计划名重映射到 canonical 词干**（`news-stat` 的 `compare` / `drilldown` 都不在词表里），补完删掉 `placeholder.html`，可渲染计数自然涨；色板表随后过 `audit_pack_contrast.py`
 3. **登录抖音账号（用户本人扫码）**：链路已到"可发布"，缺的只是 cookie；agent 不代替扫码
 4. ~~免费采集层 `news-collect`~~ ✅ 已建并接入步骤 0（stdlib-only，无 key 无付费）：百度热搜 board API + feedx RSS 双轨，实测源/新鲜度/字段坑见 `skills/news-collect/SKILL.md`。DailyHotApi 公共实例本机 DNS 解析失败 → 只做 `--base-url` 自建选项，不作默认。`npm run index` 已收录（48 active）
 5. ~~news-polish / humanizer-zh 从工作流引用里删掉~~ ✅ 已做（v1 文字轨已从 `core/runbooks.md` / `core/intent-routing.md` 清干净，两条治理文档改为指向 `skills/news-workflow/SKILL.md` 单一事实源）

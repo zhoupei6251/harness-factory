@@ -33,12 +33,15 @@
 
 ### 2.1 对比度
 
+下表由 `python skills/douyin-pro/scripts/audit_pack_contrast.py news-explainer` 按 §2 色板原值复算，改色板必须重跑它。
+判读线：正文 4.5 / 大字 3.0（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.22cqw 算大字）。
+
 | 组合 | 比值 | 判定 |
 |---|---|---|
-| ink / paper | 12.6 | ✓ |
-| pen / paper | 8.6 | ✓ |
-| crimson / paper | 5.1 | ✓ 大字号 |
-| gold / paper | 4.4 | ✓ 大字号 |
+| ink / paper | 15.20 | ✓ 任意字号 |
+| pen / paper | 5.86 | ✓ 任意字号（钢笔蓝是本包唯一可染正文的强调色）|
+| crimson / paper | 4.75 | ✓ 数学过正文线，但按法则 crimson 只作形状 |
+| gold / paper | 2.54 | ✗ 连大字线 3.0 也不过 —— 算术与法则一致：gold 只作形状 |
 
 > **强制规则**：crimson / gold 永远只作箭头、序号、关键节点形状，不作正文文字。
 

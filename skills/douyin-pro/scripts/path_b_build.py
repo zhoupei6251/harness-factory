@@ -171,6 +171,13 @@ ONSCREEN_LINE_RE = re.compile(r"^屏\s*[:：]\s*(?P<text>.+)$")
 #: 标题行可以下刀的位置: 真标点 + 强调标记。标记**只在代码里当断点用, 不上屏** ——
 #: 只剥 `"，,、"` 的话, "没人告诉他｜他一直没问" 会把竖线留在第一行显示出来。
 HEAD_BREAK_CHARS = "，,、" + ONSPLIT
+#: 自动选版认的**唯一**词表 = composition 的**文件名词干**；本元组的顺序是**兜底顺序**
+#: (整句型优先 → 条目/数据型 → 首尾专用型最后，因为 hook/closer 的书挡几何不该出现在中段)。
+#: "这一镜写成什么形态"的先决优先级在 `choose_layout` 的 (stem, fits) 表里，与这里不同。
+#: pack 里出现别的名（`list-steps` / `score` / `diagram` …）时，显式 `"layout"` 点名能用，
+#: 自动模式**永远选不到** —— 10 个未落地 pack 的 frame.md §7 就是这么计划版式的（16 个词干
+#: 全在词表外），照那些名字建文件会得到一个"看着齐备、实际惰性"的版式。写新 pack 先落这 7 个名。
+AUTO_LAYOUT_STEMS = ("story", "stat", "quote", "catalog", "rail", "closer", "hook")
 #: `title` 里属于"小节标签位"的版式: 作者没写标题时允许回落版式自带 default。
 #: story 不在这里 —— 它的 title 是**领句**, 回落预览词就是替新闻下结论(见 `_title`)。
 TITLE_LABEL_LAYOUTS = frozenset({"rail", "catalog"})
@@ -1364,22 +1371,19 @@ def choose_layout(pack: dict, scene: dict, ctx: dict) -> str:
     # 引文(quote)、切得出的条目(catalog/rail)。
     # 写屏句等于宣布"这一镜的任务是一句陈述", 所以它会压过 stat/catalog:
     # 数字镜头别写 屏:, 想让巨号数字上屏就显式点名 "layout": "stat"。
-    if ctx["is_first"]:
-        candidates.append("hook")
-    if ctx["is_last"]:
-        candidates.append("closer")
-    if scene.get("onscreen"):
-        candidates.append("story")
-    if len(facts) >= MIN_STAT_FACTS:
-        candidates.append("stat")
-    if scene.get("quote"):
-        candidates.append("quote")
-    if len(items) >= MIN_RAIL_ITEMS:
-        candidates.append("catalog")
-    if rail_ready(items):
-        candidates.append("rail")
+    for stem, fits in (
+        ("hook", ctx["is_first"]),
+        ("closer", ctx["is_last"]),
+        ("story", bool(scene.get("onscreen"))),
+        ("stat", len(facts) >= MIN_STAT_FACTS),
+        ("quote", bool(scene.get("quote"))),
+        ("catalog", len(items) >= MIN_RAIL_ITEMS),
+        ("rail", rail_ready(items)),
+    ):
+        if fits:
+            candidates.append(stem)
     # 兜底顺序: 整句版式优先(story), 条目/数据版式次之, 首尾专用版式最后
-    candidates += ["story", "stat", "quote", "catalog", "rail", "closer", "hook"]
+    candidates += list(AUTO_LAYOUT_STEMS)
     for name in dedupe(candidates):
         layout = pack["layouts"].get(name)
         if not layout:

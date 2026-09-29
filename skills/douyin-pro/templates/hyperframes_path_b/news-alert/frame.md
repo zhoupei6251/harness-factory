@@ -33,11 +33,14 @@
 
 ### 2.1 对比度
 
+下表由 `python skills/douyin-pro/scripts/audit_pack_contrast.py news-alert` 按 §2 色板原值复算，
+改色板必须重跑它。判读线：正文 4.5 / 大字 3.0（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.22cqw 算大字）。
+
 | 组合 | 比值 | 判定 |
 |---|---|---|
-| white / black | 16.8 | ✓ |
-| alert / black | 4.6 | ✓ 大字号（≥28cqw 可直接上 alert 字）|
-| warn / black | 11.5 | ✓（但 warn 永远作形状）|
+| white / black | 17.58 | ✓ 任意字号 |
+| alert / black | 3.89 | ✓ 大字档（正文线 4.5 不过 —— 小字号一律白字）|
+| warn / black | 12.17 | ✓ 任意字号（但按法则 warn 只作形状）|
 
 > **强制规则**：
 > - warn 永远只作形状（三角/感叹号/分隔线），**不作文字**

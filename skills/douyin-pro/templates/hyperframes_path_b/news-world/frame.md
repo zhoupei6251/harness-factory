@@ -33,12 +33,15 @@
 
 ### 2.1 对比度
 
+下表由 `python skills/douyin-pro/scripts/audit_pack_contrast.py news-world` 按 §2 色板原值复算，改色板必须重跑它。
+判读线：正文 4.5 / 大字 3.0（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.22cqw 算大字）。
+
 | 组合 | 比值 | 判定 |
 |---|---|---|
-| paper / navy | 14.9 | ✓ |
-| crimson / navy | 5.5 | ✓ 大字号 |
-| gold / navy | 7.8 | ✓ 大字号 |
-| lat / navy | 4.1 | ✓ 细线（不作字）|
+| paper / navy | 15.46 | ✓ 任意字号 |
+| crimson / navy | 3.14 | ✓ 仅大字档（7cqw 数据数字合法；正文线 4.5 不过 → 小字一律 paper）|
+| gold / navy | 5.88 | ✓ 数学过正文线，但按法则 gold 只作标记形状 |
+| lat / navy | 3.27 | ✓ 仅大字档，按法则 lat 只作地图细线与点位 |
 
 > **强制规则**：lat / crimson / gold 永远只作地图细线、点位标记，不作正文文字。
 

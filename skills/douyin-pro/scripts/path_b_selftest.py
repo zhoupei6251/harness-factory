@@ -12,17 +12,21 @@
   D1 的字幕几何两半(行宽 + 封顶两行 + 按时长切条);
   D2 的 stat 小标题法则; D5 的屏句长度/强调段/一条两屏句停机;
   判据 4(每镜至少一帧非纯文字) 的图片层法则 —— 授权闸 / 尺寸闸 / 取值优先级 / 署名合成
-  (纯函数部分, 网络那一层由 --check-only 的真跑覆盖)。
+  (纯函数部分, 网络那一层由 --check-only 的真跑覆盖);
+  判据 6 的字面可读层 —— 12 个 pack 的 frame.md 对比度表按色板原值复算(audit_pack_contrast)。
 """
 
 import json
 import os
 import re
 import sys
+import tempfile
 import urllib.error  # 只用来造 HTTPError/URLError 实例喂 should_retry(不打网络)
+from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
+import audit_pack_contrast as apc  # noqa: E402  (判据 6 的色板层: frame.md 对比度表复算)
 import commons_media as cm  # noqa: E402  (判据 4 的图片层纯函数; 与 pb 同样必须先落地 sys.path)
 import path_b_build as pb  # noqa: E402  (sys.path 必须先落地)
 
@@ -889,6 +893,58 @@ def t_ffprobe_tag_entry_uses_format_tags():
     import inspect
     src = inspect.getsource(pb.ffprobe_format_tag)
     assert "format_tags=" in src, "ffprobe 取标签必须走 format_tags= 而不是 format="
+
+
+# ---------------- 色板对比度审计(判据 6 的字面可读层) ----------------
+def t_pack_contrast_docs_match_palette_math():
+    # 每个 pack 的 frame.md 对比度表都必须能从 §2 色板原值复算出来。首次全量跑(2026-09-29)
+    # 抓到 11 个包共 42 处手抄漂移, 最要命的是 news-blast: 文档写 `score / pitch 5.0`,
+    # 真值 1.18, 而 §3 字阶据此把 22cqw 的主队比分染成红字压绿底 —— 审计拦的不是排版,
+    # 是会播出看不清的巨号字的设计。
+    bad = []
+    for pack_dir in apc.discover_packs(apc.DEFAULT_PACKS_ROOT):
+        _, findings = apc.audit_pack(pack_dir)
+        bad += [f for f in findings if not f.warning]
+    assert not bad, "frame.md 对比度表与色板复算不符: " + "; ".join(str(f) for f in bad[:6])
+
+
+def t_contrast_auditor_catches_a_planted_wrong_ratio():
+    # 反向判据: 上一条全绿也可能只是解析失效(读不到表就等于"没问题")。所以种一个错数,
+    # 审计器自己必须被抓 —— 没有负例的校验器不算校验器。
+    frame = (
+        "## 2. 色板\n\n"
+        "| token | 值 | 用途 |\n|---|---|---|\n"
+        "| `ink` | `#1A1A1A` | 正文 |\n"
+        "| `paper` | `#F5EFE3` | 底 |\n"
+        "| `gold` | `#B8923E` | 强调 |\n\n"
+        "| 组合 | 比值 | 判定 |\n|---|---|---|\n"
+        "| ink / paper | 9.99 | ✓ 正文主力 |\n"
+        "| gold / paper | 2.54 | ✓ 大字档 |\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        pack = Path(tmp) / "planted-pack"
+        pack.mkdir()
+        (pack / "frame.md").write_text(frame, encoding="utf-8")
+        _, findings = apc.audit_pack(pack)
+    rules = {f.rule for f in findings}
+    assert "DOC_RATIO_DRIFT" in rules, f"抄错的比值没被抓出: {sorted(rules)}"
+    assert "VERDICT_CONTRADICTS_ARITHMETIC" in rules, f"2.54 标成 ✓ 大字档没被抓出: {sorted(rules)}"
+
+
+# ---------------- 自动选版词表(canonical 文件名词干) ----------------
+def t_auto_layout_stems_are_the_only_vocabulary():
+    # 词表 AUTO_LAYOUT_STEMS 是"文件名即版式身份"(决策 D9)的唯一出处。这里防的是**静默
+    # 惰性**: 词表外的名(11 个 pack 的 frame.md §7 里那些 list-steps / score / diagram)
+    # 既不会报错也永远选不到, 只有测试会让它当场红。
+    import inspect
+    src = inspect.getsource(pb.choose_layout)
+    named = set(re.findall(r'\(\s*"([a-z][a-z_-]*)"\s*,', src))
+    vocab = set(pb.AUTO_LAYOUT_STEMS)
+    assert named <= vocab, f"choose_layout 把词表外的名放进了自动候选: {sorted(named - vocab)}"
+    assert named == vocab, f"词表与形态优先级表脱节: 这些词干永不被优先点名 {sorted(vocab - named)}"
+    for pack_name in pb.ready_packs():
+        stems = set(pb.load_style_pack(pack_name)["layouts"])
+        assert stems <= vocab, f"{pack_name} 交出自动模式选不到的版式: {sorted(stems - vocab)}"
 
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())

@@ -83,7 +83,13 @@ feedx 三个源新鲜度从「当天」到「9 个月前」都有 → 按 `feed_
 - ⚠️ 决策树命中不可渲染的包时：政策/法规/通知类改落 `news-policy`，其余改落 `news-coral`，
   或按该包 frame.md 契约补真 composition。
   `load_style_pack` 会在**加载阶段**就停机并点名可渲染替代（不会等到渲染第 1 镜）
-- 校验：`python skills/douyin-pro/scripts/path_b_selftest.py` → `可渲染 pack (有真版式): X/12`
+- 校验（三道闸，全绿才算过；脚本都在 `skills/douyin-pro/scripts/`，仓库根执行）：
+  - `path_b_selftest.py` → `全绿 61/61`，并报告 `可渲染 pack (有真版式): X/12`
+  - `audit_pack_contrast.py` → `对比度审计通过：12 个 pack 的 frame.md 色板与文档一致`
+  - `layout_selfcheck.py <pack…>` → `版式自检通过：N 个文件，0 条违规`
+- ⚠️ **补包前先重映射版式名**：自动选版只认 `path_b_build.AUTO_LAYOUT_STEMS`（hook / closer /
+  story / stat / quote / catalog / rail），其余包 frame.md §7 里的 `compare` / `drilldown` /
+  `score` / `map` 这类名字建出文件不会报错、但自动模式永远选不到（详见 ARCHITECTURE.md D9）
 
 ---
 
@@ -181,7 +187,9 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
 3. **模板决策先于脚本**：不知道选哪个模板就不开始写脚本（避免返工）
 4. **产物写 `.harness-news-runtime/`**：稿件/成片落 `articles/`、`videos/`，**不要**写 `.ai-runtime-artifacts/`（code 域）
 5. **Path B only**：本工作流只使用 Path B（`--template` 即可）；不要尝试 Path A（付费路径，不在新闻域使用）
-6. **12 pack 自检先行**：新加的 pack 必须先有 frame.md + host.html + 真 composition 才提交；`path_b_selftest.py` 58 项必绿
+6. **12 pack 自检先行**：新加的 pack 必须先有 frame.md + host.html + 真 composition 才提交；三道闸必绿
+   （`path_b_selftest.py` 61 项 + `audit_pack_contrast.py` 色板复算 + `layout_selfcheck.py` 结构不变量），
+   且版式文件名只许落 `AUTO_LAYOUT_STEMS`（见步骤 1 的重映射提示）
 7. **AIGC 标识不可关**：成片必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
    ①② 由 `path_b_build.py` 无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供。
    没有 `aigc.json` 侧车的老成片一律视为不合规，**重渲**而不是直发

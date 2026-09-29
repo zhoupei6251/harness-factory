@@ -32,11 +32,14 @@
 
 ### 2.1 对比度
 
+下表由 `python skills/douyin-pro/scripts/audit_pack_contrast.py news-onsite` 按 §2 色板原值复算，改色板必须重跑它。
+判读线：正文 4.5 / 大字 3.0（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.22cqw 算大字）。
+
 | 组合 | 比值 | 判定 |
 |---|---|---|
-| white / black | 16.8 | ✓ |
-| press / black | 11.5 | ✓ |
-| time-on / black | 8.9 | ✓ |
+| white / black | 17.02 | ✓ 任意字号 |
+| press / black | 12.17 | ✓ 任意字号（但按法则 press 不作正文）|
+| time-on / black | 6.03 | ✓ 任意字号（但按法则 time-on 只作 REC 点形状）|
 
 > **强制规则**：
 > - press 永远不作正文文字，只作"PRESS / 现场 / 直击"标识和时间戳

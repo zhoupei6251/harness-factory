@@ -50,16 +50,16 @@ drafts:
 
 按稿件特征词选视觉气质。t001（拾荒老人）= 人物故事型 → `news-coral`。
 
-⚠️ **只有 `news-coral` 现在能渲染**。其余 11 包 `compositions/` 里只有 `placeholder.html`（占位壳），
-`load_style_pack` 在加载阶段就停机（不再等第 1 镜渲染才报错）。按本表挑了它们 = 白跑，
-所以**决策树先过"可渲染"这一列**：不可渲染的形态暂时一律落 `news-coral`，或在 frame.md
-契约下补出真 composition。
+⚠️ **现在能渲染的是 `news-coral` 与 `news-policy`（2/12）**。其余 10 包 `compositions/` 里只有
+`placeholder.html`（占位壳），`load_style_pack` 在加载阶段就停机（不再等第 1 镜渲染才报错）。
+按本表挑了它们 = 白跑，所以**决策树先过"可渲染"这一列**：不可渲染的形态暂时政策/法规类落
+`news-policy`、其余落 `news-coral`，或在 frame.md 契约下补出真 composition。
 
 | 触发词 | pack 名 | 可渲染 |
 |---|---|---|
 | 单主角 / 反转 / 故事 / 召唤 / 钩子 | `news-coral` | ✅ 7 个真版式 |
 | 调查 / 深度 / 卧底 / 揭露 / 长文 | `news-ink` | ⏳ 仅占位 |
-| 新规 / 政策 / 法规 / 通知 / 施行 | `news-policy` | ⏳ 仅占位 |
+| 新规 / 政策 / 法规 / 通知 / 施行 | `news-policy` | ✅ 5 个真版式（hook/story/catalog/rail/closer；`quote` 被该包法则 4 排除、`stat` 归 `news-stat`，刻意不 author）|
 | 排行 / 数据 / 第一 / 同比 / 数字 | `news-stat` | ⏳ 仅占位 |
 | 突发 / 现场 / 直击 / 抢险 / 灾害 | `news-onsite` | ⏳ 仅占位 |
 | 今日要闻 / 整点新闻 / 速报 / 合辑 | `news-bulletin` | ⏳ 仅占位 |
@@ -71,6 +71,9 @@ drafts:
 | 国际 / 战况 / 边境 / 地理 / 联合国 | `news-world` | ⏳ 仅占位 |
 
 完整设计契约：`skills/douyin-pro/templates/hyperframes_path_b/<pack>/frame.md`（每个 pack 一份）。
+**补真版式前先看该 pack frame.md §6 的词干映射**：自动选版只认 `path_b_build.AUTO_LAYOUT_STEMS`
+那 7 个文件名（hook/closer/story/stat/quote/catalog/rail），其余名字只有分镜显式点名才生效 ——
+按 §7 原计划的名字直接建文件会造出一个"看着齐备、自动模式永远选不到"的惰性版式。
 
 跑命令：
 
@@ -95,8 +98,11 @@ python skills/douyin-pro/scripts/path_b_build.py \
 
 当前进度 (frame.md / host.html / compositions 齐全度)：
 - `news-coral`: 完整（frame + host + 7 真 compositions）
-- 其余 11 个: frame + host + 1 placeholder（真 composition 待补，且**当前不可渲染**）
-- 校验：`python skills/douyin-pro/scripts/path_b_selftest.py`（58 项，含 AIGC 标识与占位包停机测）
+- `news-policy`: 完整（frame + host + 5 真 compositions，占位壳已删）
+- 其余 10 个: frame + host + 1 placeholder（真 composition 待补，且**当前不可渲染**）
+- 校验（三道闸，仓库根执行）：`path_b_selftest.py` **61 项**（含 AIGC 标识、占位包停机、
+  色板复算与版式词表的负例）+ `audit_pack_contrast.py`（12 pack 色板/对比度复算）+
+  `layout_selfcheck.py <pack…>`（17 条结构不变量）
 
 ## Videos
 videos:

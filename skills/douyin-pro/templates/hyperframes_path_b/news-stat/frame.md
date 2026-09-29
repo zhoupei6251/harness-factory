@@ -35,12 +35,15 @@
 
 ### 2.1 对比度（米白底常见组合）
 
+下表由 `python skills/douyin-pro/scripts/audit_pack_contrast.py news-stat` 按 §2 色板原值复算，改色板必须重跑它。
+判读线：正文 4.5 / 大字 3.0（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.22cqw 算大字）。
+
 | 组合 | 比值 | 判定 |
 |---|---|---|
-| ink / paper | 12.6 | ✓ |
-| gray / paper | 4.7 | ✓ 大字号 |
-| crimson / paper | 5.1 | ✓ 大字号 |
-| ink / paper-dark | 10.8 | ✓ |
+| ink / paper | 15.20 | ✓ 任意字号（主数字的色）|
+| gray / paper | 4.65 | ✓ 任意字号（刚过正文线，配角仍只给次级文字）|
+| crimson / paper | 4.75 | ✓ 数学过正文线，但按法则 crimson 只作形状 |
+| ink / paper-dark | 13.13 | ✓ 任意字号 |
 
 > **强制规则**：crimson 和 gold 永远是**形状**（色块、细线、序号底），不作文字。
 > 主数字一律 ink（黑），crimson 只出现在"全场最关键的一个数字"上。

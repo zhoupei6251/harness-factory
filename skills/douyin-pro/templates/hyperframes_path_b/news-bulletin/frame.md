@@ -31,11 +31,14 @@
 
 ### 2.1 对比度
 
+下表由 `python skills/douyin-pro/scripts/audit_pack_contrast.py news-bulletin` 按 §2 色板原值复算，改色板必须重跑它。
+判读线：正文 4.5 / 大字 3.0（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.22cqw 算大字）。
+
 | 组合 | 比值 | 判定 |
 |---|---|---|
-| white / black | 16.8 | ✓ |
-| gray / black | 10.4 | ✓ |
-| accent / black | 11.5 | ✓（但只作序号方块底）|
+| white / black | 17.02 | ✓ 任意字号 |
+| gray / black | 6.86 | ✓ 任意字号 |
+| accent / black | 12.17 | ✓ 任意字号（但按法则 accent 只作序号方块底）|
 
 > **强制规则**：accent 永远只作序号方块底，不作文字。
 

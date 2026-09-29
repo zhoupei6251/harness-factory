@@ -32,12 +32,16 @@
 | `gold` | `#B8923E` | 烫金（印章形 + 关键日期，**只作形状**）|
 | `crimson` | `#C0392B` | 极少数用法（生效日期 / 强制字，**只作形状**）|
 
-### 2.1 对比度（实测值，2026-09-29）
+### 2.1 对比度（可复算，不是手抄）
 
-按 WCAG 2.x 相对亮度公式对 §2 的 token 原值直接算（复算脚本
-`.harness-news-runtime/tmp/contrast_policy.py`，输出与结果记录在
-`.harness-news-runtime/verifications/2026-09-29-news-policy-layouts-verification-lite.md`）。
-判读线：正文 4.5:1，大字 3:1（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.3cqw 即算大字）。
+按 WCAG 2.x 相对亮度公式对 §2 的 token 原值直接算，复算入口是一条仓库内命令：
+
+```bash
+python skills/douyin-pro/scripts/audit_pack_contrast.py news-policy --matrix
+```
+
+判读线：正文 4.5:1，大字 3:1（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.22cqw 即算大字）。
+下表每一行都被这条命令逐字校验过（比值按表中写的小数位数比对），改色板或改判定必须重跑它。
 
 | 组合 | 比值 | 判定 |
 |---|---|---|
@@ -112,7 +116,7 @@ driftDur   = max(MIN_DRIFT, slot - driftStart)
 
 ## 6. 地面清单与已落地版式
 
-发射器只认**文件名词干**（候选清单写死在 `path_b_build.choose_layout`：
+发射器只认**文件名词干**（词表 = `path_b_build.AUTO_LAYOUT_STEMS`：
 `hook / story / stat / quote / catalog / rail / closer`）。本 pack 原计划的
 `summary / points / timeline` 三个名字不在词汇表里，因此**按语义写成 canonical 文件名**，
 composition id 统一 `np-*` 前缀保留公文身份：

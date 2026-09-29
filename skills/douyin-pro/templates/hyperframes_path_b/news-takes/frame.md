@@ -34,11 +34,14 @@
 
 ### 2.1 对比度
 
+下表由 `python skills/douyin-pro/scripts/audit_pack_contrast.py news-takes` 按 §2 色板原值复算，改色板必须重跑它。
+判读线：正文 4.5 / 大字 3.0（画布 1080 宽下 1cqw=10.8px，≥24px ≈ ≥2.22cqw 算大字）。
+
 | 组合 | 比值 | 判定 |
 |---|---|---|
-| ink / paper | 12.6 | ✓ |
-| gray / paper | 4.7 | ✓ 大字号 |
-| ink / paper-dark | 10.8 | ✓ |
+| ink / paper | 15.20 | ✓ 任意字号 |
+| gray / paper | 4.65 | ✓ 任意字号（刚过正文线，只给次级文字）|
+| ink / paper-dark | 13.13 | ✓ 任意字号 |
 
 > **强制规则**：
 > - 本 pack 永远只用 ink / gray / paper / paper-dark 4 个色
