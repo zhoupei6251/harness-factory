@@ -3,8 +3,8 @@
 > 第二条路（Path B）：**零云费**，把"一个选题/一段文案"直接变成带 AI 配音 + 字幕的竖屏 MP4。
 > 配音用微软免费接口 `edge-tts`，画面用开源 `HyperFrames`，合成用 `ffmpeg`。
 > 与 Path A（高质量·自配）互补：Path B 不依赖任何付费 API / 云账号。
-
----
+> **新闻域（v2 单轨）已合并：Path B 是新闻工作流的唯一渲染路径**（2026-09-29），
+> `skills/news-workflow/SKILL.md` 不再选 Path A。其他领域（带货/娱乐/品牌号）仍可走 Path A。
 
 ## 0. 它能做什么 / 不能做什么
 
@@ -100,8 +100,12 @@ npx hyperframes render -c templates/hyperframes_path_b/index.html -o out.mp4
 
 ---
 
-## 6. 与 Path A 怎么选
+## 6. Path A 与新闻域（v2 单轨）
 
-- **要快、要免费、要"文字→视频"口播风格** → Path B（本 Runbook）。
-- **要数字人/实拍质感/品牌级精修/多通道渲染** → Path A（大脑→脚本→图像→`video-render-engine`）。
+**新闻域（v2）已不使用 Path A**：2026-09-29 整合 `skills/news-workflow/SKILL.md`，
+把双轨（文字 + 视频）压成单轨（视频 only），Path B 成为新闻域**唯一**渲染路径。
+
+**Path A 仍可用**（面向其他领域）：
+- **要数字人 / 实拍 / 品牌级精修 / 多通道渲染 / CosyVoice 等付费 TTS** → Path A。
+- Path B 仅做"文字 → 视频"动画风格（edge-tts + HyperFrames + ffmpeg 零云费）。
 - 两者都从"采集"模块拿素材，从中游拿优化脚本，区别在下游渲染引擎。

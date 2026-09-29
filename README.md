@@ -14,7 +14,9 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for the design rationale.
 npm install
 npm run typecheck   # TypeScript 7 native compiler
 npm run validate    # check schemas + skills
+npm run doctor      # verify required external tools (codebase-memory-mcp, ponytail) — bootstrap runs this automatically
 npm run bootstrap -- --platform all --route code
+npm run skills:install  # link skills into ~/.codex/skills + ~/.claude/skills
 ```
 
 This projects `core/ENTRY.md` and `platforms/<plat>/rules/ENTRY.md` to `.claude/`, `.codex/`, `.trae/`, `.codebuddy/`, creates runtime dirs, and writes `./MEMORY.md` from the route template.
@@ -71,6 +73,8 @@ Skills are split into two tiers:
 - `npm run bootstrap -- --platform X --route Y` — project canonical to platform format
 - `npm run validate` — schema + skill check
 - `npm run index` — regenerate `skills/INDEX.md`
+- `npm run skills:install` — symlink active skills into `~/.codex/skills/` and `~/.claude/skills/` so each platform can discover them
+- `npm run doctor` — hard gate for required external tooling (Node >=20.9, `codebase-memory-mcp`, its Codex/Claude wiring, `ponytail`); `bootstrap` refuses to run when it fails
 - `npm run typecheck` — TypeScript 7 native type check (via `lib/tsc.js` for Node 20 compat)
 - `npm test` — runs validate + typecheck + bootstrap smoke test
 

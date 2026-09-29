@@ -5,9 +5,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "bootstrap": "tsx scripts/bootstrap.ts",
+    "doctor":     "tsx scripts/doctor.ts",
+    "bootstrap":  "tsx scripts/doctor.ts && tsx scripts/bootstrap.ts",
     "validate":  "tsx tests/validate-schemas.ts",
     "index":     "tsx tests/build-index.ts",
+    "skills:install": "tsx scripts/install-skills.ts",
     "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
     "test":      "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts"
   },

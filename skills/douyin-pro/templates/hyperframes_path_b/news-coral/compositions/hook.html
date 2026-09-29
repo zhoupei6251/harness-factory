@@ -1,0 +1,155 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "NEWS"},
+    {"id": "headTop", "type": "string", "label": "标题第一行", "default": "标题第一行"},
+    {"id": "headBottomLead", "type": "string", "label": "标题第二行前段", "default": "第二行"},
+    {"id": "headAccent", "type": "string", "label": "标题第二行强调", "default": "强调"},
+    {"id": "support", "type": "string", "label": "辅助行", "default": "辅助信息"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-coral · hook — 首镜钩子: 珊瑚火带(纯形状) + 白底眉标片 + 反相强调词
+           实测对比度决定了这里的每一条法则 (frame.md 有计算表):
+           · 墨字在珊瑚上只有 2.92 → 珊瑚带面上禁止任何文字, 它是形状。
+           · 珊瑚字在墨上同样 2.92 → 强调词不能直接染珊瑚, 改用珊瑚片+白字 (3.41, 大字号 AA)。
+           · 眉标走白片+珊瑚字 (3.41), 压在火带与墨段的交界上, 把两个色域缝起来。
+           · 带 background 的片块只做 scaleX 擦入, 禁止 opacity: 半透明会把片底色与地面混色,
+             实测白片 α=0.72 压在珊瑚带上 → 有效底色 rgb(246,213,213) → 珊瑚字只剩 2.5:1 (审计不过)。
+             法则: 面对形状用 transform 入场, 墨(纯文字)才允许淡入。
+           本文件是版式骨架, 由 host.html 的挂载点用 data-variable-values 逐实例填值。
+           引擎只克隆 <template> 内容, <head> 会被丢弃 → 样式/脚本/字体声明全在 template 内。
+           字体审计按文件走 → 每个版式文件必须自带中文 @font-face。 */
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #1a1a1a;
+          color: #f5f0e8;
+          font-family: "HF CJK", sans-serif;
+        }
+        .h-band {
+          position: absolute;
+          inset: 0 0 auto 0;
+          height: 22cqh;
+          background: #e85d5d;
+          transform-origin: 50% 0%;
+        }
+        /* 45° 网纹只在珊瑚面上走, 不改变几何 */
+        .h-band::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background-image: repeating-linear-gradient(
+            45deg,
+            transparent 0 20px,
+            rgba(0, 0, 0, 0.06) 20px 40px
+          );
+          pointer-events: none;
+        }
+        .h-eb {
+          position: absolute;
+          left: 6cqw;
+          top: 17cqh;
+          background: #ffffff;
+          color: #e85d5d;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.9cqw;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          padding: 1cqh 2cqw;
+          transform-origin: 0% 50%;
+        }
+        .h-field {
+          position: absolute;
+          inset: 22cqh 0 20cqh 0;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          padding: 0 6cqw;
+        }
+        .h-hd {
+          font-size: 10.5cqw;
+          font-weight: 900;
+          line-height: 1.24;
+          letter-spacing: -0.01em;
+          max-width: 88cqw;
+        }
+        .h-ac {
+          display: inline-block;
+          background: #e85d5d;
+          color: #ffffff;
+          padding: 0 1.4cqw;
+          transform-origin: 0% 50%;
+        }
+        .h-hair {
+          width: 14cqw;
+          height: 1.1cqh;
+          background: #e85d5d;
+          margin: 3.6cqh 0;
+          transform-origin: 0% 50%;
+        }
+        .h-sup {
+          font-size: 3.9cqw;
+          font-weight: 400;
+          color: #b0b0b0;
+          max-width: 74cqw;
+        }
+      </style>
+
+      <div id="root" data-composition-id="nc-hook" data-width="1080" data-height="1920">
+        <div class="h-band" id="h-band"></div>
+        <div class="h-eb" id="h-eb" data-var-text="kicker">NEWS</div>
+        <div class="h-field" id="h-field">
+          <div class="h-hd">
+            <div id="h-l1" data-var-text="headTop">标题第一行</div>
+            <div><span id="h-l2" data-var-text="headBottomLead">第二行</span><span class="h-ac" id="h-ac" data-var-text="headAccent">强调</span></div>
+          </div>
+          <div class="h-hair" id="h-hair"></div>
+          <div class="h-sup" id="h-sup" data-var-text="support">辅助信息</div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        // 入场: 火带擦入 → 眉标片擦入 → 两行标题淡入 → 标尺 → 辅助行 (全部 fromTo, seek 可回退)
+        // 片块(自带 background)一律 scaleX 擦入, 不做 opacity —— 见文件头法则。
+        tl.fromTo("#h-band", { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease: "power3.out" }, 0);
+        tl.fromTo("#h-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.3);
+        tl.fromTo("#h-l1", { opacity: 0, y: 64 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.5);
+        tl.fromTo("#h-l2", { opacity: 0, y: 64 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.68);
+        tl.fromTo("#h-ac", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.82);
+        tl.fromTo("#h-hair", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 1.05);
+        tl.fromTo("#h-sup", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.4 }, 1.25);
+        // 呼吸: 整镜剩余时间持续位移, 不留静止尾巴
+        tl.to("#h-field", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#h-eb", { y: 12, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["nc-hook"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

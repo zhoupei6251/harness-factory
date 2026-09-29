@@ -1,0 +1,13 @@
+{
+  "slug": "douyin-upload",
+  "category": "news.publish",
+  "domain": "news",
+  "source": "dreammis/social-auto-upload@0012d2c (bundled skills/douyin-upload, 2026-09-03) + 本地环境补充 references/local-env.md",
+  "tags": [
+    "news",
+    "publish",
+    "douyin",
+    "sau-cli"
+  ],
+  "purpose": "通过 sau CLI 完成抖音登录/cookie 校验/视频上传/图文发布，是 news 产线 publishing 阶段的主路径"
+}

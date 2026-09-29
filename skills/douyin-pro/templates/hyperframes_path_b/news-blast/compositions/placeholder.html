@@ -1,0 +1,92 @@
+<!doctype html>
+<!--
+  news-blast · placeholder 占位版式 — 让 load_style_pack 通过;
+  真正的 hook / closer / 内容版式待后续按 frame.md 落地。
+  本文件**不会被 choose_layout 当作真版式**: 真正的版式文件落地后直接替换或删除它。
+  渲染时如果误中, 会看到一个明显的"PLACEHOLDER"提示, 方便看出 pack 还没做完。
+  地面色用 #1a1a1a (TONE_DARK, 已登记), 区分 pack 靠 data-template-name + 文字内容.
+  真版式落地时要按 frame.md 把 bg 加进 GROUND_TONE_BY_HEX.
+-->
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #1a1a1a;
+          color: #f5f0e8;
+          font-family: "HF CJK", sans-serif;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          align-items: center;
+          padding: 6cqw;
+        }
+        .ph-tag {
+          font-size: 3cqw;
+          letter-spacing: 0.3em;
+          opacity: 0.5;
+          margin-bottom: 4cqh;
+        }
+        .ph-name {
+          font-size: 12cqw;
+          font-weight: 900;
+          letter-spacing: -0.01em;
+          margin-bottom: 3cqh;
+        }
+        .ph-label {
+          font-size: 5cqw;
+          opacity: 0.7;
+          margin-bottom: 4cqh;
+        }
+        .ph-hint {
+          font-size: 4cqw;
+          opacity: 0.6;
+          padding: 2cqh 3cqw;
+          border: 0.3cqw solid currentColor;
+        }
+      </style>
+
+      <div id="root" data-composition-id="news-blast-placeholder" data-width="1080" data-height="1920">
+        <div class="ph-tag">PLACEHOLDER</div>
+        <div class="ph-name">news-blast</div>
+        <div class="ph-label">体育 · 比分</div>
+        <div class="ph-hint">等待 composition 落地 (见 frame.md)</div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo("#root", { opacity: 0 }, { opacity: 1, duration: 0.4, ease: "power2.out" }, 0);
+        tl.to("#root", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["news-blast-placeholder"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

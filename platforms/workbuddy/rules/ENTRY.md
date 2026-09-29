@@ -18,3 +18,4 @@ WorkBuddy treats agents as first-class. Export canonical agents to `~/.codebuddy
 
 - `.codebuddy/rules/ENTRY.md` (this file)
 - `.codebuddy/rules/ROOT.md` (canonical ENTRY.md)
+- `.codebuddy/rules/project_rules.md` (native entry, generated from canonical + this delta)

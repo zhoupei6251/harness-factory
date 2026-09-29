@@ -1,0 +1,10 @@
+# Codex CLI / desktop app snippet for ~/.codex/config.toml
+# Append below the existing [mcp_servers] tables.
+
+[mcp_servers.codebase_memory]
+command = "npx"
+args = ["-y", "codebase-memory-mcp", "--ui=true"]
+startup_timeout_sec = 120
+
+[mcp_servers.codebase_memory.env]
+NODE_ENV = "production"

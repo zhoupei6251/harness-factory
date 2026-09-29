@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 46 active + 51 archived = 97 skills
+Total: 47 active + 51 archived = 98 skills
 
-## Active (46)
+## Active (47)
 
 | Skill | Description |
 |-------|-------------|
@@ -19,6 +19,7 @@ Total: 46 active + 51 archived = 97 skills
 | code-review | Systematic code review patterns covering security, performance, maintainability, |
 | douyin-copy-extract | 粘贴抖音、快手、小红书、视频号公开可访问的短视频分享链接，一键提取标题、简介、口播文案，提供原版、优化朗读版、精简浓缩版，并支持违禁敏感词提醒与口播时长参考，排版整洁纯净，一键复制即用。 |
 | douyin-pro | 抖音短视频双路径生产体系（单 Skill 版）。Path A[付费·高质量]：策略大脑→（可选：素材混剪/AI高光提取）→脚本优化→AI生图/素材准备→配音渲染（百炼/GPT-SoVITS/CosyV |
+| douyin-upload | 当 agent 需要通过已安装的 `sau` CLI 完成抖音登录、cookie 校验、视频上传或图文发布时使用这个 skill。该 skill 适用于已经安装 `social-auto-upload |
 | fact-check | 事实核查 skill，对新闻内容进行多源交叉验证 |
 | find-skills | Helps users discover and install agent skills when they ask questions |
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |

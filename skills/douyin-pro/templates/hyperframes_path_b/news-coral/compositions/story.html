@@ -1,0 +1,175 @@
+<!doctype html>
+<!-- news-coral · story — 叙事节拍: 作者领句 + 珊瑚尺 + 屏句, 双地面(light/dark)由发射器逐镜翻转
+     这一版式在 v3 里被重写成"一句话的版式": 旧契约同时有 `lead`(领句)与 `detail`(支撑句),
+     两者的取材处都是正文 —— 而正文会被配音逐字念完, 于是这一镜一直在把字幕内容二次上屏,
+     判据 5(屏上整句 ≠ 口播整句)就是在这里破的。现在整句型屏上位只认屏句(`onscreen`),
+     领句只认作者写的标题行, 正文不再上屏一个字。
+     几何(全部按 1cqw=10.8px / 1cqh=19.2px 算, 画布 1080×1920):
+       眉标片 top 17cqh、片高≈3.8cqh → 下沿 20.8cqh, 与 hook/closer 的贴片同一高度 = 一套系统。
+       正文区 `inset: 24cqh 6cqw 20cqh 6cqw` → 区高 56cqh(1075px), 盒宽 88cqw(950px)。
+       内容最坏高度 = 标题 8.6cqw×1.22×3 行(17.7cqh) + 珊瑚尺 0.55cqh + 屏句 4.4cqw×1.5×2 行
+       (7.4cqh) + 两个 gap 6cqh = 31.65cqh; 居中后上下各余 12.2cqh, 漂移 `yPercent -3` 只吃掉
+       约 1cqh → 距底部 20cqh 字幕禁入区始终有一整块余量(法则 1)。
+     判据 4(每镜至少一处非纯文字帧)由序号水印、眉标片、珊瑚尺三处形状承担。 -->
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "REPORT"},
+    {"id": "ordinal", "type": "string", "label": "壁纸序号", "default": "02"},
+    {"id": "tone", "type": "string", "label": "地面明暗", "default": "light"},
+    {"id": "title", "type": "string", "label": "领句(作者标题行)", "default": "一个误会"},
+    {"id": "onscreen", "type": "string", "label": "屏句(唯一上屏整句, 不进配音)", "default": "没人告诉他，他一直没问"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        /* light 地面: cream 底 + ink 字(8.78) + gray 屏句(4.70) —— 数值见 frame.md §1.1 */
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #f5f0e8;
+          color: #1a1a1a;
+          font-family: "HF CJK", sans-serif;
+        }
+        /* dark 地面: ink 底 + cream 字(8.78) + light-gray 屏句(4.59)。
+           墨底不写珊瑚字(2.92 不过审计), 珊瑚在这里只做尺线与片底两件事。 */
+        #root[data-tone="dark"] {
+          background: #1a1a1a;
+          color: #f5f0e8;
+        }
+        /* 壁纸序号: 必须整字含在画布内(D3 的教训 —— 出血的数字水印会被当成排版事故)。
+           36cqw(389px) 两字宽 ≈30cqw, 入场 scale 1.14 → 34.2cqw, 右沿 4cqw ⇒ 左沿仍在画内;
+           高 = 36cqw×0.8 = 16cqh, top 3cqh, 缩放中心在 11cqh ⇒ 最坏占 2–20cqh, 上边不出血。 */
+        .sy-wall {
+          position: absolute;
+          top: 3cqh;
+          right: 4cqw;
+          font-family: "League Gothic", sans-serif;
+          font-size: 36cqw;
+          line-height: 0.8;
+          color: rgba(26, 26, 26, 0.12);
+          pointer-events: none;
+        }
+        #root[data-tone="dark"] .sy-wall {
+          color: rgba(245, 240, 232, 0.14);
+        }
+        /* 眉标走"白片 + 珊瑚字"(3.41, 大字号过): 片有 background ⇒ 禁止 opacity 入场(法则 8) */
+        .sy-eb {
+          position: absolute;
+          left: 6cqw;
+          top: 17cqh;
+          background: #ffffff;
+          color: #e85d5d;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.9cqw;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          padding: 0.9cqh 1.8cqw;
+          transform-origin: 0% 50%;
+        }
+        .sy-field {
+          position: absolute;
+          inset: 24cqh 6cqw 20cqh 6cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3cqh;
+        }
+        .sy-ttl {
+          /* --fit-ttl 由脚本按字数算, 兜底 8.6cqw; 3 行封顶见文件头几何注释 */
+          font-size: var(--fit-ttl, 8.6cqw);
+          font-weight: 900;
+          line-height: 1.22;
+          letter-spacing: -0.01em;
+          max-width: 88cqw;
+        }
+        .sy-rule {
+          width: 18cqw;
+          height: 0.55cqh;
+          background: #e85d5d;
+          transform-origin: 0% 50%;
+        }
+        .sy-scr {
+          font-size: var(--fit-scr, 4.4cqw);
+          font-weight: 400;
+          line-height: 1.5;
+          color: #6b6b6b;
+          max-width: 88cqw;
+        }
+        #root[data-tone="dark"] .sy-scr {
+          color: #b0b0b0;
+        }
+      </style>
+
+      <div id="root" data-composition-id="nc-story" data-tone="light" data-width="1080" data-height="1920">
+        <div class="sy-wall" id="sy-wall" data-layout-ignore="true" data-var-text="ordinal">02</div>
+        <div class="sy-eb" id="sy-eb" data-var-text="kicker">REPORT</div>
+        <div class="sy-field" id="sy-field">
+          <div class="sy-ttl" id="sy-ttl" data-var-text="title">一个误会</div>
+          <div class="sy-rule" id="sy-rule"></div>
+          <div class="sy-scr" id="sy-scr" data-var-text="onscreen">没人告诉他，他一直没问</div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const TONE_LIGHT = "light";
+        const TONE_DARK = "dark";
+        /* 预算与法则同 frame.md §4: 入场压进 INTRO_END, 剩下的整段留给匀速漂移 */
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+
+        /* 自适应字号: 中文按 1em 宽估行数, 超出预算行数就整体缩小(下限 70%)。
+           每个子合成必须是自含的(运行时只克隆 <template>), 所以这段与别的版式各存一份,
+           已在 README §7 的"自含性重复"条目里登记。 */
+        const BOX_CQW = 88;
+        function fitCqw(text, baseCqw, maxLines) {
+          const perLine = Math.max(1, Math.floor(BOX_CQW / baseCqw));
+          const lines = Math.ceil(String(text || "").length / perLine);
+          if (lines <= maxLines) return baseCqw;
+          return Math.max((baseCqw * maxLines) / lines, baseCqw * 0.7);
+        }
+        const root = document.getElementById("root");
+        const tone = String(vars.tone || TONE_LIGHT).toLowerCase();
+        root.dataset.tone = tone === TONE_DARK ? TONE_DARK : TONE_LIGHT;
+        /* 标题 8.6cqw ⇒ 一行 10 字, 3 行封顶; 屏句 4.4cqw ⇒ 一行 20 字, 2 行封顶
+           (与发射器 ONSCREEN_MAX_CHARS=16 是同一个约束的两头: 常量保证不超,
+           fitCqw 保证万一超了也不怼进字幕区) */
+        root.style.setProperty("--fit-ttl", fitCqw(vars.title, 8.6, 3) + "cqw");
+        root.style.setProperty("--fit-scr", fitCqw(vars.onscreen, 4.4, 2) + "cqw");
+
+        const tl = gsap.timeline({ paused: true });
+        // 序号水印是装饰层(无 background、不参与对比度取样), 允许 opacity + scale
+        tl.fromTo("#sy-wall", { opacity: 0, scale: 1.14 }, { opacity: 1, scale: 1, duration: 1.1, ease: "power2.out" }, 0);
+        // 面用 transform 入场(法则 8): 白底眉标片禁止 opacity 补间
+        tl.fromTo("#sy-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.35, ease: "power2.out" }, 0.28);
+        // 纯文字允许淡入: 前景色不随 alpha 合成, 对比度取样不受影响
+        tl.fromTo("#sy-ttl", { opacity: 0, y: 44 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.42);
+        tl.fromTo("#sy-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 0.68);
+        tl.fromTo("#sy-scr", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: 0.5 }, 0.86);
+        tl.to("#sy-field", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["nc-story"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

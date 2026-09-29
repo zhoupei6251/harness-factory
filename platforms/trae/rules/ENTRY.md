@@ -14,3 +14,4 @@ Trae MCP format: `.trae/mcp.json`.
 
 - `.trae/rules/ENTRY.md` (this file)
 - `.trae/rules/ROOT.md` (canonical ENTRY.md)
+- `.trae/rules/project_rules.md` (native auto-loaded entry, generated from canonical + this delta)

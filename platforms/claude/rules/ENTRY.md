@@ -14,3 +14,4 @@ Add Claude-specific MCP servers in `.mcp.json` (or use a shared `core/intelligen
 
 - `.claude/rules/ENTRY.md` (this file)
 - `.claude/rules/ROOT.md` (canonical ENTRY.md)
+- `CLAUDE.md` (native auto-loaded entry, generated from canonical + this delta)

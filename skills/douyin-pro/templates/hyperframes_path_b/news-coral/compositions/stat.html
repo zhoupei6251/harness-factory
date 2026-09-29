@@ -1,0 +1,172 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "SECRET"},
+    {"id": "ordinal", "type": "string", "label": "壁纸序号", "default": "01"},
+    {"id": "value", "type": "string", "label": "主数值", "default": "0"},
+    {"id": "unit", "type": "string", "label": "主单位", "default": "元"},
+    {"id": "label", "type": "string", "label": "主数值说明", "default": "说明"},
+    {"id": "compareValue", "type": "string", "label": "对比数值", "default": "0"},
+    {"id": "compareUnit", "type": "string", "label": "对比单位", "default": "元"},
+    {"id": "compareLabel", "type": "string", "label": "对比说明", "default": "对比"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-coral · stat — 数字锤: 壁纸序号 + 珊瑚标尺 + 巨号主值 + 对比值
+           纸面(cream)底上文字只用 ink / gray; 珊瑚只作形状(标尺/分隔线),
+           因为 珊瑚#E85D5D 在 cream#F5F0E8 上对比只有 3.01, 正文级别不过 AA。
+           几何(t001-v2 渲染回看的 D3 修正): 旧版 .st-plate 用 inset:auto 0 16cqh 0 底锚,
+           上半屏空死、序号 52cqw 顶到 top:0/right:0 被根节点裁掉两刀。
+           现在整版顶锚在同一节拍上: 序号 3cqh→约 23cqh, 面板从 26cqh 起、底部留 20cqh 字幕区。
+           面板高度实测约 47cqh(眉标 1.9 + 标尺 1.1 + 5×gap 7.5 + 巨号 30cqw×1.12=18.9
+           + 说明两行 5.7 + 对比块约 12) → 26+47=73cqh < 80cqh ✓。 */
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #f5f0e8;
+          color: #1a1a1a;
+          font-family: "HF CJK", sans-serif;
+        }
+        .st-wall {
+          position: absolute;
+          top: 3cqh;
+          right: 2cqw;
+          font-family: "League Gothic", sans-serif;
+          font-size: 46cqw;
+          line-height: 0.78;
+          color: rgba(26, 26, 26, 0.12);
+          pointer-events: none;
+        }
+        .st-plate {
+          position: absolute;
+          inset: 26cqh 6cqw auto 6cqw;
+          display: flex;
+          flex-direction: column;
+          gap: 1.5cqh;
+        }
+        .st-eb {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.9cqw;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          color: #6b6b6b;
+        }
+        .st-rule {
+          width: 12cqw;
+          height: 1.1cqh;
+          background: #e85d5d;
+          transform-origin: 0% 50%;
+        }
+        .st-figure {
+          display: flex;
+          align-items: baseline;
+          gap: 2.4cqw;
+        }
+        /* 30cqw + 1.12 是 probe 校准值: 更小行高会与单位基线错位重叠 */
+        .st-num {
+          font-family: "League Gothic", sans-serif;
+          font-size: 30cqw;
+          line-height: 1.12;
+        }
+        .st-unit {
+          font-size: 5cqw;
+          font-weight: 700;
+        }
+        .st-lab {
+          font-size: 4.2cqw;
+          color: #6b6b6b;
+          max-width: 76cqw;
+        }
+        .st-cmp {
+          border-top: 0.28cqw solid rgba(26, 26, 26, 0.18);
+          padding-top: 2.2cqh;
+          display: flex;
+          flex-direction: column;
+          gap: 0.6cqh;
+        }
+        .st-cmpk {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.6cqw;
+          letter-spacing: 0.14em;
+          color: #6b6b6b;
+        }
+        .st-cmpv {
+          display: flex;
+          align-items: baseline;
+          gap: 1.6cqw;
+        }
+        .st-cmpn {
+          font-family: "League Gothic", sans-serif;
+          font-size: 12cqw;
+          line-height: 1.1;
+        }
+        .st-cmpe {
+          font-size: 3.6cqw;
+          font-weight: 700;
+        }
+      </style>
+
+      <div id="root" data-composition-id="nc-stat" data-width="1080" data-height="1920">
+        <div class="st-wall" id="st-wall" data-layout-ignore="true" data-var-text="ordinal">01</div>
+        <div class="st-plate" id="st-plate">
+          <div class="st-eb" id="st-eb" data-var-text="kicker">SECRET</div>
+          <div class="st-rule" id="st-rule"></div>
+          <div class="st-figure">
+            <div class="st-num" id="st-num" data-var-text="value">0</div>
+            <div class="st-unit" id="st-unit" data-var-text="unit">元</div>
+          </div>
+          <div class="st-lab" id="st-lab" data-var-text="label">说明</div>
+          <div class="st-cmp" id="st-cmp">
+            <div class="st-cmpk" id="st-cmpk" data-var-text="compareLabel">对比</div>
+            <div class="st-cmpv">
+              <div class="st-cmpn" id="st-cmpn" data-var-text="compareValue">0</div>
+              <div class="st-cmpe" id="st-cmpe" data-var-text="compareUnit">元</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        // 序号入场放大上限 1.08: 盒子宽约 36.8cqw、高约 20.2cqh, 中心缩放的单边外扩
+        // = 尺寸×(s-1)/2 ≈ 1.5cqw / 0.4cqh, 恰好被 right:2cqw / top:3cqh 的安全边吃掉 →
+        // 整个入场过程都在画布内, 不会再出现 t001-v2 那种"被裁了两刀"的水印。
+        tl.fromTo("#st-wall", { opacity: 0, scale: 1.08 }, { opacity: 1, scale: 1, duration: 1.3, ease: "power2.out" }, 0);
+        tl.fromTo("#st-eb", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.35 }, 0.15);
+        tl.fromTo("#st-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 0.3);
+        tl.fromTo("#st-num", { opacity: 0, y: 70 }, { opacity: 1, y: 0, duration: 0.6, ease: "power3.out" }, 0.45);
+        tl.fromTo("#st-unit", { opacity: 0 }, { opacity: 1, duration: 0.4 }, 0.85);
+        tl.fromTo("#st-lab", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 1);
+        tl.fromTo("#st-cmp", { opacity: 0, y: 30 }, { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 1.2);
+        tl.to("#st-plate", { yPercent: -2.6, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#st-wall", { y: -18, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["nc-stat"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

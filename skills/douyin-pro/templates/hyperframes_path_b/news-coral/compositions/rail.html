@@ -1,0 +1,165 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "TIMELINE"},
+    {"id": "title", "type": "string", "label": "小标题", "default": "三段时间线"},
+    {"id": "ordinal", "type": "string", "label": "壁纸序号", "default": "03"},
+    {"id": "item1Label", "type": "string", "label": "第1条标签", "default": "标签一"},
+    {"id": "item1Value", "type": "string", "label": "第1条事实", "default": "事实一"},
+    {"id": "item2Label", "type": "string", "label": "第2条标签", "default": "标签二"},
+    {"id": "item2Value", "type": "string", "label": "第2条事实", "default": "事实二"},
+    {"id": "item3Label", "type": "string", "label": "第3条标签", "default": "标签三"},
+    {"id": "item3Value", "type": "string", "label": "第3条事实", "default": "事实三"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-coral · rail — 事实脊线: 左侧珊瑚脊 scaleY 擦入 + 三行错峰入场
+           固定 3 行: 几何按 3 行排, 行数可变会把排版变成运行时问题 (README 记录该取舍)。 */
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #f5f0e8;
+          color: #1a1a1a;
+          font-family: "HF CJK", sans-serif;
+        }
+        .rl-wall {
+          position: absolute;
+          top: 2cqh;
+          right: 4cqw;
+          font-family: "League Gothic", sans-serif;
+          font-size: 22cqw;
+          line-height: 0.8;
+          color: rgba(26, 26, 26, 0.12);
+          pointer-events: none;
+        }
+        .rl-head {
+          position: absolute;
+          inset: 14cqh 6cqw auto 6cqw;
+          display: flex;
+          flex-direction: column;
+          gap: 1.6cqh;
+        }
+        .rl-eb {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.9cqw;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          color: #6b6b6b;
+        }
+        .rl-ttl {
+          font-size: 8.6cqw;
+          font-weight: 900;
+          line-height: 1.2;
+          max-width: 74cqw;
+        }
+        .rl-spine {
+          position: absolute;
+          left: 6cqw;
+          top: 34cqh;
+          bottom: 20cqh;
+          width: 0.9cqw;
+          background: #e85d5d;
+          transform-origin: 50% 0%;
+        }
+        .rl-rows {
+          position: absolute;
+          inset: 34cqh 6cqw 20cqh 11cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3.4cqh;
+        }
+        .rl-row {
+          display: flex;
+          align-items: baseline;
+          gap: 2.4cqw;
+          padding-bottom: 1.8cqh;
+          border-bottom: 0.2cqw solid rgba(26, 26, 26, 0.16);
+        }
+        .rl-no {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.8cqw;
+          font-weight: 700;
+          color: #6b6b6b;
+        }
+        .rl-lb {
+          font-size: 4.2cqw;
+          font-weight: 700;
+          flex: 1;
+        }
+        .rl-vl {
+          font-size: 5cqw;
+          font-weight: 900;
+          text-align: right;
+          max-width: 44cqw;
+        }
+      </style>
+
+      <div id="root" data-composition-id="nc-rail" data-width="1080" data-height="1920">
+        <div class="rl-wall" id="rl-wall" data-layout-ignore="true" data-var-text="ordinal">03</div>
+        <div class="rl-head" id="rl-head">
+          <div class="rl-eb" id="rl-eb" data-var-text="kicker">TIMELINE</div>
+          <div class="rl-ttl" id="rl-ttl" data-var-text="title">三段时间线</div>
+        </div>
+        <div class="rl-spine" id="rl-spine"></div>
+        <div class="rl-rows" id="rl-rows">
+          <div class="rl-row" id="rl-r1">
+            <div class="rl-no">01</div>
+            <div class="rl-lb" data-var-text="item1Label">标签一</div>
+            <div class="rl-vl" data-var-text="item1Value">事实一</div>
+          </div>
+          <div class="rl-row" id="rl-r2">
+            <div class="rl-no">02</div>
+            <div class="rl-lb" data-var-text="item2Label">标签二</div>
+            <div class="rl-vl" data-var-text="item2Value">事实二</div>
+          </div>
+          <div class="rl-row" id="rl-r3">
+            <div class="rl-no">03</div>
+            <div class="rl-lb" data-var-text="item3Label">标签三</div>
+            <div class="rl-vl" data-var-text="item3Value">事实三</div>
+          </div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const STAGGER = 0.16;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo("#rl-wall", { opacity: 0, scale: 1.1 }, { opacity: 1, scale: 1, duration: 1.1, ease: "power2.out" }, 0);
+        tl.fromTo("#rl-eb", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.35 }, 0.15);
+        tl.fromTo("#rl-ttl", { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+        tl.fromTo("#rl-spine", { scaleY: 0 }, { scaleY: 1, duration: 0.8, ease: "power2.out" }, 0.55);
+        tl.fromTo("#rl-r1", { opacity: 0, x: 34 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7);
+        tl.fromTo("#rl-r2", { opacity: 0, x: 34 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7 + STAGGER);
+        tl.fromTo("#rl-r3", { opacity: 0, x: 34 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7 + STAGGER * 2);
+        tl.to("#rl-rows", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#rl-head", { yPercent: -2, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["nc-rail"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

@@ -1,0 +1,167 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "ACTION"},
+    {"id": "cta", "type": "string", "label": "行动指令前段", "default": "今天就查一下"},
+    {"id": "ctaAccent", "type": "string", "label": "行动指令强调", "default": "社保"},
+    {"id": "channel", "type": "string", "label": "频道/来源行", "default": "央视新闻"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-coral · closer — 收口: 顶部珊瑚火带(与 hook 互为书挡) + 一句行动指令 + 来源行
+           旧稿这里写着"珊瑚文字在墨底 5.08 AA", 那是没算过的数: 实测 coral/ink = 2.92
+           (frame.md 1.1), 连大字号 3.0 都不过 → 本版式的珊瑚一律只做形状, 文字走
+           cream / light-gray / "白片+珊瑚字"(3.41) 三种合法写法。
+           D4 修正: 旧 .cl-mark 是 15cqw×3.2cqh 的孤立矩形, 浮在空白里像漏画的占位块。
+           现在改成整宽火带, 且几何与 hook 逐项相同(带 22cqh、眉标片 17cqh) →
+           首镜与末镜互为书的封面与封底, 观感上"这条片子是一个整体"。
+           几何: 火带 0→22cqh; 眉标片 top 17cqh、片高≈3.8cqh(2.9cqw 字一行 ≈1.9cqh + 上下
+           padding 1.8cqh)→ 下沿 20.8cqh, 正好压在带与墨的交界缝上; 正文区
+           `inset: 22cqh 6cqw 20cqh 6cqw` 与 hook 的 `.h-field`(22cqh 0 20cqh 0 + padding 0 6cqw)
+           是同一个内容盒 —— 书挡要的就是"逐项相同", 连左右留白都不许差。
+           内容高度 = 两行 CTA 14.4(10.5cqw×1.22×2) + 发丝线 0.35 + 来源行 2.0(3cqw×1.2)
+           + 两个 gap 6.4 = 23.2cqh; 区高 58cqh 居中 → 上下各余 17.4cqh,
+           漂移 `yPercent -3` 只吃掉 1.7cqh → 距字幕禁入区始终有一整块余量。 */
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #1a1a1a;
+          color: #f5f0e8;
+          font-family: "HF CJK", sans-serif;
+        }
+        #root::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background-image: repeating-linear-gradient(
+            45deg,
+            transparent 0 20px,
+            rgba(245, 240, 232, 0.05) 20px 40px
+          );
+          pointer-events: none;
+        }
+        /* 火带是形状: 面上不许写字(珊瑚↔墨/珊瑚↔cream 都不过), 文字全部走独立层 */
+        .cl-band {
+          position: absolute;
+          left: 0;
+          right: 0;
+          top: 0;
+          height: 22cqh;
+          background: #e85d5d;
+          transform-origin: 50% 0%;
+        }
+        .cl-band::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background-image: repeating-linear-gradient(
+            45deg,
+            transparent 0 20px,
+            rgba(0, 0, 0, 0.06) 20px 40px
+          );
+          pointer-events: none;
+        }
+        /* 珊瑚块只是形状; 眉标走白片+珊瑚字, 与 hook 同族 */
+        .cl-eb {
+          position: absolute;
+          left: 6cqw;
+          top: 17cqh;
+          background: #ffffff;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.9cqw;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          color: #e85d5d;
+          padding: 0.9cqh 1.8cqw;
+          transform-origin: 0% 50%;
+        }
+        .cl-field {
+          position: absolute;
+          inset: 22cqh 6cqw 20cqh 6cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3.2cqh;
+        }
+        .cl-cta {
+          font-size: 10.5cqw;
+          font-weight: 900;
+          line-height: 1.22;
+          letter-spacing: -0.01em;
+          max-width: 88cqw;
+        }
+        /* 强调词反相: 珊瑚面 + 白字 (墨字/珊瑚字压在珊瑚或墨上只有 2.92, 不合法) */
+        .cl-cta .ac {
+          display: inline-block;
+          background: #e85d5d;
+          color: #ffffff;
+          padding: 0 1.4cqw;
+          transform-origin: 0% 50%;
+        }
+        .cl-hair {
+          width: 100%;
+          height: 0.35cqh;
+          background: rgba(245, 240, 232, 0.24);
+          transform-origin: 0% 50%;
+        }
+        .cl-ch {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 3cqw;
+          font-weight: 700;
+          letter-spacing: 0.12em;
+          color: #b0b0b0;
+        }
+      </style>
+
+      <div id="root" data-composition-id="nc-closer" data-width="1080" data-height="1920">
+        <div class="cl-band" id="cl-band"></div>
+        <div class="cl-eb" id="cl-eb" data-var-text="kicker">ACTION</div>
+        <div class="cl-field" id="cl-field">
+          <div class="cl-cta">
+            <span id="cl-cta" data-var-text="cta">今天就查一下</span><span class="ac" id="cl-ac" data-var-text="ctaAccent">社保</span>
+          </div>
+          <div class="cl-hair" id="cl-hair"></div>
+          <div class="cl-ch" id="cl-ch" data-var-text="channel">央视新闻</div>
+        </div>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        // 火带用 scaleY 擦入(自带 background 的面禁止 opacity —— 法则 8), 与 hook 的火带同一支笔触
+        tl.fromTo("#cl-band", { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease: "power3.out" }, 0);
+        tl.fromTo("#cl-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.3);
+        tl.fromTo("#cl-cta", { opacity: 0, y: 64 }, { opacity: 1, y: 0, duration: 0.55, ease: "power3.out" }, 0.45);
+        tl.fromTo("#cl-ac", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 0.6);
+        tl.fromTo("#cl-hair", { scaleX: 0 }, { scaleX: 1, duration: 0.6, ease: "power2.out" }, 0.9);
+        tl.fromTo("#cl-ch", { opacity: 0 }, { opacity: 1, duration: 0.45 }, 1.2);
+        tl.to("#cl-field", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["nc-closer"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

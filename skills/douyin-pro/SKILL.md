@@ -7,6 +7,11 @@ agent_created: false
 
 # 抖音短视频生产 · 双路径 Skill
 
+> ⚠️ **新闻域工作流状态（2026-09-29 更新）**：
+> `news-workflow` 已整合为单轨（v2）—— Path A 不在新闻域使用。
+> 本 Skill 的双路径定义仍保留, 因为带货 / 娱乐 / 品牌号等其他领域仍可能用 Path A。
+> 新闻域请见 `skills/news-workflow/SKILL.md` + `routes/news/ARCHITECTURE.md`。
+
 > **一条 Skill，两条路**：Path A [付费] 追求品质上限；Path B [免费] 追求零成本快出。选完就跑，不用配环境。
 
 ## ⚡ 一键安装（首次必做）

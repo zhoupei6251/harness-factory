@@ -12,8 +12,12 @@ Every task starts with: classify the intent, then load the minimum doc set.
 | bug / fix / broken | bug | `NEVER.md` + `runbooks.md#bug` |
 | review / audit | review | `NEVER.md` + `principles.md` |
 | config / setup | config | `runbooks.md#bootstrap` |
+| news / article / hot topic / column | news | `routing.md` + `runbooks.md#news` + `MEMORY.md` |
 
 ## Anti-pattern: pre-loading everything
 
 Do not read all 7 governance docs at session start. Read by intent.
 Token cost of pre-loading all 7: ~3000 tokens. Per-intent load: ~500 tokens.
+
+News intent additionally loads the news skill chain on demand:
+`news-generator` (draft) → `fact-check` (verify) → `news-polish` (refine) → `humanizer` (de-AI).

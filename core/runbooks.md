@@ -33,3 +33,15 @@ Full guide: `references/tooling.md`. Both tools are local and free — no API ke
 2. Trace to root cause, not symptom
 3. Fix in the shared path, not the symptom path
 4. Run the full validate suite
+
+## News pipeline
+
+Route: `news`. Runtime: `.harness-news-runtime/` (plans / memory / articles). State: root `MEMORY.md` (projected from `routes/news/MEMORY.md`).
+
+1. **Research** — collect facts into `.harness-news-runtime/plans/`; register the topic in `MEMORY.md` (`topics[]`, status `researching`). Every fact must carry a source URL and trust level.
+2. **Draft** — invoke `news-generator` (inverted pyramid, 5W1H lead). Write the draft to `.harness-news-runtime/articles/<topic-id>-draft.md`; set topic status `drafting`.
+3. **Fact check** — invoke `fact-check` on the draft. All named facts, figures, names, and dates must pass multi-source verification; update `drafts[].fact_check` to `passed` / `flagged`. `flagged` blocks publishing.
+4. **Polish** — invoke `news-polish` (headline ≤20 chars, tight lead, one idea per paragraph), then `humanizer` to remove AI-writing signs. Save the final to `.harness-news-runtime/articles/<topic-id>.md`.
+5. **Publish** — set topic status `published` with `published_at`, update `MEMORY.md` `last_updated`, and report the article path to the user.
+
+Phase is always mirrored in `MEMORY.md` → `in_progress.current_phase` so any session can resume.
