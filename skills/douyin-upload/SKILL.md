@@ -61,7 +61,14 @@ category: news.publish
 |---|---|---|
 | 由 `path_b_build.py` 烧进成片（开场 4 秒左下角「AI 生成合成内容」，字芯 ≥ 最短边 5%） | 由 `path_b_build.py` 写 mp4 元数据键 `AIGC`（GB 45438-2025 附录 E） | `sau douyin upload-video --declaration 内容由AI生成` |
 
+- **命令先由闸门给**：`python skills/douyin-pro/scripts/check_publishable.py <abs>/final.mp4`
+  退出码 0 才允许发。它照 `aigc.json` 核 ①② 是否真在，并把 ③ 必带的
+  `--declaration 内容由AI生成` 连整条 `sau` 命令原样打出来 —— 别手抄参数。
 - 成片旁没有 `aigc.json` 侧车 = ①② 缺失（老成片就是这个状态），**先回 douyin-pro 重渲再发**。
+- 侧车只有 `draft` 一段 = `--draft` 草稿（①② 都没做），闸门直接判不可发布；
+  要发就去掉 `--draft` 重渲。**草稿永远不发**，这是渲染层"关掉标识"的唯一代价。
+- 真要不带 ③ 发（不建议：元数据过抖音转码即失，③ 是唯一活到平台侧的一件），
+  显式 `check_publishable.py --allow-undeclared`，并在新闻域 MEMORY 的 `videos[].declaration` 记 `undeclared`。
 - `--declaration` 必须传弹窗**选项原文** `内容由AI生成`；上游选不上只 warning、**不阻断发布**，
   所以成功凭据只有日志里的 `自主声明已选择「内容由AI生成」`。看不到这行就按未声明处理，
   改 `--headed` 人工补勾（细节与源码行号：`references/cli-contract.md` § 自主声明）。

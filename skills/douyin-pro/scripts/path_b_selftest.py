@@ -27,6 +27,7 @@ from pathlib import Path
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import audit_pack_contrast as apc  # noqa: E402  (判据 6 的色板层: frame.md 对比度表复算)
+import check_publishable as cpk  # noqa: E402  (发布闸门: 照台账核 ①②, ③ 的必带参数由它给)
 import commons_media as cm  # noqa: E402  (判据 4 的图片层纯函数; 与 pb 同样必须先落地 sys.path)
 import path_b_build as pb  # noqa: E402  (sys.path 必须先落地)
 
@@ -969,6 +970,51 @@ def t_aigc_label_cannot_be_turned_off():
     msg2 = expect_error(pb.mux_and_burn, "s.mp4", [], [], "/tmp", "/tmp/f.mp4",
                         1080, 1920, aigc_badge_seconds=1.5)
     assert "2" in msg2, f"短时长停机文案没说明国标 2 秒线: {msg2}"
+
+
+def t_draft_badge_absent_but_subtitles_kept():
+    # --draft 走的就是这条路: aigc_text=None ⇒ 一条 AIGC 事件都不挂, 而字幕照烧
+    # (草稿要看的正是版式与字幕, 不该被顺手砍掉)。
+    cues = [(0.0, 3.0, "第一屏\\N第二屏"), (3.0, 6.0, "另一句")]
+    draft_ass = pb.build_ass(cues, 1080, 1920, aigc_text=None, aigc_seconds=4.0)
+    assert ",AIGC," not in draft_ass, "草稿不许还挂着 AIGC 角标事件"
+    assert draft_ass.count("Dialogue: 0,") == 2, (
+        f"草稿必须照烧 {len(cues)} 条字幕, 实得 {draft_ass.count('Dialogue: 0,')}")
+    full = pb.build_ass(cues, 1080, 1920, aigc_text=pb.AIGC_LABEL_TEXT, aigc_seconds=4.0)
+    assert ",AIGC," in full, "非草稿必须挂上角标 —— 否则上面那条断言是空的"
+
+
+def t_publish_gate_refuses_draft_and_missing_sidecar():
+    # 发布闸门的判据表: 交付件(①② 都在)过, 草稿/无侧车/半成品全部拦下并点名缺哪件。
+    deliverable = {
+        "file": "final.mp4", "metadata_key": "AIGC",
+        "implicit": {"AIGC": {"Label": "1"}},
+        "explicit": {"burned_in": True, "text": pb.AIGC_LABEL_TEXT},
+    }
+    assert cpk.check(deliverable) == [], "齐活的交付件必须放行"
+    assert cpk.check(None), "没有台账必须拦"
+    draft = {"file": "probe.mp4", "draft": {"burned_in": False,
+                                            "to_publish": "去掉 --draft 重渲"}}
+    bad = cpk.check(draft)
+    assert len(bad) == 1 and "draft" in bad[0], f"草稿要一条点名草稿的拦截: {bad}"
+    # 半成品(有台账但没烧标 / 没元数据)各拦一条, 不许静默放行
+    assert cpk.check({**deliverable, "explicit": {"burned_in": False}}), "未烧标必须拦"
+    assert cpk.check({**deliverable, "metadata_key": None}), "无元数据台账必须拦"
+    # 布尔位只认真 true: 字符串 "false" 与 1 都不算数(台账是 JSON 写的, 但老产物可能手改)
+    assert cpk.check({**deliverable, "explicit": {"burned_in": "true"}}), "burned_in 必须是布尔 true"
+
+
+def t_publish_gate_default_requires_declaration():
+    # ③ 默认必带, 参数值必须是抖音弹窗**选项原文** —— 自己编一句「本视频由AI生成」
+    # 平台上根本没有这个选项, 选了等于没选(上游只 warning 不阻断, 见 cli-contract.md)。
+    assert cpk.DECLARATION_TEXT == "内容由AI生成", f"声明文案被改了: {cpk.DECLARATION_TEXT!r}"
+    assert cpk.DECLARATION_PROOF == f"自主声明已选择「{cpk.DECLARATION_TEXT}」", (
+        f"成功凭据与文案脱钩: {cpk.DECLARATION_PROOF!r}")
+    # main() 里 --allow-undeclared 是唯一逃生门, 且默认关闭(用户口径: 默认都打开)
+    import inspect
+    src = inspect.getsource(cpk.main)
+    assert '"--allow-undeclared"' in src and "action=\"store_true\"" in src, (
+        "③ 的开关必须存在且默认 off")
 
 
 def t_ffprobe_tag_entry_uses_format_tags():

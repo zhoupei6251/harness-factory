@@ -25,9 +25,11 @@
               `path_b_build.aigc_badge_ink_bounds` 比, 容差 INK_TOL_PX。
               **这一项是模型对渲染的核对** —— 2026-09-29 那次底边距算错 8px
               (行盒下空白没扣)是在这里暴露的, 不是读代码读出来的。
-  3 **时序**  成片与 silent 在同一时刻各取一帧, 在实测墨迹 bbox 内数差异像素:
-              角标事件窗口内必须大面积在变, 窗口外必须几乎为零。silent.mp4 是
-              **任何时刻都没有角标**的基准, 所以差异只可能来自角标本身。
+  3 **时序**  每个采样点取成片一帧、silent 一帧, silent 那帧再烧一遍**删掉 AIGC 条**
+              的 ASS 作基准, 然后在实测墨迹 bbox 内数差异像素: 窗口内必须大面积在变,
+              窗口外必须几乎为零。**基准必须是"有字幕、无角标"而不是裸 silent** ——
+              角标 bbox 落在字幕带上, 裸 silent 少的是整行字幕, 量到的差异会把字幕算进
+              角标(2026-09-29 用 43.0s 探针实测: 窗口外 23.50s 处差 8.5%, 全是字幕笔画)。
 
 依赖: ffmpeg / ffprobe(走 `path_b_build.which()` 解析)、Pillow(量像素)。
 退出码: 0 三项全过; 1 任一项不符或产物缺失(打印具体差值, 不静默跳过)。
@@ -175,6 +177,27 @@ def burn(ff: str, ass: str, out: str, base: list[str], tmp: str,
     return Image.open(out).convert("RGB")
 
 
+def burn_at(ff: str, ass: str, src: str, t: float, out: str, tmp: str,
+            label: str) -> Image.Image:
+    """把 ass 烧到 **src 在 t 秒那一帧**上(字幕时间轴与成片同刻)。
+
+    不能先抽静帧再对静帧烧: 静帧输入的时间轴从 0 起算, libass 按 local t=0 选字幕,
+    烧上去的就不是 t 秒那一行(2026-09-29 实测: 那样得到的基准帧与裸抽帧**逐像素相同**,
+    于是 t=23.50s 的 2454 个差异像素全被算成角标, 而同一时刻的真值是 3px)。
+    这里让 ffmpeg 一路解码到 t(`select='gte(t,…)'`)再出第一帧, 字幕与成片同刻。
+    """
+    vf = os.path.join(tmp, f"vf_{label}.txt")
+    open(vf, "w", encoding="utf-8").write(
+        f"subtitles={pb.ffmpeg_sub_path(ass)},"
+        f"select='gte(t\\,{t:.3f})'\n")
+    p = subprocess.run([ff, "-loglevel", "error", "-y", "-i", src,
+                        "-filter_script:v", vf, "-frames:v", "1", out],
+                       capture_output=True, text=True)
+    if p.returncode or not os.path.exists(out):
+        die(f"同时刻烧录失败({label}): {p.stderr[-500:]}")
+    return Image.open(out).convert("RGB")
+
+
 def _per_channel(img: Image.Image, op) -> Image.Image:
     """三通道两两取 min/max → 单通道灰度图。
 
@@ -311,7 +334,8 @@ def main() -> int:
     # ---- 3 时序 ----
     box = (dx0, dy0, dx1 + 1, dy1 + 1)
     area = (box[2] - box[0]) * (box[3] - box[1])
-    print(f"\n[3 时序] 基准 silent.mp4 vs 成片 · bbox {box} = {area}px")
+    print(f"\n[3 时序] 基准 = silent 同刻帧重烧「无 AIGC 条」ASS vs 成片 · "
+          f"bbox {box} = {area}px")
     print(f"{'时刻':>9} | {'bbox 差异':>10} | {'占比':>7} | 判定")
     inside = sorted({round(t0 + 0.2, 2), round((t0 + t1) / 2, 2), round(t1 - 0.15, 2)})
     outside = ([round(t1 + 0.2, 2), round((t1 + usable) / 2, 2), round(usable - 0.2, 2)]
@@ -323,14 +347,21 @@ def main() -> int:
         if not (0 <= t <= usable - 0.15):
             continue
         a = frame(ff, args.video, t, os.path.join(tmp, f"v{t}.png"))
-        b = frame(ff, silent, t, os.path.join(tmp, f"s{t}.png"))
+        b = burn_at(ff, full_ass, silent, t, os.path.join(tmp, f"b{t}.png"),
+                    tmp, f"b{t}")
         n = count_diff(a, b, box)
         ratio = n / area
         got = ratio > ON_RATIO
-        verdict = "角标在" if got else ("角标不在" if ratio < OFF_RATIO else "半?")
-        mark = "✓" if got == expect else f"✗ 期望{'在' if expect else '不在'}"
+        half = OFF_RATIO <= ratio <= ON_RATIO
+        verdict = "半?" if half else ("角标在" if got else "角标不在")
+        mark = "✓" if not half and got == expect else \
+            f"✗ 期望{'在' if expect else '不在'}"
         print(f"t={t:>7.2f}s | {n:>10} | {ratio * 100:>6.1f}% | {verdict}  {mark}")
-        if got != expect:
+        if half:
+            fails.append(f"t={t:.2f}s 差异占比 {ratio * 100:.1f}% 落在判据空档 "
+                         f"[{OFF_RATIO * 100:.0f}%, {ON_RATIO * 100:.0f}%] —— "
+                         "角标在不在判不出来, 按失败处理")
+        elif got != expect:
             fails.append(f"t={t:.2f}s 期望角标{'在' if expect else '不在'}, "
                          f"实测差异占比 {ratio * 100:.1f}%")
 

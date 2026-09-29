@@ -1,0 +1,121 @@
+#!/usr/bin/env python3
+"""发布前闸门: 照着 aigc.json 核 ①② 在不在, 再给出必须带的平台声明参数。
+
+位置: skills/douyin-pro/scripts/check_publishable.py
+读的是成片旁边的标识台账 aigc.json (由 path_b_build.py 写), 判据与
+skills/douyin-upload/SKILL.md 的「三件套」表一一对应:
+
+    ① 画面显式角标   → sidecar.explicit.burned_in 必须为 true
+    ② 文件隐式元数据 → sidecar.metadata_key / implicit 必须存在 (发射器已 ffprobe 读回过)
+    ③ 平台自主声明   → 本脚本把它需要的 `--declaration 内容由AI生成` 原样打出来
+
+**默认三件全开** (2026-09-29 用户口径: 「那还是默认都打开吧」):
+- 渲染加 `--draft` 可以不做 ①② (调版式、看效果、量像素用), 那份成片在这里就是
+  不可发布 —— 草稿的台账**不含** metadata_key / implicit / explicit 三段, 缺什么
+  记什么缺, 不写一堆 false 装作"标识在只是没开"。
+- ③ 只有 `--allow-undeclared` 这一个显式逃生门, 用了会打警告并要求留痕。
+
+退出码: 0 = 可发布, 1 = 拒绝(打印缺的是哪一件)。
+
+用法:
+    python skills/douyin-pro/scripts/check_publishable.py <成片.mp4>
+    python skills/douyin-pro/scripts/check_publishable.py .harness-news-runtime/videos/t001-v4/final.mp4
+"""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+import sys
+
+#: 抖音发布页「自主声明」弹窗的**选项原文**, 不是我们自己编的话术。
+#: 取值凭据(上游源码行号)见 skills/douyin-upload/references/cli-contract.md § 自主声明。
+DECLARATION_TEXT = "内容由AI生成"
+#: 上游选不上时只 warning、**不阻断发布**, 所以成功凭据是日志里这一行:
+DECLARATION_PROOF = "自主声明已选择「内容由AI生成」"
+
+
+def sidecar_for(video: str) -> str:
+    """成片旁边的那份台账 —— 与 path_b_build.py 写它的位置同源(同目录)。"""
+    return os.path.join(os.path.dirname(os.path.abspath(video)), "aigc.json")
+
+
+def check(sidecar: dict | None) -> list[str]:
+    """台账 → 违规清单(空即通过)。纯函数, 自测锁的就是这张表。"""
+    if sidecar is None:
+        return ["没有 aigc.json —— ①② 无从谈起(无侧车的老成片一律重渲): "
+                "path_b_build.py 重跑一次再发"]
+    bad: list[str] = []
+    if sidecar.get("draft"):
+        # 草稿轨 (--draft) 的产物: ①② 根本没做。这是用户要的"渲染层开关"落点,
+        # 代价就写在这里 —— 不能发, 而不是"发出去没人知道是 AI 做的"。
+        why = sidecar["draft"].get("to_publish") or "去掉 --draft 重渲"
+        return [f"这是 --draft 草稿(① 角标与 ② 元数据都没写), 不得发布 —— {why}"]
+    explicit = sidecar.get("explicit") or {}
+    if explicit.get("burned_in") is not True:
+        bad.append("① 显式角标缺失或未烧录 (sidecar.explicit.burned_in != true) —— 重渲")
+    if not sidecar.get("metadata_key") or not sidecar.get("implicit"):
+        bad.append("② 隐式元数据台账缺失 (metadata_key / implicit 为空) —— "
+                   "发射器没写过或没读回, 重渲")
+    return bad
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description="发布前核 AIGC 三件套")
+    ap.add_argument("video", help="成片 .mp4 路径")
+    ap.add_argument("--allow-undeclared", action="store_true",
+                    help=f"不带 ③ 平台自主声明(--declaration {DECLARATION_TEXT})"
+                         "仍然放行 —— 默认不给, 用了要在 MEMORY.videos[].declaration 留痕")
+    args = ap.parse_args()
+
+    path = sidecar_for(args.video)
+    sidecar = None
+    if os.path.isfile(path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                sidecar = json.load(fh)
+        except ValueError as exc:
+            print(f"❌ {path} 不是合法 JSON: {exc}")
+            return 1
+    elif not os.path.isfile(args.video):
+        print(f"❌ 找不到成片: {args.video}")
+        return 1
+    else:
+        # 与 check(None) 用同一句话: 无侧车 = ①② 无从谈起, 别让用户从两条措辞里猜哪条是真判据
+        print(f"❌ 拒绝发布 {os.path.basename(args.video)}:")
+        for line in check(None):
+            print(f"   · {line}")
+        return 1
+
+    bad = check(sidecar)
+    if bad:
+        print(f"❌ 拒绝发布 {os.path.basename(args.video)}:")
+        for line in bad:
+            print(f"   · {line}")
+        return 1
+
+    print(f"✅ ①② 齐活: {os.path.basename(args.video)}")
+    if sidecar.get("explicit", {}).get("shown_seconds") is not None:
+        exp = sidecar["explicit"]
+        print(f"   ① 角标 {exp.get('text')} · {exp.get('position')} · "
+              f"字芯 {exp.get('glyph_height_px')}px / 最短边 {exp.get('short_side_px')}px · "
+              f"{exp.get('shown_seconds')}s")
+        print(f"   ② 元数据键 {sidecar.get('metadata_key')} · "
+              f"Label={sidecar.get('implicit', {}).get('AIGC', {}).get('Label')}")
+    if args.allow_undeclared:
+        print("⚠️  --allow-undeclared: ③ 平台自主声明不带 —— 《标识办法》§ 4-四 的"
+              "「应当」里, 元数据过抖音转码即失, ③ 是唯一活到平台侧的那一件。")
+        print("   请在 routes/news/MEMORY.md 的 videos[].declaration 记 undeclared, "
+              "谁决定的、什么时候, 事后能查。")
+        print(f"   发布命令(无 --declaration): sau douyin upload-video "
+              f"--account <账号> --file {args.video} --title … --desc … --tags …")
+        return 0
+    print(f"③ 必须带: --declaration {DECLARATION_TEXT}")
+    print(f"   成功凭据 = 日志出现「{DECLARATION_PROOF}」, 没有这行按未声明处理")
+    print(f"   发布命令: sau douyin upload-video --account <账号> --file {args.video} "
+          f"--title … --desc … --tags … --declaration {DECLARATION_TEXT}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

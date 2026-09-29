@@ -39,6 +39,8 @@ fact-check (Step 3, 硬门禁)
    ↓ 产出: drafts[].fact_check = passed
 douyin-pro Path B (Step 4)
    ↓ 产出: .harness-news-runtime/videos/<id>/final.mp4 + aigc.json (标识侧车)
+check_publishable.py (Step 4.5 · 发布闸门)
+   ↓ 判据: 照 aigc.json 核 ①②, 打出 ③ 必带的 --declaration 参数; 退出码 1 = 不许发
 douyin-upload upload-video (Step 5)
    ↓ 产出: MEMORY.published_at 回填
 ```
@@ -66,9 +68,10 @@ skills/douyin-pro/                   ← 渲染器 (Path B)
 │   ├── path_b_build.py             ← 9 步发射器 (解析→配音→发射→自检→门禁→渲染→动量→烧字幕+AIGC→联络表)
 │   ├── layout_selfcheck.py          ← 17 条结构不变量 (渲前拦截)
 │   ├── audit_pack_contrast.py       ← frame.md 色板与对比度表复算 (文档里的"实测值"不许手抄)
-│   ├── verify_aigc_badge.py         ← AIGC 角标真像素复测 (字芯/墨迹/时长三项, 文档数字只认它)
-│   ├── fixtures/badge_probe_shots.json ← 上面那个复测器用的 5 镜探针输入 (证据链不能住在 gitignore 里)
-│   ├── path_b_selftest.py           ← 63 项纯函数断言 (12 pack 加载 + AIGC 合规 + 词表 + 上面两闸门的负例)
+│   ├── verify_aigc_badge.py         ← AIGC 角标真像素复测 (字芯/墨迹/时长三项; 时序基准 = silent 同刻重烧无角标 ASS; 文档数字只认它)
+│   ├── check_publishable.py         ← 发布闸门 (照 aigc.json 核 ①② + 打出 ③ 必带参数; 草稿在这里被拒)
+│   ├── fixtures/badge_probe_shots.json ← 探针**输入** (5 镜 news-policy): 发射器渲它、复测器量它
+│   ├── path_b_selftest.py           ← 66 项纯函数断言 (12 pack 加载 + AIGC 合规 + 草稿轨/发布闸门 + 词表 + 上面两闸门的负例)
 │   ├── commons_media.py             ← 图片层 (path B 当前未启用, 留作图片型模板扩展)
 │   └── install_path_b_deps.py       ← 依赖一键装
 ├── templates/hyperframes_path_b/   ← 12 个节目包
@@ -88,7 +91,7 @@ skills/news-collect/                  ← 步骤 0 采集层（stdlib-only：百
 skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询在本域禁用**）
 ```
 
-**核心发射器 `path_b_build.py`**——支持 12 pack + `--template`，并无条件产出 AIGC 标识（画面角标 + mp4 元数据 + `aigc.json` 侧车）。
+**核心发射器 `path_b_build.py`**——支持 12 pack + `--template`，交付轨无条件产出 AIGC 标识（画面角标 + mp4 元数据 + `aigc.json` 侧车）；`--draft` 是草稿轨，代价由 `check_publishable.py` 结算：草稿发不出去。
 
 ---
 
@@ -134,7 +137,8 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 | D5 | fact-check 硬门禁 | 不通过 = 不发；多源交叉验证（澎湃/工人日报/搜狐/官方回应）|
 | D6 | 屏句 ≠ 配音 | `onscreen:` 行单独成屏上屏上整句，配音未授权走正文；这条结构保证来自 path_b_build.py 的 `check_onscreen` 闸门 |
 | D7 | placeholder 不参与选择 | 11 个新 pack 的 placeholder composition 被 `load_style_pack` **直接跳过**；只剩占位壳的包视为不可渲染，在加载阶段停机点名替代包（2026-09-29 审计后收紧，旧口径"只是让加载通过"会误导到渲染期才崩）|
-| D8 | AIGC 标识三件套不可关 | 显式角标（**左下角、字芯 ≥ 最短边 5%、开场常驻 4 秒**）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ 发布时 `--declaration 内容由AI生成`；①② 由发射器无条件产出并读回核验，缺侧车的老成片一律重渲。**法律底线与自我加码要分清**：《标识办法》§ 4-四 的"应当"只落在**起始画面**与**播放周边**，末尾/中间是"可以"；左上角、贯穿全片、7.9% 字高都是我们自己加的，2026-09-29 按用户取舍退到线上（左下角 + 擦边字号 + 4 秒）。退掉的两档代价记在这里：①**播放周边**不再由贯穿全片的角标承担，改由 ② 元数据 + ③ 发布端声明承担；②左下角正是抖音标题/头像/进度条那一层的叠加区，平台 UI 会盖在角标上面（旧实现落左上角避开的就是这一层）；③擦边字号**没有余量**兜字体回退，换字体/换机器必须重量一次字面率（重量入口 `skills/douyin-pro/scripts/verify_aigc_badge.py`，量真实渲染像素而不是模型自己）|
+| D8 | AIGC 标识三件套对**交付件**不可关 | 显式角标（**左下角、字芯 ≥ 最短边 5%、开场常驻 4 秒**）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ 发布时 `--declaration 内容由AI生成`；①② 由发射器无条件产出并读回核验，缺侧车的老成片一律重渲。**法律底线与自我加码要分清**：《标识办法》§ 4-四 的"应当"只落在**起始画面**与**播放周边**，末尾/中间是"可以"；左上角、贯穿全片、7.9% 字高都是我们自己加的，2026-09-29 按用户取舍退到线上（左下角 + 擦边字号 + 4 秒）。退掉的两档代价记在这里：①**播放周边**不再由贯穿全片的角标承担，改由 ② 元数据 + ③ 发布端声明承担；②左下角正是抖音标题/头像/进度条那一层的叠加区，平台 UI 会盖在角标上面（旧实现落左上角避开的就是这一层）；③擦边字号**没有余量**兜字体回退，换字体/换机器必须重量一次字面率（重量入口 `skills/douyin-pro/scripts/verify_aigc_badge.py`，量真实渲染像素而不是模型自己）|
+| D11 | 标识的开关只能把东西变成**发不出去**，不能把它变成**没标** | 用户 2026-09-29 先要"默认关掉"、同日改口"还是默认都打开"，于是开关按**分层**落地，默认三件全开：渲染层 `--draft`（不烧 ①、不写 ②，侧车只留 `draft` 一段）与发布层 `check_publishable.py --allow-undeclared`（③ 可以不带，但要警告 + 在 `videos[].declaration` 留痕）。**关键设计不是"能不能关"，而是关完之后这份东西是什么**：草稿的台账**不含** `explicit` / `metadata_key` / `implicit` 三段（缺什么记什么缺，不写一堆 `false` 装作"标识在只是没开"），发布闸门读到即 EXIT=1 —— 所以"关掉标识"买到的是"能调版式、能量像素、不许发"，而不是"无标的成品"。合规默认值不许由一次会话的偏好改动：`--draft` 与 `--allow-undeclared` 都得显式敲，不敲就是全开 |
 | D9 | 版式名只认**文件名词干** | 自动选版的词表是 `path_b_build.AUTO_LAYOUT_STEMS`（`hook / closer / story / stat / quote / catalog / rail`，元组顺序即兜底顺序）；pack 自己起的名字**不能**进自动候选 —— 只能按语义落到 canonical 文件名，映射在 pack 的 frame.md §6 记全，别让人再猜一遍。composition id 由 `MOUNT_TPL` 与文件名解耦，可保留 pack 前缀（`np-*`）维持公文身份。**这条坑是静默的**：2026-09-29 清点出 10 个未落地 pack 的 §7 共计划了 16 个词表外文件名（`evidence`/`lead-detail`/`compare`/`drilldown`/`clock`/`sit`/`list`/`diagram`/`list-steps`/`risk-callout`/`segment`/`chain`/`play`/`score`/`map`/`region`）—— 照那些名字建文件不会报错，只会得到一个自动模式永远选不到的惰性版式。已由 `t_auto_layout_stems_are_the_only_vocabulary` 上闸（点名表 ⊆ 词表 = 词表，可渲染 pack 的词干 ⊆ 词表）|
 | D10 | 设计系统里的数字必须有**复算入口** | frame.md 的对比度表是"实测值"，但此前只能靠手抄维护：2026-09-29 首次全量复算抓到 11 个包共 **42 处**漂移，其中 `news-blast` 文档写 `score / pitch 5.0`（真值 **1.18**）而 §3 字阶据此把 22cqw 的主队比分染成红字压绿底 —— 手抄的假数会直接变成**播出后看不清的巨号字**。现在这类数一律由 `audit_pack_contrast.py` 从 §2 色板原值复算（判读线写进常量：正文 4.5 / 大字 3.0，1080 宽下 ≥2.22cqw ≈ 24px），文档只许写命令不许写脚本残留路径，改色板或改判定即红。**法则可以比数学严，数学不行**：gold 只作形状是包内法则，"gold 数学不过线"是假陈述 —— 审计按此区分 `VERDICT_CONTRADICTS_ARITHMETIC` |
 
@@ -174,9 +178,11 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 4. **产物写 `.harness-news-runtime/`**: 不写 `.ai-runtime-artifacts/` (那是 code 域)
 5. **Path B only**: 不要传 `--template` 之外的渲染选项；不要尝试 Path A
 6. **12 pack 自检**: 任何新加的 pack 必须先有 frame.md 才能 commit；三道闸全绿才算过 ——
-   `path_b_selftest.py`(63 项) + `layout_selfcheck.py <pack…>`(17 条结构不变量) +
+   `path_b_selftest.py`(66 项) + `layout_selfcheck.py <pack…>`(17 条结构不变量) +
    `audit_pack_contrast.py`(色板复算, 见 D10)。新 pack 的名字必须落 `AUTO_LAYOUT_STEMS`(见 D9)
-7. **AIGC 标识不可关**: ①画面角标 ②mp4 元数据 ③发布自主声明 三件齐活；`aigc.json` 缺失的成片先重渲
+7. **AIGC 标识对交付件不可关**: ①画面角标 ②mp4 元数据 ③发布自主声明 三件齐活，`aigc.json` 缺失的成片先重渲；
+   发之前必须过 `check_publishable.py <成片>`（退出码 1 即不许发）。想不要标识只有 `--draft`
+   一条路，而它的产物本身就不可发布（见 D11）—— **不许**拿"跳过闸门"当日常流程
 8. **不可渲染的包不许选**: 决策树命中只有占位壳的 pack 时, 政策/法规类改落 `news-policy`、其余改落 `news-coral`, 或先补真版式
 9. **采集零付费**: 热点线索只来自 `skills/news-collect`（stdlib-only，本机可复跑）；不调用任何按次扣费的榜单/话题搜索（Beatra 6/60 credits）。缺源补免费源，不花钱
 
@@ -186,14 +192,17 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 
 ```
 $ python skills/douyin-pro/scripts/path_b_selftest.py
-[selftest] 63 项 · style=news-coral
-  ok    t_full_loadability_progress
+[selftest] 66 项 · style=news-coral
+  ok    t_draft_badge_absent_but_subtitles_kept
       可渲染 pack (有真版式): 2/12 —— news-coral, news-policy
+  ok    t_full_loadability_progress
   ok    t_aigc_badge_sits_in_the_gap_between_content_and_subtitles
   ok    t_aigc_badge_landscape_band_yields_to_subtitles
   ok    t_pack_contrast_docs_match_palette_math
   ok    t_auto_layout_stems_are_the_only_vocabulary
-[selftest] 全绿 63/63
+  ok    t_publish_gate_refuses_draft_and_missing_sidecar
+  ok    t_publish_gate_default_requires_declaration
+[selftest] 全绿 66/66
 
 $ python skills/douyin-pro/scripts/audit_pack_contrast.py
 对比度审计通过：12 个 pack 的 frame.md 色板与文档一致（0 条警告）
@@ -211,13 +220,32 @@ $ python skills/douyin-pro/scripts/layout_selfcheck.py \
 - ✅ 验证记录的留存口径写进 §6（契约证据进 `scripts/` 受版本管理，文档不再指向 gitignore 路径）
 - ✅ AIGC 标识落地：画面角标（**左下角、MarginV 303、字芯实测 55px = 最短边 1080 的 5.09%、
   开场 4.0s**）+ mp4 元数据 `AIGC`（GB 45438-2025 附录 E）+ `aigc.json` 侧车 + 读回核验（读不回即拒绝交付）。
-  像素判据由 `verify_aigc_badge.py` 复现（同一条命令在本机重跑输出逐字相同）：
-  实测含描边阴影墨迹 y **1549–1615** vs 模型 `ink_bounds(mv=303)` **1549.3–1615.0**（上侧差 0.3px、
-  下侧 0.0px）；距左 49px = 4.54cqw、距底 310px = 16.15cqh（仍在底部 20cqh 带内，视觉上就是左下角）；
-  时序在 t=0.2/2.0/3.85s 差异占比 76.6%、t=4.2/27/49.8s **0.0%**。植入假字号（FontSize 75→60）
-  的负例报 3 条违规并 EXIT=1。命令与完整输出：
+  像素判据由 `verify_aigc_badge.py` 复现：实测含描边阴影墨迹 y **1549–1615** vs 模型
+  `ink_bounds(mv=303)` **1549.3–1615.0**（上侧差 0.3px、下侧 0.0px）；距左 49px = 4.54cqw、
+  距底 310px = 16.15cqh（仍在底部 20cqh 带内，视觉上就是左下角）；窗口内差异占比 76.6%、窗口外 **0.0%**。
+  植入假字号（FontSize 75→60）的负例报 3 条违规并 EXIT=1。命令与完整输出：
   `.harness-news-runtime/verifications/2026-09-29-aigc-badge-bottom-left-floor-verification-lite.md`
-  （探针输入 `scripts/fixtures/badge_probe_shots.json` 一并受版本管理）
+  **订正（同日）**：那条记录 §2.2 引用的 `fixtures/badge_probe_shots.json` 当时是**发射器产出的 shots 文件**
+  （只有 `values`、没有 `body`），照原命令重跑会在分镜 1 停机报"正文为空"—— 几何结论不受影响
+  （字芯/墨迹只由分辨率与 ASS 样式决定，已用改成真输入的 fixture 重渲复测，上列数字逐字复现），
+  但**时序那几行的 `t=27.00s / 49.79s` 是 50.0s 探针的采样点**，换输入后总时长变 43.0s，采样点随之变。
+  复现命令的机器前提也补一句：`hyperframes` 要 **Node ≥ 22**（本机 nvm 默认曾切到 20.9.0，
+  `npx -y hyperframes` 会报 `requires Node.js >= 22` 且 `check.json` 为空 —— 那不是版式失败）
+  **订正 2（同日，重跑开关那次发现）**：同一条记录 §2.3 的**时序基准是裸 `silent.mp4`**（烧 ASS 之前），
+  当时那句"所以差异只可能来自角标"不成立 —— 角标 bbox 落在字幕带上，窗口外那一行少的是**整行字幕**，
+  43.0s 探针上 `t=23.50s` 量到 2454px = 8.5% 全被算进角标差异，而旧代码只按 `>15%` 判在不在，
+  于是 8.5% 落进 `[1%,15%]` 判据空档却被打了 `✓`（脚本注释写着"落进空档按失败处理"，代码没做）。
+  基准已改为**同刻重烧**：把"删掉 AIGC 条"的 ASS 烧到 `silent` 在同一时刻的帧上，两边只剩角标之差
+  （不能先抽静帧再烧 —— 静帧输入的时间轴从 0 起算，libass 按 local t=0 选字幕，量不到 t 秒那一行）；
+  空档同时改为**按失败停机**。改后同一行 **2454px → 3px**，上面那句"窗口外 **0.0%**"从此才真是
+  由构造成立的事实。命令与完整输出见开关那份记录 §4
+- ✅ **标识开关按层落地，默认全开**（D11）：渲染 `--draft` 出草稿（无 ①②，台账只留 `draft` 段）、
+  发布 `check_publishable.py` 结算 —— 草稿 EXIT=1 拒发，交付件 EXIT=0 打印 ③ 必带的
+  `--declaration 内容由AI生成`。两条轨都在真实渲染件上验过（同一条 fixture、同一台机器）：
+  草稿的 `ffprobe` 里查不到 `AIGC` 键、`verify_aigc_badge.py` 直接报"ASS 里没有 AIGC 事件"并 EXIT=1，
+  交付件则 `Label=1` 读回 + 角标三项几何全过。记录见
+  `.harness-news-runtime/verifications/2026-09-29-aigc-switch-draft-rail-and-publish-gate-verification-lite.md`
+
 - ✅ 发布链路：`--declaration 内容由AI生成` 已对齐上游源码，成功凭据写进 skill
 - ✅ 占位包改为**加载期停机**（不再拖到渲染第 1 镜）
 - ✅ 进度指标换成可交叉核验的"有真版式 pack 数"（2/12）

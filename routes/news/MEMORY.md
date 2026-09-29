@@ -91,8 +91,13 @@ python skills/douyin-pro/scripts/path_b_build.py \
 - `onscreen` 在 JSON 里要用 `｜` 分隔标记语法（如 `"门诊新规｜全国执行"`）——
   `parse_input` 会按该标记重写 `onscreen`/`onscreenAccent`，直传 `onscreenAccent` 字段会被覆盖掉。
 - `--aigc-producer`（默认 `harness-news-pathb`）是隐式标识里的 ContentProducer，
-  `--aigc-label`（默认 `AI 生成合成内容`）是显式角标文字。**两者都不许留空**：
-  空 producer 或全片时长 < 2 秒 → 停机，合规项没有逃生门。
+  `--aigc-label`（默认 `AI 生成合成内容`）是显式角标文字。**交付件两者都不许留空**：
+  空 producer 或全片时长 < 2 秒 → 停机，可交付的成片没有"关掉标识"这条路。
+- **标识开关只有两档，都在"发不出去"这一侧**（2026-09-29 用户口径：先要开关、最后定「还是默认都打开」）：
+  ① 渲染层 `--draft` —— 不烧角标、不写元数据，侧车只落 `draft` 一段（**不含** `explicit` /
+  `metadata_key` / `implicit`，缺什么记什么缺，不写一堆 false 装作"标识在只是没开"）；
+  ② 发布层 `check_publishable.py --allow-undeclared` —— 不带平台自主声明仍然放行，但会打警告
+  并要求在 `videos[].declaration` 留痕。调版式、量像素走 ①，交付不走。
 - 成片旁必落 `aigc.json` 侧车（font_size_px / glyph_height_px / short_side_px / margin_v_px /
   position / shown_seconds / 七要素），发布前用它 + `contact-sheet.jpg` **第 1 镜**人工核一遍
   左下角标 —— 角标只在开场 4 秒常驻，看后面的镜头当然看不到，这不是缺陷。
@@ -101,9 +106,11 @@ python skills/douyin-pro/scripts/path_b_build.py \
 - `news-coral`: 完整（frame + host + 7 真 compositions）
 - `news-policy`: 完整（frame + host + 5 真 compositions，占位壳已删）
 - 其余 10 个: frame + host + 1 placeholder（真 composition 待补，且**当前不可渲染**）
-- 校验（三道闸，仓库根执行）：`path_b_selftest.py` **63 项**（含 AIGC 标识、占位包停机、
-  色板复算与版式词表的负例）+ `audit_pack_contrast.py`（12 pack 色板/对比度复算）+
+- 校验（三道闸，仓库根执行）：`path_b_selftest.py` **66 项**（含 AIGC 标识、草稿轨与发布闸门的
+  判据、占位包停机、色板复算与版式词表的负例）+ `audit_pack_contrast.py`（12 pack 色板/对比度复算）+
   `layout_selfcheck.py <pack…>`（17 条结构不变量）
+- 发布前另过一道 `check_publishable.py <成片.mp4>`：它不审版式，只照 `aigc.json` 核 ①② 在不在，
+  并把 ③ 必带的 `--declaration 内容由AI生成` 原样打出来（退出码 1 = 这份东西不许发）
 
 ## Videos
 videos:
@@ -163,7 +170,9 @@ in_progress:
     blocker: 一把锁 —— 抖音账号未登录（`sau douyin check` 返回 valid 前不发）。原第二把锁
              「t001 成片无 AIGC 标识」已于 09-29 12:09 解除：v004 = 同脚本重渲 + 标识三件套，独立核验通过
     note: 发布走 upload-video 时必须带 `--declaration 内容由AI生成`，成功凭据是日志出现
-          `自主声明已选择「…」`（上游失败只 warning、不阻断）。发布前还有一件人定的事：
+          `自主声明已选择「…」`（上游失败只 warning、不阻断）。发之前先跑
+          `python skills/douyin-pro/scripts/check_publishable.py <成片>`，它会把这条参数连命令一起打出来。
+          发布前还有一件人定的事：
           把 `--aigc-producer` 换成真实主体名重渲（见 v004.caveat）。发布主路径已接入
           （skills/douyin-upload + 本机 .venv/Scripts/sau.exe，见其 references/local-env.md）
 

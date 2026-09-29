@@ -84,9 +84,12 @@ feedx 三个源新鲜度从「当天」到「9 个月前」都有 → 按 `feed_
   或按该包 frame.md 契约补真 composition。
   `load_style_pack` 会在**加载阶段**就停机并点名可渲染替代（不会等到渲染第 1 镜）
 - 校验（三道闸，全绿才算过；脚本都在 `skills/douyin-pro/scripts/`，仓库根执行）：
-  - `path_b_selftest.py` → `全绿 61/61`，并报告 `可渲染 pack (有真版式): X/12`
+  - `path_b_selftest.py` → 末行 `[selftest] 全绿 N/N`（**项数以脚本输出为准**，别在文档里抄数：
+    61→63→66 这三级台阶全是加断言造成的手抄漂移），并报告 `可渲染 pack (有真版式): X/12`
   - `audit_pack_contrast.py` → `对比度审计通过：12 个 pack 的 frame.md 色板与文档一致`
   - `layout_selfcheck.py <pack…>` → `版式自检通过：N 个文件，0 条违规`
+  - ⚠️ **前提**：`hyperframes` 要 Node ≥ 22；nvm 若指向 20.x，`npx -y hyperframes check` 只会产出
+    空的 `check.json` + `requires Node.js >= 22`，那不是版式失败
 - ⚠️ **补包前先重映射版式名**：自动选版只认 `path_b_build.AUTO_LAYOUT_STEMS`（hook / closer /
   story / stat / quote / catalog / rail），其余包 frame.md §7 里的 `compare` / `drilldown` /
   `score` / `map` 这类名字建出文件不会报错、但自动模式永远选不到（详见 ARCHITECTURE.md D9）
@@ -150,6 +153,10 @@ python skills/douyin-pro/scripts/path_b_build.py \
 
 回填 MEMORY `videos[].output` + `videos[].render_status: done`。
 
+**调版式用草稿轨**：加 `--draft` 就不烧 ① 角标、不写 ② 元数据，侧车只留 `draft` 一段。
+这份产物在步骤 5 的闸门里**必然被拒**（`check_publishable.py` 读到 `draft` 即 EXIT=1），
+所以它可以用来量像素、看留白、比版式，但不论如何发不出去。交付不加这个 flag。
+
 **注意**：`--template` 与 `--style` 同义（兼容旧用法）；`DEFAULT_TEMPLATE = news-coral`。
 
 ---
@@ -160,7 +167,9 @@ python skills/douyin-pro/scripts/path_b_build.py \
 
 **前置门禁**（任一不成立就不发）：
 - `drafts[].fact_check == passed`
-- 成片旁有 `aigc.json` 且 `burned_in: true`（AIGC 标识是合规硬要求，老成片没有 → 重渲再发）
+- **闸门先过**：`python skills/douyin-pro/scripts/check_publishable.py <abs>/final.mp4` 退出码必须是 0。
+  它照 `aigc.json` 核 ①`explicit.burned_in` 与 ②`metadata_key`/`implicit`，并把 ③ 必带的
+  `--declaration 内容由AI生成` 连整条命令打出来；`--draft` 草稿与无侧车的老成片都在这里被拒（EXIT=1 → 重渲）
 - `sau douyin check --account <name>` 返回 `valid`
 - **未登录时不代替用户扫码**，把成品交用户手动发
 
@@ -188,11 +197,15 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
 4. **产物写 `.harness-news-runtime/`**：稿件/成片落 `articles/`、`videos/`，**不要**写 `.ai-runtime-artifacts/`（code 域）
 5. **Path B only**：本工作流只使用 Path B（`--template` 即可）；不要尝试 Path A（付费路径，不在新闻域使用）
 6. **12 pack 自检先行**：新加的 pack 必须先有 frame.md + host.html + 真 composition 才提交；三道闸必绿
-   （`path_b_selftest.py` 63 项 + `audit_pack_contrast.py` 色板复算 + `layout_selfcheck.py` 结构不变量），
+   （`path_b_selftest.py` 全量断言 + `audit_pack_contrast.py` 色板复算 + `layout_selfcheck.py` 结构不变量；
+   项数以脚本输出为准，见步骤 1），
    且版式文件名只许落 `AUTO_LAYOUT_STEMS`（见步骤 1 的重映射提示）
-7. **AIGC 标识不可关**：成片必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
-   ①② 由 `path_b_build.py` 无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供。
-   没有 `aigc.json` 侧车的老成片一律视为不合规，**重渲**而不是直发
+7. **AIGC 标识对交付件不可关**：成片必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
+   ①② 由 `path_b_build.py` 无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供，
+   发之前由 `check_publishable.py` 逐件核。没有 `aigc.json` 侧车的老成片一律视为不合规，**重渲**而不是直发。
+   唯一"不要标识"的合法轨道是 `--draft`（步骤 4），它的产物被闸门判为不可发布 ——
+   **开关买到的是调试自由，不是免标识的成品**；真要跳过 ③ 只能显式
+   `check_publishable.py --allow-undeclared`，且要在 `videos[].declaration` 记 `undeclared` 留痕
 8. **采集只走 `news-collect`**：热点线索来自本地可复跑的免费采集器，**不**调用任何按次扣费的榜单/搜索接口
    （Beatra 热榜 6 / 话题搜索 60 credits）。付费不是本路线的可选项，缺源就补免费源而不是花钱
 

@@ -1970,7 +1970,8 @@ def _sha256_prefix(data, nbytes: int) -> str:
 def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
                  aigc_badge_seconds: float = 0.0,
                  aigc_producer: str = DEFAULT_AIGC_PRODUCER,
-                 aigc_label: str = AIGC_LABEL_TEXT):
+                 aigc_label: str = AIGC_LABEL_TEXT,
+                 draft: bool = False):
     """拼配音 → 烧 ASS 字幕(含 AIGC 显式角标) → 写 AIGC 隐式元数据 → 读回核验。
 
     `aigc_badge_seconds` 是角标持续时长, 主流程传 `aigc_badge_seconds(全片时长)`
@@ -1981,18 +1982,27 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
     隐式标识按 GB 45438-2025 附录 E 写进容器元数据, 写完 ffprobe 读回核验,
     不一致就抛 EmitterError。字幕轨为空时降级为只合成音频(不许让成片不可用)。
     返回真正落到文件里的那份标识 JSON, 供调用方落 sidecar 备查。
+
+    `draft=True` 是**草稿轨**, 不是交付件的逃生门: ① 角标与 ② 元数据都不写,
+    返回 None, 调用方据此把 `aigc.json` 落成只有 `draft` 一段的样子 ——
+    `check_publishable.py` 读到那份侧车就拒绝发布。所以"把标识关掉"的代价被
+    定成"这份东西发不出去", 而不是"发出去没人知道它是 AI 做的"。
+    调版式、看效果、量像素用草稿; 交付不用。
     """
-    if not aigc_producer:
-        # 不提供"关掉标识"这条路: 《标识办法》§ 2 要求"应当"添加, 拿空参数当开关
-        # 等于给用户一个违法的便利。要改的是标识内容(--aigc-producer 填主体名), 不是有无。
-        raise EmitterError(
-            "AIGC 标识不可关闭 (aigc_producer 为空) —— 无标识成片不得交付, "
-            "请填生成者名称: --aigc-producer <你的频道/主体名>")
-    if aigc_badge_seconds < AIGC_LABEL_MIN_SECONDS:
-        raise EmitterError(
-            f"全片时长只有 {aigc_badge_seconds:.2f}s, 开场角标达不到国标 "
-            f"{AIGC_LABEL_MIN_SECONDS}s 的显式标识持续下限 —— 补足内容, "
-            "或在剪辑端另加一条 ≥2s 的显著标识后再交付")
+    if not draft:
+        if not aigc_producer:
+            # 可交付的成片不提供"关掉标识"这条路: 《标识办法》§ 2 要求"应当"添加,
+            # 拿空参数当开关等于给用户一个违法的便利。要改的是标识内容
+            # (--aigc-producer 填主体名), 不是有无。不想要标就走 --draft,
+            # 那条轨的产物直接不可发布, 而不是"无标的成品"。
+            raise EmitterError(
+                "AIGC 标识不可关闭 (aigc_producer 为空) —— 无标识成片不得交付, "
+                "请填生成者名称: --aigc-producer <你的频道/主体名>")
+        if aigc_badge_seconds < AIGC_LABEL_MIN_SECONDS:
+            raise EmitterError(
+                f"全片时长只有 {aigc_badge_seconds:.2f}s, 开场角标达不到国标 "
+                f"{AIGC_LABEL_MIN_SECONDS}s 的显式标识持续下限 —— 补足内容, "
+                "或在剪辑端另加一条 ≥2s 的显著标识后再交付")
     narr = os.path.join(work_dir, "narration.mp3")
     # concat 解封装器把 list.txt 里的相对路径按 **list.txt 自己的目录** 解析。
     # 实测传 "--work-dir .harness-news-runtime/tmp/x" 这种相对目录时, 条目写成
@@ -2014,8 +2024,9 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
         _ffmpeg_failure(concat_log, f"配音拼接失败, 详见 {concat_log}")
 
     ass_path = os.path.join(work_dir, "subs.ass")
-    write_text(ass_path, build_ass(cues, w, h, aigc_text=aigc_label,
-                                   aigc_seconds=aigc_badge_seconds))
+    write_text(ass_path, build_ass(cues, w, h,
+                                   aigc_text=None if draft else aigc_label,
+                                   aigc_seconds=0.0 if draft else aigc_badge_seconds))
     err_log = os.path.join(work_dir, "ffmpeg_final.log")
     # 明确取流: 视频只从渲染产物拿, 声音只从拼接好的 narration 拿。
     # 合成里现在挂了 <audio>, 渲染出的 silent.mp4 也可能带一层声音;
@@ -2025,8 +2036,8 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
     # 实测 `-movflags +faststart` 会把不认识的键**静默丢掉**(ffprobe 读不到、
     # 字节里也搜不到), 必须加 use_metadata_tags 才落到 mdta atom。
     movflags = ["-movflags", "+faststart+use_metadata_tags"]
-    aigc_meta = aigc_metadata_json(aigc_producer, silent)
-    meta_args = ["-metadata", f"{AIGC_METADATA_KEY}={aigc_meta}"]
+    aigc_meta = None if draft else aigc_metadata_json(aigc_producer, silent)
+    meta_args = [] if draft else ["-metadata", f"{AIGC_METADATA_KEY}={aigc_meta}"]
     ff = which("ffmpeg") or "ffmpeg"
     if not cues:
         log("⚠️ 字幕轨为空, 跳过烧录字幕(仅合成配音)")
@@ -2047,6 +2058,10 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
         r = run_exe(cmd, stdout=subprocess.DEVNULL, stderr=elf)
     if r.returncode != 0 or not os.path.exists(final):
         _ffmpeg_failure(err_log, f"ffmpeg 合成失败, 详见 {err_log}")
+    if draft:
+        log("⚠️ 草稿模式 (--draft): 角标没烧、元数据没写 —— 台账会标成草稿, "
+            "发布那一步(check_publishable.py)读到即拒绝")
+        return None
     # 写完立刻读回来验一次: 标识"写了"不等于"在文件里", 而缺标识的成片是违法
     # 品而不是瑕疵品 —— 这里必须停机, 不能只在日志里抱怨一句。
     # 比对按语义而不是按字节: ffprobe 的输出层可能给特殊字符换层壳, 而真正要
@@ -2099,6 +2114,10 @@ def main():
     ap.add_argument("--aigc-label", default=AIGC_LABEL_TEXT,
                     help=f"显式角标文字(默认 %(default)s), 开场 "
                          f"{AIGC_LABEL_ON_SECONDS:g} 秒常驻左下角")
+    ap.add_argument("--draft", action="store_true",
+                    help="草稿轨: 不烧 AIGC 角标、不写隐式元数据, 侧车只落 "
+                         "draft 一段(不含 explicit/metadata_key/implicit) —— "
+                         "check_publishable.py 读到即拒绝发布。调版式/看效果用它, 交付不用")
     ap.add_argument("--fps", type=int, default=DEFAULT_FPS, help=f"渲染帧率 (默认 {DEFAULT_FPS})")
     ap.add_argument("--quality", default=DEFAULT_QUALITY, choices=QUALITY_CHOICES,
                     help=f"渲染质量 (默认 {DEFAULT_QUALITY})")
@@ -2213,29 +2232,45 @@ def main():
         aigc_meta = mux_and_burn(silent, audio_files, cues, work, final, w, h,
                                  aigc_badge_seconds=badge_seconds,
                                  aigc_producer=args.aigc_producer,
-                                 aigc_label=args.aigc_label)
+                                 aigc_label=args.aigc_label,
+                                 draft=args.draft)
         # 标识台账: 发布环节(douyin-upload)要照着它做平台侧自主声明,
         # 监管要举证时也拿这份对着成片核。只随成片走, 不进工作目录。
         # glyph_height_px 是**合规线上真正被量的那个数**(字芯高, 不是 em 高),
         # 落进台账就不用举证时再让人重算一遍字面率。
+        # 草稿的台账**故意不含 metadata_key / implicit / explicit 三段** ——
+        # 缺什么就记什么缺, 而不是写一堆 false 装作"标识在只是没开";
+        # check_publishable.py 认这三段的存在性, 草稿因此过不了发布闸门。
         badge_fs = aigc_badge_font_size(w, h)
+        if args.draft:
+            sidecar = {
+                "file": os.path.basename(final),
+                "draft": {
+                    "reason": "--draft 草稿渲染: ① 画面角标与 ② 隐式元数据都没有",
+                    "burned_in": False,
+                    "to_publish": "去掉 --draft 重渲一次, 让 ①② 落进成片",
+                },
+                "resolution": f"{w}x{h}",
+            }
+        else:
+            sidecar = {
+                "file": os.path.basename(final),
+                "metadata_key": AIGC_METADATA_KEY,
+                "implicit": json.loads(aigc_meta),
+                "explicit": {
+                    "text": args.aigc_label,
+                    "position": "bottom-left",
+                    "font_size_px": badge_fs,
+                    "glyph_height_px": round(badge_fs * AIGC_LABEL_GLYPH_RATIO, 1),
+                    "short_side_px": min(w, h),
+                    "margin_v_px": aigc_badge_margin_v(w, h),
+                    "shown_seconds": round(badge_seconds, 3),
+                    "burned_in": True,
+                },
+                "resolution": f"{w}x{h}",
+            }
         write_text(os.path.join(os.path.dirname(os.path.abspath(final)), "aigc.json"),
-                   json.dumps({
-                       "file": os.path.basename(final),
-                       "metadata_key": AIGC_METADATA_KEY,
-                       "implicit": json.loads(aigc_meta),
-                       "explicit": {
-                           "text": args.aigc_label,
-                           "position": "bottom-left",
-                           "font_size_px": badge_fs,
-                           "glyph_height_px": round(badge_fs * AIGC_LABEL_GLYPH_RATIO, 1),
-                           "short_side_px": min(w, h),
-                           "margin_v_px": aigc_badge_margin_v(w, h),
-                           "shown_seconds": round(badge_seconds, 3),
-                           "burned_in": True,
-                       },
-                       "resolution": f"{w}x{h}",
-                   }, ensure_ascii=False, indent=2))
+                   json.dumps(sidecar, ensure_ascii=False, indent=2))
 
         # ⑨ 联络表: 逐镜一帧, 人工验收比对
         build_contact_sheet(silent, shots, os.path.dirname(os.path.abspath(final)), work)
