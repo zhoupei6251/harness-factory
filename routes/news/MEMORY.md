@@ -88,19 +88,20 @@ python skills/douyin-pro/scripts/path_b_build.py \
 
 - `--input` 两种写法：**场景 JSON**（数组，每镜 `layout/kicker/title/body/onscreen`）最稳；
   走 `.md` 脚本则**每镜必须自带 `屏:` 行**，否则 `check_onscreen` 闸门挡住（不是渲染失败，是拒收）。
-- `onscreen` 在 JSON 里要用 `｜` 分隔标记语法（如 `"左上角必须有标识｜贯穿全片"`）——
+- `onscreen` 在 JSON 里要用 `｜` 分隔标记语法（如 `"门诊新规｜全国执行"`）——
   `parse_input` 会按该标记重写 `onscreen`/`onscreenAccent`，直传 `onscreenAccent` 字段会被覆盖掉。
 - `--aigc-producer`（默认 `harness-news-pathb`）是隐式标识里的 ContentProducer，
   `--aigc-label`（默认 `AI 生成合成内容`）是显式角标文字。**两者都不许留空**：
   空 producer 或全片时长 < 2 秒 → 停机，合规项没有逃生门。
-- 成片旁必落 `aigc.json` 侧车（font_size_px / short_side_px / shown_seconds / 七要素），
-  发布前用它 + `contact-sheet.jpg` 人工核一遍左上角标。
+- 成片旁必落 `aigc.json` 侧车（font_size_px / glyph_height_px / short_side_px / margin_v_px /
+  position / shown_seconds / 七要素），发布前用它 + `contact-sheet.jpg` **第 1 镜**人工核一遍
+  左下角标 —— 角标只在开场 4 秒常驻，看后面的镜头当然看不到，这不是缺陷。
 
 当前进度 (frame.md / host.html / compositions 齐全度)：
 - `news-coral`: 完整（frame + host + 7 真 compositions）
 - `news-policy`: 完整（frame + host + 5 真 compositions，占位壳已删）
 - 其余 10 个: frame + host + 1 placeholder（真 composition 待补，且**当前不可渲染**）
-- 校验（三道闸，仓库根执行）：`path_b_selftest.py` **61 项**（含 AIGC 标识、占位包停机、
+- 校验（三道闸，仓库根执行）：`path_b_selftest.py` **63 项**（含 AIGC 标识、占位包停机、
   色板复算与版式词表的负例）+ `audit_pack_contrast.py`（12 pack 色板/对比度复算）+
   `layout_selfcheck.py <pack…>`（17 条结构不变量）
 

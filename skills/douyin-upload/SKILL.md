@@ -59,7 +59,7 @@ category: news.publish
 
 | ① 画面内显式标识 | ② 文件元数据隐式标识 | ③ 平台自主声明 |
 |---|---|---|
-| 由 `path_b_build.py` 烧进成片（左上角贯穿全片「AI 生成合成内容」） | 由 `path_b_build.py` 写 mp4 元数据键 `AIGC`（GB 45438-2025 附录 E） | `sau douyin upload-video --declaration 内容由AI生成` |
+| 由 `path_b_build.py` 烧进成片（开场 4 秒左下角「AI 生成合成内容」，字芯 ≥ 最短边 5%） | 由 `path_b_build.py` 写 mp4 元数据键 `AIGC`（GB 45438-2025 附录 E） | `sau douyin upload-video --declaration 内容由AI生成` |
 
 - 成片旁没有 `aigc.json` 侧车 = ①② 缺失（老成片就是这个状态），**先回 douyin-pro 重渲再发**。
 - `--declaration` 必须传弹窗**选项原文** `内容由AI生成`；上游选不上只 warning、**不阻断发布**，

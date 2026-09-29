@@ -52,6 +52,7 @@ import argparse
 import hashlib
 import html
 import json
+import math
 import os
 import re
 import shutil
@@ -97,10 +98,14 @@ PLACEHOLDER_LAYOUT = "placeholder"
 # ------------------------- AIGC 标识 (合规硬要求) -------------------------
 #: 依据: 《人工智能生成合成内容标识办法》(2025-09-01 施行) § 4/§ 5 +
 #: 强制性国标 GB 45438-2025《网络安全技术 人工智能生成合成内容标识方法》。
-#: 显式标识 (§ 4-四): 视频起始画面与播放周边要有显著提示标识; 国标另要求
-#: **文字高度 ≥ 画面最短边的 5%**、**持续时长 ≥ 2 秒**。本实现取"全程左上角角标",
-#: 一次满足起始/周边/中间/末尾四个位置, 字号按最短边 7.9% (字面率实测值换算来的,
-#: 见 AIGC_LABEL_GLYPH_RATIO 与 aigc_badge_font_size)。
+#: 显式标识 (§ 4-四) 里写"**应当**"的只有两处: 视频**起始画面**与视频**播放周边**;
+#: "末尾/整个播放期间"那半句的措辞是"可以"。国标对视频另给量化线: **持续时长不应
+#: 少于 2 秒**(标准正文摘录可见), **文字高度 ≥ 画面最短边的 5%**(5% 这句在标准里
+#: 逐字见于**图片**条款, 视频条款由两处合规解读转述为同一口径, 本仓按此实现)。
+#: 本实现取"**开场 AIGC_LABEL_ON_SECONDS 秒 + 左下角 + 字芯擦在 5% 线上**":
+#: 起始画面与 ≥2s 持续由角标满足; **放弃全程常驻**, "播放周边"这一条改由 mp4
+#: 元数据(隐式标识)与发布端 `--declaration 内容由AI生成` 承担 —— 这是相对旧实现
+#: (贯穿全片左上角)刻意收窄的姿态, 记在 routes/news/ARCHITECTURE.md D8。
 #: 隐式标识 (§ 5 + 国标附录): 文件元数据里加**字段名含 AIGC** 的扩展字段, 值是 JSON:
 #:   {"Label","ContentProducer","ProduceID","ReservedCode1",
 #:    "ContentPropagator","PropagateID","ReservedCode2"}
@@ -121,19 +126,39 @@ AIGC_LABEL_TEXT = "AI 生成合成内容"
 #: 国标量的"文字高度"是**字形实际高度**, ASS 的 FontSize 是 em 高度, 两者差一个
 #: 字面率。2026-09-29 端到端成片实测(Microsoft YaHei / 1080×1920 / 取整帧量白色
 #: 字芯): FontSize 70 → 字芯 51px, 即 ratio = 0.729 —— 而 5% 线要的是 54px,
-#: 所以"字号按 5% 取"当场不合规。字号 = 线 / ratio, 再乘余量 AIGC_LABEL_HEADROOM
-#: (换字体的字面率只会更低不会更高, 1.15 是把这一档余量写实, 不是审美)。
+#: 所以"字号按 5% 取"当场不合规。字号 = ⌈线 / ratio⌉(见 aigc_badge_font_size)。
+#: ⚠️ 0.729 只对 ASS_HEADER 里 pin 住的那个字体成立, 而擦边字号**没有余量**兜它:
+#:    换字体、或渲染机上没有该字体让 libass 静默回退到字面率更低的 CJK 字体时,
+#:    字芯会掉到线以下, 且三道闸一道都不会红。旧实现乘 1.15 买的就是这个保险,
+#:    现在按"擦到最小"的要求把余量退了回去 —— 改字体或换机器必须重量一次。
 AIGC_LABEL_GLYPH_RATIO = 0.729
 AIGC_LABEL_FLOOR_FRAC = 0.05
-AIGC_LABEL_HEADROOM = 1.15
-AIGC_LABEL_SHORT_SIDE_FRAC = round(AIGC_LABEL_FLOOR_FRAC / AIGC_LABEL_GLYPH_RATIO
-                                  * AIGC_LABEL_HEADROOM, 4)
+#: 显式角标在**开场常驻**的时长(秒)。国标线是 2s, 取 4s = 线的两倍: 第 1 镜常常
+#: 短于 4s, 多出来的这一档让角标跨进第 2 镜, 不至于"刚出现就跟着切镜没了"。
+AIGC_LABEL_ON_SECONDS = 4.0
 AIGC_LABEL_MARGIN_W_FRAC = 0.045     # 距左边 = 宽 * 0.045
-AIGC_LABEL_MARGIN_H_FRAC = 0.022     # 距顶边 = 高 * 0.022 (避开状态栏/刘海区)
+#: 角标墨迹与**内容禁入线**、**字幕块顶**各侧至少留出的高(像素)。整条带只有 92px
+#: 而墨迹(字芯+描边+阴影)占 65px, 所以这个数不是装饰而是**报出这条带有多挤**: 谁改了
+#: 字号、字幕行数或底边距而没重算带, 先在这里红, 不要等成片压字。
+AIGC_LABEL_BAND_GAP_PX = 8
+#: 实测(Microsoft YaHei / FontSize 75 / 黑底单烧 ASS 只留 AIGC 一条, 取当前 mv=303):
+#: 白色字芯占 y 1555–1609, 而 MarginV 定义的"行盒底"在 y=1920−303=1617 ——
+#: 字芯下面还有 **8px 下伸部空白**。底边距不扣这一档, 画出来的角标就比模型高 8px。
+#: 2026-09-29 复测的真错: 旧推导没扣, 于是模型报"上侧留 13px", 按 8px 反算实画只剩
+#: 5px(角标几乎贴上内容下界 1536)。上面那三个 y 全部可用 `verify_aigc_badge.py` 重取。
+#: ⚠️ 这一档**随字号缩放**(实测约 0.10 em: 75 号→8px, 60 号→7px), 不是普适常数。
+#: 现在只在 AIGC 字号那一个点用它; 改 AIGC_LABEL_FLOOR_FRAC 或改最短边基准后必须
+#: 用 `verify_aigc_badge.py` 重量一遍, 它会把实测与模型逐侧差报出来。
+AIGC_LABEL_LINE_SLACK_PX = 8
+#: AIGC 样式的阴影厚度; ASS_HEADER 用 {aigc_sh} 取它, 阴影只朝右下各扩这一档。
+AIGC_LABEL_SHADOW_PX = 1
+#: 角标描边 = round(字号 / 本值) → 75 号给 5px。与字幕描边(ASS_OUTLINE_H_FRAC,
+#: 按画面高算)是两套: 角标描边要跟字高一起缩放, 按画面高算会在横屏上粗过字本身。
+AIGC_LABEL_OUTLINE_EM_DIV = 16
 AIGC_PRODUCE_ID_BYTES = 32           # 内容编号取渲染产物哈希的前 N 位十六进制
 AIGC_INTEGRITY_CODE_BYTES = 40       # ReservedCode1 取哈希的前 N 位十六进制
 #: 显式标识最短持续时长(秒)。国标对视频显式标识的量化线: 文字高度 ≥ 最短边 5%、
-#: 持续 ≥ 2 秒。本实现让角标贯穿全片, 但**仍要挡**住"片长不足 2 秒"的极端输入 ——
+#: 持续 ≥ 2 秒。角标虽只开 4 秒, **仍要挡**住"片长不足 2 秒"的极端输入 ——
 #: 那种片子必须补时长或改人工加标, 不能假装合规。
 AIGC_LABEL_MIN_SECONDS = 2.0
 
@@ -295,7 +320,7 @@ YCbCr Matrix: TV.709
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,{font},{fs},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,{ol},1,2,{ml},{mr},{mv},134
-Style: AIGC,{font},{aigc_fs},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,{aigc_ol},1,7,{aml},{amr},{amv},134
+Style: AIGC,{font},{aigc_fs},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,{aigc_ol},{aigc_sh},1,{aml},{amr},{amv},134
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -556,26 +581,133 @@ def collect_cues(sub_files, durations, line_chars, max_lines=CAPTION_MAX_LINES):
 
 
 def aigc_badge_font_size(w: int, h: int) -> int:
-    """AIGC 角标字号 = 画面**最短边** × AIGC_LABEL_SHORT_SIDE_FRAC。
+    """AIGC 角标字号 = ⌈画面**最短边** × 5% ÷ 实测字面率⌉, 也就是"擦到线上"。
 
     两条容易踩空的量纲, 都在这里处理:
 
     1. **按最短边, 不按高度**。国标写的是"画面最短边的 5%": 竖屏 1080×1920 最短边是
        宽 1080(线 = 54px), 横屏 1920×1080 最短边反过来是**高** 1080 —— 拿高度当基准
        写死会在横屏上算错。
-    2. **字号 ≠ 字高**。ASS 的 FontSize 是 em 高度, 国标量的是字形实际高度。
-       0.065 这一档是**推**出来的、错的: 端到端成片实测(Microsoft YaHei,
-       1080×1920, FontSize 70)白色字芯只有 51px, 字面率 0.729, 低于 54px 的线 ——
-       也就是说上一版按 6.5% 出的片**并不合规**, 而它自己不会报错。
-       现在把实测字面率写成 AIGC_LABEL_GLYPH_RATIO, 字号 = 5% / 0.729 × 1.15
-       ≈ 最短边 7.89% → 竖屏 FontSize 85 → 字芯约 62px(线的 115%)。
+    2. **字号 ≠ 字高**。ASS 的 FontSize 是 em 高度, 国标量的是字形实际高度, 中间差
+       一个实测字面率(0.729, 见 AIGC_LABEL_GLYPH_RATIO)。1080 短边 → 54px 线 →
+       FontSize = ⌈54 / 0.729⌉ = **75** → 字芯 54.7px = 最短边 **5.06%**。
+
+    **为什么是 ceil 而不是 round**: round(54 / 0.729) = 74 → 字芯 53.9px, 比线低
+    0.1px。取整风格在这里不是审美问题, 四舍五入会直接把片子弹到合规线以下,
+    而且不报错 —— 擦边只许向上。
 
     残余风险(如实写): 0.729 是**这一台机器、这一个字体、这一个分辨率**上量来的,
-    不是通用常数。换 pack / 换字体 / 改输出分辨率后必须重量一次(成片取一帧, 量左上角
-    白色字芯的纵向像素数 ÷ FontSize), 别默认推导值够用; `aigc.json` 里落了
-    font_size_px 与 short_side_px, 对着 contact-sheet.jpg 就能核。
+    不是通用常数。现在字号贴线, 一旦字体回退就没人兜住(见 AIGC_LABEL_GLYPH_RATIO
+    的 ⚠️); 换 pack / 换字体 / 换机器后必须重量一次(成片取一帧, 量左下角白色字芯的
+    纵向像素数 ÷ FontSize)。`aigc.json` 里落了 font_size_px / glyph_height_px /
+    short_side_px / margin_v_px, 对着 contact-sheet.jpg 第 1 镜就能核。
     """
-    return max(1, int(round(min(w, h) * AIGC_LABEL_SHORT_SIDE_FRAC)))
+    return max(1, math.ceil(min(w, h) * AIGC_LABEL_FLOOR_FRAC / AIGC_LABEL_GLYPH_RATIO))
+
+
+def aigc_badge_outline(fs: int) -> int:
+    """角标描边厚度 = round(字号 / AIGC_LABEL_OUTLINE_EM_DIV), 下限 1px。
+
+    从 build_ass 的内联表达式提成函数, 不是为好看: **自测要用同一个数算墨迹边界**
+    (aigc_badge_ink_bounds), 描边既是画出来的东西也是几何量, 两处各写一遍迟早会
+    算出两个答案。
+    """
+    return max(1, int(round(fs / AIGC_LABEL_OUTLINE_EM_DIV)))
+
+
+def aigc_badge_ink_bounds(w: int, h: int, mv: int) -> tuple[float, float]:
+    """底边距为 mv 时, 角标**墨迹**(字芯 + 描边 + 阴影)的 y 上界与下界。
+
+    ASS 对底部对齐的 MarginV 指的是**行盒底到画面底**, 既不是字芯底也不是墨迹底,
+    这三层换算全部在这里做, 不许在调用方各补一次:
+
+    ```
+    行盒底 = h − mv
+    字芯底 = 行盒底 − 下伸部空白(实测 8px, 见 AIGC_LABEL_LINE_SLACK_PX)
+    字芯顶 = 字芯底 − 字号 × 字面率
+    墨迹顶 = 字芯顶 − 描边            墨迹底 = 字芯底 + 描边 + 阴影(阴影只朝右下)
+    ```
+
+    模型对真渲染复测过(2026-09-29, news-policy 1080×1920, **当前取值** mv=303, 命令见
+    `verify_aigc_badge.py` 与其验证记录 §2.3): 同一份 ASS 烧与不烧同一帧相减, 实测墨迹
+    y **1549–1615**、白色字芯 **1555–1609**(55px); 本函数报 1549.3–1615.0 —— 上侧差
+    0.3px(抗锯齿)、下侧 0.0px。**不扣下伸部空白**的旧模型在同一个 mv 上报 1557.3–1623.0,
+    整整低 8px —— 旧实现就是带着这 8px 选出 mv=311, 自称"上侧留 13px"而实画只有 5px。
+    """
+    fs = aigc_badge_font_size(w, h)
+    ol = aigc_badge_outline(fs)
+    glyph_bottom = h - mv - AIGC_LABEL_LINE_SLACK_PX
+    return (glyph_bottom - fs * AIGC_LABEL_GLYPH_RATIO - ol,
+            glyph_bottom + ol + AIGC_LABEL_SHADOW_PX)
+
+
+def aigc_badge_band_bounds(w: int, h: int) -> tuple[int, int]:
+    """把角标整块墨迹塞进"内容禁入线之下、字幕块顶之上"这条带, 解出 mv 的上下界。
+
+    返回 (下界 lo, 上界 hi) —— **是像素底边距的允许区间, 不是 y 坐标**; hi < lo 就是
+    这条带装不下(横屏必然如此, 见 aigc_badge_margin_v)。
+
+    ```
+    字幕块顶 = h − 字幕底边距 − 封顶行数 × 字幕字号
+    内容下界 = h × (1 − layout_selfcheck.CAPTION_RESERVE_CQH/100)      # 20cqh → 0.80
+    带顶约束 墨迹顶 ≥ 内容下界 + G  →  mv ≤ h − 空白 − 字芯 − 描边 − 内容下界 − G
+    带底约束 墨迹底 ≤ 字幕块顶 − G  →  mv ≥ h − 空白 + 描边 + 阴影 − 字幕块顶 + G
+    ```
+
+    取整一律向带内收(hi 向下取整、lo 向上取整): 边界算窄了角标只是挪几个像素,
+    算宽了就是压字。
+    """
+    fs = aigc_badge_font_size(w, h)
+    ol = aigc_badge_outline(fs)
+    glyph = fs * AIGC_LABEL_GLYPH_RATIO
+    gap = AIGC_LABEL_BAND_GAP_PX
+    content_floor = h * (1 - layout_selfcheck.CAPTION_RESERVE_CQH / 100)
+    subtitle_top = (h - int(h * ASS_MARGIN_BOTTOM_H_FRAC)
+                    - CAPTION_MAX_LINES * caption_font_size(h))
+    lo = math.ceil(h - AIGC_LABEL_LINE_SLACK_PX + ol + AIGC_LABEL_SHADOW_PX
+                   - subtitle_top + gap)
+    hi = math.floor(h - AIGC_LABEL_LINE_SLACK_PX - glyph - ol - content_floor - gap)
+    return lo, hi
+
+
+def aigc_badge_margin_v(w: int, h: int) -> int:
+    """左下角标距**画面底边**的 MarginV —— 由带上下界取中, 不许手填像素。
+
+    竖屏 1080×1920 用实测常量全程解(aigc_badge_band_bounds, 与 build_ass 烧的同一套):
+
+    ```
+    字幕块顶 1628 · 内容下界 1536 · 可用带 92px
+    角标自身  字芯 54.675 + 上下描边 10 + 阴影 1 = 65.7px, 再加行盒下空白 8px
+    lo = 1920 − 8 + 5 + 1 − 1628 + 8 = 298      hi = 1920 − 8 − 54.675 − 5 − 1536 − 8 = 308
+    mv = (298 + 308) / 2 = 303  →  墨迹 1549.3–1615, 上侧 13px / 下侧 13px
+    ```
+
+    **取中而不是贴边**: 带内只有 10px 可调, 贴任何一侧就把那一侧压到判据线 8px 上
+    (抗锯齿再吃 1px 即红), 而另一侧白送 10px; 取中让两侧各 13px, 离红线都有 5px 缓冲,
+    也让自测能锁住"两侧各 ≥ AIGC_LABEL_BAND_GAP_PX"这个真判据。
+
+    旧值 311 是"字幕块顶 − 固定间隙"直接反推出来的, 没扣行盒下空白, 于是模型里的
+    13px 在画面上只有 5px(1549.3 − 8 = 实画 1541, 距内容下界 1536)。2026-09-29 复测改正。
+
+    带装不下时(横屏 1920×1080: 带 51px < 墨迹 65.7px, lo=171 > hi=140)返回 **lo** ——
+    即"宁可压进底部 20cqh 的内容预留带, 也不压 burned 字幕": 字幕压角标是两层文字
+    叠在一起、两边都读不出, 而内容预留带本来就允许在极端画面上被侵占(代价写进
+    `build_ass` 与本函数返回值的实测记录, 不靠注释兜)。
+    """
+    lo, hi = aigc_badge_band_bounds(w, h)
+    if lo > hi:
+        return lo
+    return (lo + hi) // 2
+
+
+def aigc_badge_seconds(total_seconds: float) -> float:
+    """角标持续时长 = min(AIGC_LABEL_ON_SECONDS, 全片时长)。
+
+    截到开场 4 秒是取舍; **向片长取小**不是取舍而是算术 —— 事件终点不许越过最后一
+    帧。不足 AIGC_LABEL_MIN_SECONDS 的短片这里原样返回, 由 mux_and_burn 在唯一出口
+    停机, 免得两条路径各挡一遍、各说一套。
+    """
+    return min(AIGC_LABEL_ON_SECONDS, total_seconds)
 
 
 def build_ass(cues, w: int, h: int, font: str = "Microsoft YaHei",
@@ -586,15 +718,16 @@ def build_ass(cues, w: int, h: int, font: str = "Microsoft YaHei",
     ⚠️ 不要用 subtitles 的 force_style 调字号: libass 读 VTT 时脚本坐标默认
     只有 288 高, FontSize=36 会被放大到画面 12% 高, 竖屏上直接溢出屏幕。
 
-    AIGC 显式标识: `aigc_text` 非空且 `aigc_seconds` > 0 时, 额外挂一条**贯穿全片**
-    的 `AIGC` 样式事件(Alignment 7 = 左上角, Layer 1 压在字幕之上), 一次满足
-    《标识办法》§ 4-四 的"起始画面 + 播放周边 + 中间 + 末尾"与国标"持续 ≥ 2 秒"。
-    为什么落左上角(实测 news-coral 各版式): 右上角被 36cqw 的壁纸序号占了
-    (top:3cqh / right:4cqw, 横向约 62→96cqw), 下方 y≥0.80 是字幕带; 左上角这条
-    (竖屏 1080×1920 实测量: MarginL 48px≈4.4cqw, FontSize 85 → 字芯 62px,
-    "AI 生成合成内容" 九字符占 522px≈48.3cqw, 纵向 57→118px≈6.1cqh)是全片唯一
-    无人认领的区域 —— 离 62cqw 的序号还剩约 14cqw 间隙, 眉标从 17cqh 才起。
-    换 pack / 换字号后这个间隙要重算, 别默认它永远不撞。
+    AIGC 显式标识: `aigc_text` 非空且 `aigc_seconds` > 0 时, 额外挂一条**开场**的
+    `AIGC` 样式事件(Alignment 1 = 左下角, Layer 1 压在字幕之上), 满足《标识办法》
+    § 4-四 的"起始画面"与国标"持续 ≥ 2 秒"; 时长由调用方按 aigc_badge_seconds() 给。
+    为什么落左下角(实测 news-coral / news-policy 各版式): 底部 20cqh 是 frame.md
+    法则 1 给字幕留的禁入带, `layout_selfcheck` 以 CAPTION_RESERVE_INTRUDED 守它,
+    所以 y≥1536 **从来没有版式内容**; 两行字幕块顶实测 1628 —— 1536–1628 这 92px
+    是全片唯一既不属于内容也不属于字幕的空档(推导见 aigc_badge_margin_v)。
+    代价(如实写): 左下角正是抖音标题/头像那一层的叠加区, 平台 UI 会盖在角标上面
+    —— 旧实现落左上角避开的就是这一层, 现在按用户取舍换过来了。
+    换 pack / 换字号 / 改字幕行数后这条带要重算, 别默认它永远不撞。
     """
     aigc_fs = aigc_badge_font_size(w, h)
     header = ASS_HEADER.format(
@@ -604,9 +737,10 @@ def build_ass(cues, w: int, h: int, font: str = "Microsoft YaHei",
         ml=int(w * ASS_MARGIN_W_FRAC), mr=int(w * ASS_MARGIN_W_FRAC),
         mv=int(h * ASS_MARGIN_BOTTOM_H_FRAC),
         aigc_fs=aigc_fs,
-        aigc_ol=max(1, int(round(aigc_fs / 16))),
+        aigc_ol=aigc_badge_outline(aigc_fs),
+        aigc_sh=AIGC_LABEL_SHADOW_PX,
         aml=int(w * AIGC_LABEL_MARGIN_W_FRAC), amr=int(w * AIGC_LABEL_MARGIN_W_FRAC),
-        amv=int(h * AIGC_LABEL_MARGIN_H_FRAC),
+        amv=aigc_badge_margin_v(w, h),
     )
     events = [
         f"Dialogue: 0,{ass_time(s)},{ass_time(e)},Default,,0,0,0,,{text}"
@@ -1839,9 +1973,11 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
                  aigc_label: str = AIGC_LABEL_TEXT):
     """拼配音 → 烧 ASS 字幕(含 AIGC 显式角标) → 写 AIGC 隐式元数据 → 读回核验。
 
-    `aigc_badge_seconds` 是角标持续时长, 主流程传全片时长(贯穿); 低于
-    `AIGC_LABEL_MIN_SECONDS` 直接停机 —— 《标识办法》§ 4-四 要视频起始画面与播放
-    周边有显著标识, 国标另量化了"文字高度 ≥ 最短边 5%、持续 ≥ 2 秒"两条线。
+    `aigc_badge_seconds` 是角标持续时长, 主流程传 `aigc_badge_seconds(全片时长)`
+    (= 开场 4 秒, 片长不足则等于片长); 低于 `AIGC_LABEL_MIN_SECONDS` 直接停机 ——
+    国标量化了"文字高度 ≥ 最短边 5%、持续 ≥ 2 秒"两条线, 而《标识办法》§ 4-四 的
+    "应当"落在**起始画面**与**播放周边**: 前者由这条 4 秒角标满足, 后者由下面那份
+    隐式元数据 + 发布端自主声明满足(取舍记在 routes/news/ARCHITECTURE.md D8)。
     隐式标识按 GB 45438-2025 附录 E 写进容器元数据, 写完 ffprobe 读回核验,
     不一致就抛 EmitterError。字幕轨为空时降级为只合成音频(不许让成片不可用)。
     返回真正落到文件里的那份标识 JSON, 供调用方落 sidecar 备查。
@@ -1854,7 +1990,7 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
             "请填生成者名称: --aigc-producer <你的频道/主体名>")
     if aigc_badge_seconds < AIGC_LABEL_MIN_SECONDS:
         raise EmitterError(
-            f"全片时长只有 {aigc_badge_seconds:.2f}s, 贯穿式角标达不到国标 "
+            f"全片时长只有 {aigc_badge_seconds:.2f}s, 开场角标达不到国标 "
             f"{AIGC_LABEL_MIN_SECONDS}s 的显式标识持续下限 —— 补足内容, "
             "或在剪辑端另加一条 ≥2s 的显著标识后再交付")
     narr = os.path.join(work_dir, "narration.mp3")
@@ -1961,7 +2097,8 @@ def main():
                          + DEFAULT_AIGC_PRODUCER + "。正式发布建议填账号主体名称 "
                          "(GB 45438-2025 允许写名称; 不要填身份证号等个人敏感信息)")
     ap.add_argument("--aigc-label", default=AIGC_LABEL_TEXT,
-                    help="显式角标文字(默认 %(default)s), 贯穿全片显示在左上角")
+                    help=f"显式角标文字(默认 %(default)s), 开场 "
+                         f"{AIGC_LABEL_ON_SECONDS:g} 秒常驻左下角")
     ap.add_argument("--fps", type=int, default=DEFAULT_FPS, help=f"渲染帧率 (默认 {DEFAULT_FPS})")
     ap.add_argument("--quality", default=DEFAULT_QUALITY, choices=QUALITY_CHOICES,
                     help=f"渲染质量 (默认 {DEFAULT_QUALITY})")
@@ -2069,15 +2206,19 @@ def main():
         final = args.output
         os.makedirs(os.path.dirname(os.path.abspath(final)) or ".", exist_ok=True)
         log(f"→ ffmpeg 合成最终视频: {final}")
-        # 显式标识时长 = 全片时长(贯穿), 由 mux_and_burn 卡 ≥ AIGC_LABEL_MIN_SECONDS:
-        # 单镜短片的真实时长可以低到 MIN_SLOT_SECONDS(1s), 达不到国标 2 秒线, 必须挡。
-        badge_seconds = sum(durations)
+        # 显式标识时长 = 开场 AIGC_LABEL_ON_SECONDS 秒(不足则等于全片时长),
+        # 由 mux_and_burn 卡 ≥ AIGC_LABEL_MIN_SECONDS: 单镜短片的真实时长可以低到
+        # MIN_SLOT_SECONDS(1s), 达不到国标 2 秒线, 必须挡。
+        badge_seconds = aigc_badge_seconds(sum(durations))
         aigc_meta = mux_and_burn(silent, audio_files, cues, work, final, w, h,
                                  aigc_badge_seconds=badge_seconds,
                                  aigc_producer=args.aigc_producer,
                                  aigc_label=args.aigc_label)
         # 标识台账: 发布环节(douyin-upload)要照着它做平台侧自主声明,
         # 监管要举证时也拿这份对着成片核。只随成片走, 不进工作目录。
+        # glyph_height_px 是**合规线上真正被量的那个数**(字芯高, 不是 em 高),
+        # 落进台账就不用举证时再让人重算一遍字面率。
+        badge_fs = aigc_badge_font_size(w, h)
         write_text(os.path.join(os.path.dirname(os.path.abspath(final)), "aigc.json"),
                    json.dumps({
                        "file": os.path.basename(final),
@@ -2085,9 +2226,11 @@ def main():
                        "implicit": json.loads(aigc_meta),
                        "explicit": {
                            "text": args.aigc_label,
-                           "position": "top-left",
-                           "font_size_px": aigc_badge_font_size(w, h),
+                           "position": "bottom-left",
+                           "font_size_px": badge_fs,
+                           "glyph_height_px": round(badge_fs * AIGC_LABEL_GLYPH_RATIO, 1),
                            "short_side_px": min(w, h),
+                           "margin_v_px": aigc_badge_margin_v(w, h),
                            "shown_seconds": round(badge_seconds, 3),
                            "burned_in": True,
                        },

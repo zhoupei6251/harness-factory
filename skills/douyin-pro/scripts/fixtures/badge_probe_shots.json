@@ -1,0 +1,88 @@
+[
+  {
+    "no": 1,
+    "layout": "hook",
+    "start": 0.0,
+    "dur": 9.12,
+    "composition_id": "np-hook",
+    "ground": "light",
+    "values": {
+      "kicker": "探针·新规",
+      "headTop": "门诊新规",
+      "headBottomLead": "全国执行",
+      "headAccent": "10月起",
+      "support": "探针屏句·请勿发布",
+      "slotSeconds": 9.12
+    }
+  },
+  {
+    "no": 2,
+    "layout": "catalog",
+    "start": 9.12,
+    "dur": 11.808,
+    "composition_id": "np-catalog",
+    "ground": "light",
+    "values": {
+      "kicker": "探针·条文",
+      "title": "探针三条要点",
+      "step1Label": "探针第一条标题",
+      "step1Body": "第一条说明文字, 用来压 42 字上限的换行行为。",
+      "step2Label": "探针第二条标题",
+      "step2Body": "第二条说明文字, 比第一条短一点看留白是否均匀。",
+      "step3Label": "探针第三条标题",
+      "step3Body": "第三条说明文字, 末行没有发丝线所以要单独看一眼。",
+      "slotSeconds": 11.808
+    }
+  },
+  {
+    "no": 3,
+    "layout": "story",
+    "start": 20.927999999999997,
+    "dur": 9.504,
+    "composition_id": "np-story",
+    "ground": "dark",
+    "values": {
+      "kicker": "探针·解读",
+      "ordinal": "03",
+      "tone": "dark",
+      "title": "探针领句占位用",
+      "onscreen": "探针屏句·请勿发布",
+      "slotSeconds": 9.504
+    }
+  },
+  {
+    "no": 4,
+    "layout": "rail",
+    "start": 30.431999999999995,
+    "dur": 9.24,
+    "composition_id": "np-rail",
+    "ground": "light",
+    "values": {
+      "kicker": "探针·时间线",
+      "title": "探针三步走",
+      "ordinal": "04",
+      "item1Label": "探针征求意见",
+      "item1Value": "2026.03",
+      "item2Label": "探针正式发布",
+      "item2Value": "2026.07",
+      "item3Label": "探针全面施行",
+      "item3Value": "2026.10",
+      "slotSeconds": 9.24
+    }
+  },
+  {
+    "no": 5,
+    "layout": "closer",
+    "start": 39.672,
+    "dur": 10.344,
+    "composition_id": "np-closer",
+    "ground": "dark",
+    "values": {
+      "kicker": "探针·行动",
+      "cta": "探针行动句",
+      "ctaAccent": "后缀",
+      "channel": "探针·模拟来源",
+      "slotSeconds": 10.344
+    }
+  }
+]

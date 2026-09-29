@@ -727,6 +727,8 @@ def t_placeholder_pack_stops_at_load():
 # "Style: AIGC" 吃掉第 0 列): 下标错了不是断言失效, 就是 int() 崩在颜色串上。
 S_FONT_SIZE = 2
 S_BORDER_STYLE = 15
+S_OUTLINE = 16      # 描边也画字, 算角标的视觉高度时必须一起算
+S_SHADOW = 17
 S_ALIGNMENT = 18
 S_MARGIN_L = 19
 S_MARGIN_R = 20
@@ -741,10 +743,12 @@ def _aigc_ass(aigc_seconds=30.0):
                         aigc_text=pb.AIGC_LABEL_TEXT, aigc_seconds=aigc_seconds)
 
 
-def t_aigc_badge_event_present_and_persistent():
-    # 显式标识: 一条 Layer 1、从 0 起到全片末的 AIGC 事件(贯穿 = 一次满足
-    # 起始/周边/中间/末尾四个位置), 且压在字幕层之上。
-    ass = _aigc_ass(aigc_seconds=11.928)
+def t_aigc_badge_event_covers_the_opening():
+    # 显式标识: 一条 Layer 1、从第 0 秒起、只覆盖开场窗(AIGC_LABEL_ON_SECONDS)的
+    # AIGC 事件, 且压在字幕层之上。《标识办法》§ 4-四 写"应当"的只有**起始画面**
+    # 与**播放周边**, "末尾/全程"那半句是"可以" —— 所以开场窗满足的是"应当"那一半,
+    # "周边"改由 mp4 隐式元数据 + 发布端自主声明承担(取舍记在 ARCHITECTURE D8)。
+    ass = _aigc_ass(aigc_seconds=pb.AIGC_LABEL_ON_SECONDS)
     line = [ln for ln in ass.splitlines() if ln.startswith("Dialogue") and ",AIGC," in ln]
     assert len(line) == 1, f"AIGC 事件应恰好 1 条, 实得 {len(line)}: {line}"
     cols = line[0].split(",")
@@ -755,7 +759,19 @@ def t_aigc_badge_event_present_and_persistent():
     # ASS 时间戳只到百分之一秒, 允许这一档量化差。
     h_, m_, rest = cols[D_END].split(":")
     sec = int(h_) * 3600 + int(m_) * 60 + float(rest)
-    assert abs(sec - 11.928) <= 0.01, f"AIGC 事件必须贯穿到全片末, 实得 {cols[D_END]}"
+    assert abs(sec - pb.AIGC_LABEL_ON_SECONDS) <= 0.01, (
+        f"开场窗应为 {pb.AIGC_LABEL_ON_SECONDS}s, 实得 {cols[D_END]}")
+    assert sec >= pb.AIGC_LABEL_MIN_SECONDS, (
+        f"开场窗 {sec}s 低于国标 {pb.AIGC_LABEL_MIN_SECONDS}s 持续线")
+
+
+def t_aigc_badge_seconds_capped_at_on_seconds():
+    # 长片只开 AIGC_LABEL_ON_SECONDS 秒; 比它短的片子角标跨全片 —— 事件终点不许越过
+    # 最后一帧(这是算术, 不是取舍)。短到不足 2s 的**原样返回**, 挡在 mux_and_burn。
+    assert pb.aigc_badge_seconds(59.3) == pb.AIGC_LABEL_ON_SECONDS
+    assert pb.aigc_badge_seconds(pb.AIGC_LABEL_ON_SECONDS) == pb.AIGC_LABEL_ON_SECONDS
+    assert pb.aigc_badge_seconds(3.0) == 3.0
+    assert pb.aigc_badge_seconds(1.5) == 1.5, "1.5s 要原样交给停机判定, 这里不许夹"
 
 
 def t_aigc_badge_absent_when_no_seconds():
@@ -765,9 +781,9 @@ def t_aigc_badge_absent_when_no_seconds():
     assert ",AIGC," not in ass, "0 秒时长不该产出 AIGC 事件"
 
 
-def t_aigc_badge_style_is_top_left_and_legible():
-    # Alignment 7 = 左上; BorderStyle 1 = 描边+阴影(彩底上唯一稳妥的可读性来源);
-    # 字号按最短边推, 且推导后的**字芯**要够到国标 5% 线(留 15% 余量)。
+def t_aigc_badge_style_is_bottom_left_at_floor():
+    # Alignment 1 = 左下; BorderStyle 1 = 描边+阴影(彩底上唯一稳妥的可读性来源);
+    # 字号**擦在**国标 5% 线上: 字芯 ≥ 线, 又不超出线一整档(=1px em 的取整粒度)。
     style = [ln for ln in _aigc_ass().splitlines() if ln.startswith("Style: AIGC,")]
     assert len(style) == 1, f"缺 AIGC 样式行: {style}"
     cols = style[0].split(",")
@@ -775,21 +791,40 @@ def t_aigc_badge_style_is_top_left_and_legible():
     font_size = int(cols[S_FONT_SIZE])
     border_style = int(cols[S_BORDER_STYLE])
     alignment = int(cols[S_ALIGNMENT])
-    assert alignment == 7, f"AIGC 角标 Alignment 应为 7(左上), 实得 {alignment}"
+    assert alignment == 1, f"AIGC 角标 Alignment 应为 1(左下), 实得 {alignment}"
     assert border_style == 1, f"AIGC 角标 BorderStyle 应为 1(描边+阴影), 实得 {border_style}"
     # 边角性: 国标要求显式标识落在"边角", 边距必须是薄边而不是居中偏移。
     ml, mr, mv = int(cols[S_MARGIN_L]), int(cols[S_MARGIN_R]), int(cols[S_MARGIN_V])
     assert ml == int(1080 * pb.AIGC_LABEL_MARGIN_W_FRAC) == mr, f"左右边距不符: {ml}/{mr}"
-    assert mv == int(1920 * pb.AIGC_LABEL_MARGIN_H_FRAC), f"顶边距不符: {mv}"
-    assert ml < 1080 * 0.1 and mv < 1920 * 0.1, (
-        f"标识必须贴边角, 实得 MarginL={ml} MarginV={mv}")
+    assert mv == pb.aigc_badge_margin_v(1080, 1920), (
+        f"底边距不是从字幕几何推出来的: 实得 {mv}, 应为 {pb.aigc_badge_margin_v(1080, 1920)}")
+    # 边角性: 国标要求显式标识落在"边角"。这层意思在两个方向上**不等价**:
+    #   水平 —— MarginL 必须是薄边(48px), 不能是居中偏移;
+    #   垂直 —— 底边距 303px 不是薄边, 它是为了让开两行字幕块(aigc_badge_margin_v),
+    #           而"仍在画面底角"由 t_aigc_badge_sits_in_the_gap_between_content_and_
+    #           subtitles 断言(角标整块落在底部 20cqh 带内, 视觉上就是左下角)。
+    # 所以垂直只挡"别退到画面中间去": 超过底部四分之一(480px)就不叫边角了。
+    assert ml < 1080 * 0.1, f"标识必须贴左边(薄边而非居中偏移), 实得 MarginL={ml}"
+    assert mv < 1920 * 0.25, f"底边距越过底部四分之一, 已不是边角标识, 实得 MarginV={mv}"
     # FontSize 是 em 高, 国标量的是字芯高: 用实测字面率换算后才可比。
     glyph_h = font_size * pb.AIGC_LABEL_GLYPH_RATIO
     floor = min(1080, 1920) * pb.AIGC_LABEL_FLOOR_FRAC
     assert glyph_h >= floor, (
         f"字芯 {glyph_h:.1f}px < 国标线 {floor:.1f}px(最短边 5%): 不合规"
     )
+    # 上界同样是合规语义: 字号每 +1px em, 字芯就 +0.729px。超过 floor + ratio 就
+    # 意味着有人把"擦到最小"又换回了带余量的档位 —— 那条余量是旧实现的保险, 现在
+    # 由用户明确退掉了, 留着断言是为了让下一次改动是被看见的, 不是悄悄发生的。
+    assert glyph_h < floor + pb.AIGC_LABEL_GLYPH_RATIO, (
+        f"字芯 {glyph_h:.1f}px 比 {floor:.1f}px 的线高出一整档字号: "
+        f"「擦到最小」的要求被改回去了")
     assert font_size == pb.aigc_badge_font_size(1080, 1920), "样式字号与推导函数不一致"
+    # 单行性: WrapStyle 0 会把溢出的第二行**居中**, 左下角标一旦折行就变成居中块,
+    # 既不贴边也会压字幕。宽度用 2026-09-29 成片实测的推进量核, 不按"每字 1 em"估。
+    advance = AIGC_LABEL_MEASURED_ADVANCE_EM / len(pb.AIGC_LABEL_TEXT)
+    right_edge = ml + font_size * advance * len(pb.AIGC_LABEL_TEXT) * AIGC_LABEL_WIDTH_HEADROOM
+    assert right_edge < 1080 - mr, (
+        f"角标右边界 {right_edge:.0f}px 超出可用宽度 {1080 - mr}px → 会折行")
 
 
 def t_aigc_badge_font_size_uses_short_side():
@@ -801,25 +836,74 @@ def t_aigc_badge_font_size_uses_short_side():
 
 
 #: 2026-09-29 成片实测(1080×1920 / Microsoft YaHei / 量白色像素范围): FontSize 85 时
-#: "AI 生成合成内容" 九字符横向占 522px → 总推进宽 522/85 = 6.14 em。
+#: "AI 生成合成内容" 九字符横向占 522px → 总推进宽 522/85 = 6.14 em。取**每 em** 为单位
+#: 是为了让它与字号无关(现在字号是 75, 乘回去就是 75×6.141/9/字 = 460px)。
 #: 这一版之前这里按"每字 1 em"估, 算出 75.3cqw 就把**已经合规**的角标判成越界 ——
 #: 估算模型也得跟成片对一次表, 否则测的是自己的假设而不是渲染结果。
 AIGC_LABEL_MEASURED_ADVANCE_EM = 522 / 85
 AIGC_LABEL_WIDTH_HEADROOM = 1.10
-#: news-coral 右上壁纸序号的左边界(实测 top:3cqh / right:4cqw, 横向 62→96cqw)。
-WALLPAPER_ORDINAL_START_CQW = 62
+#: 左下角标与"版式内容下界 / 字幕块顶"两侧各必须留下的间隙(px), 与
+#: `pb.AIGC_LABEL_BAND_GAP_PX` 同值(函数里第 5 行断言把两者钉在一起, 防止一头改了
+#: 另一头不知道)。这条带总共只有 92px: 擦边字芯 54.7px 加描边阴影共 65.7px, 再加
+#: 行盒下空白 8px, 取中后上下各剩 13px —— 所以这个数不是挑一个刚好能过的值, 而是
+#: **报出这条带有多挤**: 谁改了字号、字幕行数或底边距而没重算带, 就会先在这里红掉,
+#: 而不是等成片压字。
+BADGE_BAND_MIN_GAP_PX = 8
 
 
-def t_aigc_badge_does_not_reach_wallpaper_ordinal():
-    # 左上角这条不许长过去撞上右上角壁纸序号: 两者同在顶部带, 撞了就糊成一团。
-    fs = pb.aigc_badge_font_size(1080, 1920)
-    left = int(1080 * pb.AIGC_LABEL_MARGIN_W_FRAC)
-    em_per_char = AIGC_LABEL_MEASURED_ADVANCE_EM / len(pb.AIGC_LABEL_TEXT)
-    width = fs * em_per_char * len(pb.AIGC_LABEL_TEXT) * AIGC_LABEL_WIDTH_HEADROOM
-    right_edge_cqw = (left + width) / 1080 * 100
-    assert right_edge_cqw < WALLPAPER_ORDINAL_START_CQW, (
-        f"AIGC 角标最右到 {right_edge_cqw:.1f}cqw, 会压上 "
-        f"{WALLPAPER_ORDINAL_START_CQW}cqw 的序号壁纸")
+def t_aigc_badge_sits_in_the_gap_between_content_and_subtitles():
+    # 底部带是算出来的: 版式内容不许进 20cqh 以下(由 layout_selfcheck 的
+    # CAPTION_RESERVE_INTRUDED 在发射前守着), 字幕块顶 = h − 字幕底边距 − 封顶行数
+    # × 字幕字号(实测 1628)。左下角标连描边与阴影一起算, 必须整块夹在这两者中间 ——
+    # 它替代旧的"左上角不撞壁纸序号"断言: 位置一换, 那条测的就是不存在的地带了。
+    w, h = 1080, 1920
+    cols = [ln for ln in _aigc_ass().splitlines() if ln.startswith("Style: AIGC,")][0].split(",")
+    fs, ol, shadow = int(cols[S_FONT_SIZE]), int(cols[S_OUTLINE]), int(cols[S_SHADOW])
+    mv = int(cols[S_MARGIN_V])
+    content_floor = h * (1 - pb.layout_selfcheck.CAPTION_RESERVE_CQH / 100)
+    subtitle_top = (h - int(h * pb.ASS_MARGIN_BOTTOM_H_FRAC)
+                    - pb.CAPTION_MAX_LINES * pb.caption_font_size(h))
+    # ASS 的 MarginV 量到的是**行盒底**, 既不是字芯底也不是墨迹底: 字芯下面还有
+    # 下伸部空白(实测 8px, 见 AIGC_LABEL_LINE_SLACK_PX)。旧断言按"行盒底=字芯底"算,
+    # 于是它跟着 aigc_badge_margin_v 一起自称"上下各 13px", 而真渲染上侧只剩 13−8=5px。
+    glyph_bottom = h - mv - pb.AIGC_LABEL_LINE_SLACK_PX
+    ink_top = glyph_bottom - fs * pb.AIGC_LABEL_GLYPH_RATIO - ol
+    ink_bottom = glyph_bottom + ol + shadow
+    assert pb.AIGC_LABEL_BAND_GAP_PX == BADGE_BAND_MIN_GAP_PX, "两处间隙常量已分叉, 判据不可信"
+    assert ol == pb.aigc_badge_outline(fs), f"样式描边不是推导值: {ol} ≠ {pb.aigc_badge_outline(fs)}"
+    assert shadow == pb.AIGC_LABEL_SHADOW_PX, f"样式阴影不是常量值: {shadow}"
+    assert (ink_top, ink_bottom) == pb.aigc_badge_ink_bounds(w, h, mv), (
+        "自测与 aigc_badge_ink_bounds 算出两条墨迹边界 → 有一处没跟上 ASS 语义")
+    assert content_floor < ink_top < ink_bottom < subtitle_top, (
+        f"角标 {ink_top:.0f}–{ink_bottom:.0f}px 没有落在内容下界({content_floor:.0f}px)"
+        f"与字幕块顶({subtitle_top}px)之间")
+    top_gap = ink_top - content_floor
+    bottom_gap = subtitle_top - ink_bottom
+    assert top_gap >= BADGE_BAND_MIN_GAP_PX and bottom_gap >= BADGE_BAND_MIN_GAP_PX, (
+        f"与两侧间隙过窄: 上 {top_gap:.1f}px / 下 {bottom_gap:.1f}px"
+        f"(线 {BADGE_BAND_MIN_GAP_PX}px; 整条带只有 {subtitle_top - content_floor:.0f}px)"
+        " —— 改字号或字幕几何后必须重算 aigc_badge_margin_v")
+
+
+def t_aigc_badge_landscape_band_yields_to_subtitles():
+    # 横屏 1920×1080: 底部带只有 51px(字幕块顶 915 − 内容下界 864), 而角标墨迹连行盒
+    # 下空白一共要 73.7px —— **装不下**, band_bounds 给 lo > hi。这里测的不是几何而是
+    # 取舍方向: 宁可压进内容预留带, 也不压 burned 字幕。两层文字叠在一起两边都读不出,
+    # 而预留带本来就是"版式内容不许进"的余量, 极端画面上侵占它比糊掉口播字幕轻。
+    w, h = 1920, 1080
+    lo, hi = pb.aigc_badge_band_bounds(w, h)
+    assert lo > hi, (
+        f"横屏这本该是「装不下」的样本, 实得 lo={lo} hi={hi}: 字幕几何或字号变了, 重看这条带")
+    mv = pb.aigc_badge_margin_v(w, h)
+    assert mv == lo, f"装不下时必须落在让开字幕的那一侧(lo), 实得 mv={mv}"
+    subtitle_top = (h - int(h * pb.ASS_MARGIN_BOTTOM_H_FRAC)
+                    - pb.CAPTION_MAX_LINES * pb.caption_font_size(h))
+    content_floor = h * (1 - pb.layout_selfcheck.CAPTION_RESERVE_CQH / 100)
+    ink_top, ink_bottom = pb.aigc_badge_ink_bounds(w, h, mv)
+    assert ink_bottom <= subtitle_top - BADGE_BAND_MIN_GAP_PX, (
+        f"退让后仍压字幕: 墨迹底 {ink_bottom:.1f} > 块顶 {subtitle_top} − 间隙")
+    assert ink_top < content_floor, "侵占内容预留带是这条退让的**代价**, 必须看得见"
+    assert mv < h * 0.25, f"横屏退让后角标已退出底角(mv={mv}), 不再是边角标识"
 
 
 def t_aigc_metadata_shape_follows_gb45438():

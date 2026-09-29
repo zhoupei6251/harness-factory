@@ -145,7 +145,7 @@ python skills/douyin-pro/scripts/path_b_build.py \
 5. hyperframes check --strict（引擎门禁）
 6. HyperFrames 渲染 → silent.mp4
 7. scdet 动量审计（每镜尾段必须仍在变化）
-8. ffmpeg 合成（拼配音 + 烧 ASS 字幕 + **贯穿全片左上角 AIGC 显式角标 + mp4 元数据隐式标识，读回核验**）
+8. ffmpeg 合成（拼配音 + 烧 ASS 字幕 + **开场 4 秒左下角 AIGC 显式角标 + mp4 元数据隐式标识，读回核验**）
 9. 联络表 contact-sheet.jpg（人工验收比对）+ `aigc.json` 标识侧车
 
 回填 MEMORY `videos[].output` + `videos[].render_status: done`。
@@ -188,7 +188,7 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
 4. **产物写 `.harness-news-runtime/`**：稿件/成片落 `articles/`、`videos/`，**不要**写 `.ai-runtime-artifacts/`（code 域）
 5. **Path B only**：本工作流只使用 Path B（`--template` 即可）；不要尝试 Path A（付费路径，不在新闻域使用）
 6. **12 pack 自检先行**：新加的 pack 必须先有 frame.md + host.html + 真 composition 才提交；三道闸必绿
-   （`path_b_selftest.py` 61 项 + `audit_pack_contrast.py` 色板复算 + `layout_selfcheck.py` 结构不变量），
+   （`path_b_selftest.py` 63 项 + `audit_pack_contrast.py` 色板复算 + `layout_selfcheck.py` 结构不变量），
    且版式文件名只许落 `AUTO_LAYOUT_STEMS`（见步骤 1 的重映射提示）
 7. **AIGC 标识不可关**：成片必须同时有画面内角标（①）+ mp4 元数据 `AIGC` 键（②）+ 平台自主声明（③）。
    ①② 由 `path_b_build.py` 无条件产出并自检（读不回元数据即拒绝交付），③ 由发布命令 `--declaration` 提供。
