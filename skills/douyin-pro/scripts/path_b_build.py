@@ -12,7 +12,8 @@ Path B 全链路串联脚本 · 抖音短视频生产专家团
               ──▶ ⑤ check 门禁      (hyperframes check --strict: 不过就不渲染)
               ──▶ ⑥ HyperFrames 渲染 → silent.mp4 (画面)
               ──▶ ⑦ 动量审计        (scdet: 每镜尾段必须仍在变化, 判据 3)
-              ──▶ ⑧ ffmpeg 合成      → 拼音频 + 烧 ASS 字幕 → final.mp4
+              ──▶ ⑧ ffmpeg 合成      → 拼音频 + 烧 ASS 字幕(含 AIGC 角标)
+                                        + 写 AIGC 元数据 → final.mp4 + aigc.json
               ──▶ ⑨ 联络表          (contact-sheet.jpg: 每镜一帧, 供人工验收)
 
 画面不再由本脚本内联拼 HTML(那是旧版"丑"的根源: px 排版 + 单层纯文字 + 无设计系统)。
@@ -48,6 +49,7 @@ Path B 全链路串联脚本 · 抖音短视频生产专家团
 """
 
 import argparse
+import hashlib
 import html
 import json
 import os
@@ -86,6 +88,54 @@ ALL_TEMPLATES = (
 )
 #: --style / --template 选择映射; 选模板看 news-workflow/SKILL.md 的"模板决策树"或
 #: routes/news/MEMORY.md videos[].template 字段 (12 个 pack 任何一个都合法)。
+
+#: 占位 composition 的文件名(=版式名)。每个新 pack 先放它凑齐三层目录, 但它
+#: **不是版式**: `load_style_pack` 直接跳过它, 于是"只有占位"的 pack 会在加载阶段
+#: 就报"没有可用版式", 而不是渲染到第 1 镜才抛"填不满任何版式"(决策 D7)。
+PLACEHOLDER_LAYOUT = "placeholder"
+
+# ------------------------- AIGC 标识 (合规硬要求) -------------------------
+#: 依据: 《人工智能生成合成内容标识办法》(2025-09-01 施行) § 4/§ 5 +
+#: 强制性国标 GB 45438-2025《网络安全技术 人工智能生成合成内容标识方法》。
+#: 显式标识 (§ 4-四): 视频起始画面与播放周边要有显著提示标识; 国标另要求
+#: **文字高度 ≥ 画面最短边的 5%**、**持续时长 ≥ 2 秒**。本实现取"全程左上角角标",
+#: 一次满足起始/周边/中间/末尾四个位置, 字号按最短边 7.9% (字面率实测值换算来的,
+#: 见 AIGC_LABEL_GLYPH_RATIO 与 aigc_badge_font_size)。
+#: 隐式标识 (§ 5 + 国标附录): 文件元数据里加**字段名含 AIGC** 的扩展字段, 值是 JSON:
+#:   {"Label","ContentProducer","ProduceID","ReservedCode1",
+#:    "ContentPropagator","PropagateID","ReservedCode2"}
+#: Label "1" = 属于人工智能生成合成内容; ContentProducer/ProduceID 必填,
+#: ContentPropagator/PropagateID 是**传播平台**上传时回填的, 生产端留空占位。
+#: ⚠️ 值一律转义成 ASCII (`ensure_ascii=True`): 国标要求要素值使用 GB 18030-2022
+#:    字符集, ASCII 是其子集因此合法; 而中文直写实测能原样读回(shell=False + UTF-8
+#:    落 mdta, 见 2026-09-29 探针), 但一旦有人把这条命令搬进 cmd.exe/PowerShell
+#:    或非 UTF-8 代码页的环境, 中文就会变成乱码字节 —— 乱码的标识等于没有标识。
+AIGC_METADATA_KEY = "AIGC"
+AIGC_LABEL_VALUE = "1"
+#: 生成合成服务提供者的名称或编码。标准允许写名称; 27 位编码是网信办《实践指南》
+#: 给备案主体的规则(第 3 位主体类型 / 4 位绑定方式 / 5-22 位代码), 个人创作者没有
+#: 统一社会信用代码, **不要**把身份证号写进公开文件的元数据 —— 所以默认写管线名,
+#: 由 --aigc-producer 覆盖成你自己的频道/主体名。
+DEFAULT_AIGC_PRODUCER = "harness-news-pathb"
+AIGC_LABEL_TEXT = "AI 生成合成内容"
+#: 国标量的"文字高度"是**字形实际高度**, ASS 的 FontSize 是 em 高度, 两者差一个
+#: 字面率。2026-09-29 端到端成片实测(Microsoft YaHei / 1080×1920 / 取整帧量白色
+#: 字芯): FontSize 70 → 字芯 51px, 即 ratio = 0.729 —— 而 5% 线要的是 54px,
+#: 所以"字号按 5% 取"当场不合规。字号 = 线 / ratio, 再乘余量 AIGC_LABEL_HEADROOM
+#: (换字体的字面率只会更低不会更高, 1.15 是把这一档余量写实, 不是审美)。
+AIGC_LABEL_GLYPH_RATIO = 0.729
+AIGC_LABEL_FLOOR_FRAC = 0.05
+AIGC_LABEL_HEADROOM = 1.15
+AIGC_LABEL_SHORT_SIDE_FRAC = round(AIGC_LABEL_FLOOR_FRAC / AIGC_LABEL_GLYPH_RATIO
+                                  * AIGC_LABEL_HEADROOM, 4)
+AIGC_LABEL_MARGIN_W_FRAC = 0.045     # 距左边 = 宽 * 0.045
+AIGC_LABEL_MARGIN_H_FRAC = 0.022     # 距顶边 = 高 * 0.022 (避开状态栏/刘海区)
+AIGC_PRODUCE_ID_BYTES = 32           # 内容编号取渲染产物哈希的前 N 位十六进制
+AIGC_INTEGRITY_CODE_BYTES = 40       # ReservedCode1 取哈希的前 N 位十六进制
+#: 显式标识最短持续时长(秒)。国标对视频显式标识的量化线: 文字高度 ≥ 最短边 5%、
+#: 持续 ≥ 2 秒。本实现让角标贯穿全片, 但**仍要挡**住"片长不足 2 秒"的极端输入 ——
+#: 那种片子必须补时长或改人工加标, 不能假装合规。
+AIGC_LABEL_MIN_SECONDS = 2.0
 
 #: 自动选版式与推导文案时用的尺度, 全部按"竖屏 9:16 一行能放几个中文字"定
 HOOK_LINE_CHARS = 7          # 主标题一行最多几字 (10cqw 字号下 ≈7)
@@ -233,6 +283,7 @@ YCbCr Matrix: TV.709
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
 Style: Default,{font},{fs},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,{ol},1,2,{ml},{mr},{mv},134
+Style: AIGC,{font},{aigc_fs},&H00FFFFFF,&H000000FF,&H00000000,&H96000000,-1,0,0,0,100,100,0,0,1,{aigc_ol},1,7,{aml},{amr},{amv},134
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -297,6 +348,25 @@ def run(cmd, **kw):
     return subprocess.run(cmd_list, **kw)
 
 
+def run_exe(cmd, **kw):
+    """启动 **必须是 .exe** 的命令, 且绕开 cmd.exe: Windows 下走 shell=False。
+
+    为什么需要第二条路: `run()` 在 win32 下用 `shell=True` 是为了能启动
+    npx/npm/hyperframes 这些 .cmd 包装, 代价是参数要过 cmd.exe 这道重新解析 ——
+    而 `-metadata AIGC={"AIGC":{"Label":"1"}}` 这种值里既有 `"` 又有 `{}`:
+    cmd.exe 把成对双引号**从命令行里删掉**(自己的引号语法), 到 ffmpeg 手里
+    JSON 就已经碎了。ffmpeg/ffprobe 都是 .exe, CreateProcess 能直接起,
+    不需要 shell —— 那就让带 JSON 的那一条命令不过 shell。
+    """
+    cmd_list = [str(c) for c in cmd]
+    log("▶ " + " ".join(cmd_list))
+    if sys.platform == "win32":
+        # 传 list(shell=False): CPython 内部用 list2cmdline 拼命令行,
+        # MSVCRT 的 argv 解析正好是它的逆运算, `"` 会原样回到 argv 里。
+        return subprocess.run(cmd_list, **kw)
+    return subprocess.run(cmd_list, **kw)
+
+
 def which(tool: str) -> str | None:
     return shutil.which(tool) or shutil.which(tool + ".exe")
 
@@ -330,6 +400,31 @@ def ffprobe_duration(path: str) -> float | None:
         return float(out)
     except (subprocess.SubprocessError, ValueError):
         return None
+
+
+def ffprobe_format_tag(path: str, key: str) -> str | None:
+    """读容器(format)级元数据的一个键; 不存在或 ffprobe 不可用时返回 None。
+
+    和 ffprobe_duration 一样属于"探测", 探不到不当失败 —— 是否要停机由调用方决定
+    (AIGC 标识那条就必须停机, 见 mux_and_burn)。
+
+    ⚠️ 入口名必须是 `format_tags=<键>` 而不是 `format=<键>`: `format=` 只认 ffprobe
+    自己的固定字段(duration/format_name/…), 自定义元数据键走它**不报错、只返回空**,
+    实测本机 N-122527 就是这种静默假阴性 —— 拿它当核验等于"核验永远失败",
+    反过来若写反了(拿 format_tags 去取 duration)也一样取不到。
+    """
+    ff = which("ffprobe")
+    if not ff:
+        return None
+    try:
+        out = subprocess.check_output(
+            [ff, "-v", "error", "-show_entries", f"format_tags={key}",
+             "-of", f"default=noprint_wrappers=1:nokey=1", path],
+            stderr=subprocess.DEVNULL,
+        ).decode("utf-8", errors="replace").strip()
+    except (subprocess.SubprocessError, ValueError):
+        return None
+    return out or None
 
 
 def estimate_duration(text: str) -> float:
@@ -448,24 +543,67 @@ def collect_cues(sub_files, durations, line_chars, max_lines=CAPTION_MAX_LINES):
     return cues
 
 
-def build_ass(cues, w: int, h: int, font: str = "Microsoft YaHei") -> str:
+def aigc_badge_font_size(w: int, h: int) -> int:
+    """AIGC 角标字号 = 画面**最短边** × AIGC_LABEL_SHORT_SIDE_FRAC。
+
+    两条容易踩空的量纲, 都在这里处理:
+
+    1. **按最短边, 不按高度**。国标写的是"画面最短边的 5%": 竖屏 1080×1920 最短边是
+       宽 1080(线 = 54px), 横屏 1920×1080 最短边反过来是**高** 1080 —— 拿高度当基准
+       写死会在横屏上算错。
+    2. **字号 ≠ 字高**。ASS 的 FontSize 是 em 高度, 国标量的是字形实际高度。
+       0.065 这一档是**推**出来的、错的: 端到端成片实测(Microsoft YaHei,
+       1080×1920, FontSize 70)白色字芯只有 51px, 字面率 0.729, 低于 54px 的线 ——
+       也就是说上一版按 6.5% 出的片**并不合规**, 而它自己不会报错。
+       现在把实测字面率写成 AIGC_LABEL_GLYPH_RATIO, 字号 = 5% / 0.729 × 1.15
+       ≈ 最短边 7.89% → 竖屏 FontSize 85 → 字芯约 62px(线的 115%)。
+
+    残余风险(如实写): 0.729 是**这一台机器、这一个字体、这一个分辨率**上量来的,
+    不是通用常数。换 pack / 换字体 / 改输出分辨率后必须重量一次(成片取一帧, 量左上角
+    白色字芯的纵向像素数 ÷ FontSize), 别默认推导值够用; `aigc.json` 里落了
+    font_size_px 与 short_side_px, 对着 contact-sheet.jpg 就能核。
+    """
+    return max(1, int(round(min(w, h) * AIGC_LABEL_SHORT_SIDE_FRAC)))
+
+
+def build_ass(cues, w: int, h: int, font: str = "Microsoft YaHei",
+              aigc_text: str | None = AIGC_LABEL_TEXT,
+              aigc_seconds: float = 0.0) -> str:
     """显式写 PlayRes, 字号按输出高度推导。
 
     ⚠️ 不要用 subtitles 的 force_style 调字号: libass 读 VTT 时脚本坐标默认
     只有 288 高, FontSize=36 会被放大到画面 12% 高, 竖屏上直接溢出屏幕。
+
+    AIGC 显式标识: `aigc_text` 非空且 `aigc_seconds` > 0 时, 额外挂一条**贯穿全片**
+    的 `AIGC` 样式事件(Alignment 7 = 左上角, Layer 1 压在字幕之上), 一次满足
+    《标识办法》§ 4-四 的"起始画面 + 播放周边 + 中间 + 末尾"与国标"持续 ≥ 2 秒"。
+    为什么落左上角(实测 news-coral 各版式): 右上角被 36cqw 的壁纸序号占了
+    (top:3cqh / right:4cqw, 横向约 62→96cqw), 下方 y≥0.80 是字幕带; 左上角这条
+    (竖屏 1080×1920 实测量: MarginL 48px≈4.4cqw, FontSize 85 → 字芯 62px,
+    "AI 生成合成内容" 九字符占 522px≈48.3cqw, 纵向 57→118px≈6.1cqh)是全片唯一
+    无人认领的区域 —— 离 62cqw 的序号还剩约 14cqw 间隙, 眉标从 17cqh 才起。
+    换 pack / 换字号后这个间隙要重算, 别默认它永远不撞。
     """
+    aigc_fs = aigc_badge_font_size(w, h)
     header = ASS_HEADER.format(
         w=w, h=h, font=font,
         fs=caption_font_size(h),
         ol=max(2, int(round(h / ASS_OUTLINE_H_FRAC))),
         ml=int(w * ASS_MARGIN_W_FRAC), mr=int(w * ASS_MARGIN_W_FRAC),
         mv=int(h * ASS_MARGIN_BOTTOM_H_FRAC),
+        aigc_fs=aigc_fs,
+        aigc_ol=max(1, int(round(aigc_fs / 16))),
+        aml=int(w * AIGC_LABEL_MARGIN_W_FRAC), amr=int(w * AIGC_LABEL_MARGIN_W_FRAC),
+        amv=int(h * AIGC_LABEL_MARGIN_H_FRAC),
     )
-    events = "\n".join(
+    events = [
         f"Dialogue: 0,{ass_time(s)},{ass_time(e)},Default,,0,0,0,,{text}"
         for s, e, text in cues
-    )
-    return header + events + "\n"
+    ]
+    if aigc_text and aigc_seconds > 0:
+        events.insert(0, f"Dialogue: 1,{ass_time(0)},{ass_time(aigc_seconds)},"
+                         f"AIGC,,0,0,0,,{aigc_text}")
+    return header + "\n".join(events) + "\n"
 
 
 # ------------------------- 场景解析 -------------------------
@@ -786,8 +924,31 @@ def rail_ready(items: list[dict]) -> bool:
 
 
 # ------------------------- 设计系统包 -------------------------
+def pack_has_real_layout(style: str) -> bool:
+    """这个 pack 有没有**真版式**(placeholder.html 之外至少一个 compositions/*.html)。
+
+    只查文件在不在, 不解析契约 —— 给"哪些 pack 能渲染"这类盘点用, 未落地的 pack
+    调 `load_style_pack` 会直接停机, 拿它做批量统计不合适。
+    """
+    comp_dir = os.path.join(TEMPLATE_ROOT, style, "compositions")
+    if not os.path.isdir(comp_dir):
+        return False
+    return any(f.endswith(".html") and f != f"{PLACEHOLDER_LAYOUT}.html"
+               for f in os.listdir(comp_dir))
+
+
+def ready_packs() -> list[str]:
+    """当前可选出真版式的 pack 名单(顺序跟 ALL_TEMPLATES)。"""
+    return [s for s in ALL_TEMPLATES if pack_has_real_layout(s)]
+
+
 def load_style_pack(style: str) -> dict:
-    """读 ``templates/hyperframes_path_b/<style>/``: 宿主骨架 + 各版式契约。"""
+    """读 ``templates/hyperframes_path_b/<style>/``: 宿主骨架 + 各版式契约。
+
+    ``placeholder.html`` 不进 ``layouts`` (D7): 它只是把三层目录凑齐的壳, 不是版式。
+    跳掉之后若一个版式都不剩, 就在这里停 —— 报"这个 pack 还没有真版式 + 现在哪些有",
+    而不是等配完音、发射到第 1 镜才抛"填不满任何版式"(那要白跑一趟网络与渲染)。
+    """
     pack_dir = os.path.join(TEMPLATE_ROOT, style)
     host_path = os.path.join(pack_dir, "host.html")
     comp_dir = os.path.join(pack_dir, "compositions")
@@ -798,6 +959,8 @@ def load_style_pack(style: str) -> dict:
     layouts = {}
     for file_name in sorted(os.listdir(comp_dir)):
         if not file_name.endswith(".html"):
+            continue
+        if file_name == f"{PLACEHOLDER_LAYOUT}.html":
             continue
         text = read_text(os.path.join(comp_dir, file_name))
         attr = VARIABLE_ATTR_RE.search(text)
@@ -834,7 +997,14 @@ def load_style_pack(style: str) -> dict:
             "variables": contract,
         }
     if not layouts:
-        raise EmitterError(f"{comp_dir} 里没有版式文件")
+        ready = ready_packs()
+        raise EmitterError(
+            f"{style} 还没有真版式: compositions/ 里只有 placeholder.html(占位壳)。"
+            "占位版式不参与选择, 所以这一包现在**不可渲染**。"
+            + (f"当前可渲染的 pack: {', '.join(ready)}。" if ready
+               else "当前没有任何 pack 有真版式。")
+            + " 处理: 换用可渲染的 pack, 或按 frame.md 的设计契约补出真 composition。"
+        )
     return {"name": style, "dir": pack_dir, "host": read_text(host_path),
             "compositions_dir": comp_dir, "layouts": layouts}
 
@@ -1601,8 +1771,83 @@ def _ffmpeg_failure(log_path: str, message: str) -> None:
     raise EmitterError(message)
 
 
-def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h):
-    """拼配音 → 烧 ASS 字幕。字幕轨为空时降级为只合成音频(不许让成片不可用)。"""
+def aigc_metadata_json(producer: str, silent_path: str) -> str:
+    """按 GB 45438-2025 附录 E 拼隐式标识 JSON(单行, 纯 ASCII)。
+
+    结构是标准钉死的: 外层字段名必须**含 "AIGC"**, 值是一个 JSON 文本, 里面
+    `Label` / `ContentProducer` / `ProduceID` / `ReservedCode1` /
+    `ContentPropagator` / `PropagateID` / `ReservedCode2` 七项。
+
+    各字段取法与理由:
+    - `Label="1"` —— "1" = 属于 AI 生成合成内容(由本流水线自己合成, 不是"可能"/"疑似",
+      那两个是平台侧判定用语, 创作者不该自降等级)。
+    - `ContentProducer` —— 标准允许写**名称**或 27 位编码(网安秘字〔2025〕29 号)。
+      27 位编码要把主体类型/绑定方式与 18 位统一社会信用代码或身份号码绑定, 本机既没有
+      企业资质也没有把身份证号写进公开产物 metadata 的授权, 所以走"名称"这一支。
+    - `ProduceID` —— 取渲染产物 silent.mp4 的 sha256 前 32 位十六进制(标准上限 32 字节)。
+      为什么拿画面文件而不是稿件文本: 稿件改了没渲出新片时不该发同一个编号, 而 silent.mp4
+      是"这一版画面"的唯一指纹, 编号与内容严格绑定。
+    - `ReservedCode1` —— 完整性校验码, 取 sha256(producer + ProduceID) 前 40 位(上限 40 字节)。
+    - 传播三项留空 —— 谁把片子发出去是平台/发布方(抖音)的事, 由它们在传播时改写;
+      本流水线是**生成**方, 冒充传播方填自己的编号反而违反"单文件仅一份隐式标识"。
+
+    `ensure_ascii=True`(默认)是有意的: 值里只留 ASCII, 命令行与 mp4 metadata
+    两处都不依赖进程代码页, 任何 JSON 解析器读回来都能还原中文。实测中文直写
+    (`ensure_ascii=False`)在本机 shell=False 链路上也能以 UTF-8 原样落进 mdta
+    并读回, 但那要求**每一环**都在 UTF-8 上: 一旦有人把这条命令搬进 cmd.exe 的
+    936 代码页或非 UTF-8 的封装脚本, 中文就成乱码字节 —— 而乱码的标识等于没有标识。
+    """
+    produce_id = _sha256_prefix(silent_path, AIGC_PRODUCE_ID_BYTES)
+    inner = {
+        "Label": AIGC_LABEL_VALUE,
+        "ContentProducer": producer,
+        "ProduceID": produce_id,
+        "ReservedCode1": _sha256_prefix(
+            f"{producer}{produce_id}".encode("utf-8"), AIGC_INTEGRITY_CODE_BYTES),
+        "ContentPropagator": "",
+        "PropagateID": "",
+        "ReservedCode2": "",
+    }
+    return json.dumps({"AIGC": inner}, ensure_ascii=True,
+                      separators=(",", ":"))
+
+
+def _sha256_prefix(data, nbytes: int) -> str:
+    """对文件路径或 bytes 取 sha256 十六进制前缀(长度按**字节**算, hex 一字节一字符)。"""
+    h = hashlib.sha256()
+    if isinstance(data, (bytes, bytearray)):
+        h.update(bytes(data))
+    else:
+        with open(data, "rb") as f:
+            for chunk in iter(lambda: f.read(1 << 20), b""):
+                h.update(chunk)
+    return h.hexdigest()[:nbytes]
+
+
+def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
+                 aigc_badge_seconds: float = 0.0,
+                 aigc_producer: str = DEFAULT_AIGC_PRODUCER,
+                 aigc_label: str = AIGC_LABEL_TEXT):
+    """拼配音 → 烧 ASS 字幕(含 AIGC 显式角标) → 写 AIGC 隐式元数据 → 读回核验。
+
+    `aigc_badge_seconds` 是角标持续时长, 主流程传全片时长(贯穿); 低于
+    `AIGC_LABEL_MIN_SECONDS` 直接停机 —— 《标识办法》§ 4-四 要视频起始画面与播放
+    周边有显著标识, 国标另量化了"文字高度 ≥ 最短边 5%、持续 ≥ 2 秒"两条线。
+    隐式标识按 GB 45438-2025 附录 E 写进容器元数据, 写完 ffprobe 读回核验,
+    不一致就抛 EmitterError。字幕轨为空时降级为只合成音频(不许让成片不可用)。
+    返回真正落到文件里的那份标识 JSON, 供调用方落 sidecar 备查。
+    """
+    if not aigc_producer:
+        # 不提供"关掉标识"这条路: 《标识办法》§ 2 要求"应当"添加, 拿空参数当开关
+        # 等于给用户一个违法的便利。要改的是标识内容(--aigc-producer 填主体名), 不是有无。
+        raise EmitterError(
+            "AIGC 标识不可关闭 (aigc_producer 为空) —— 无标识成片不得交付, "
+            "请填生成者名称: --aigc-producer <你的频道/主体名>")
+    if aigc_badge_seconds < AIGC_LABEL_MIN_SECONDS:
+        raise EmitterError(
+            f"全片时长只有 {aigc_badge_seconds:.2f}s, 贯穿式角标达不到国标 "
+            f"{AIGC_LABEL_MIN_SECONDS}s 的显式标识持续下限 —— 补足内容, "
+            "或在剪辑端另加一条 ≥2s 的显著标识后再交付")
     narr = os.path.join(work_dir, "narration.mp3")
     # concat 解封装器把 list.txt 里的相对路径按 **list.txt 自己的目录** 解析。
     # 实测传 "--work-dir .harness-news-runtime/tmp/x" 这种相对目录时, 条目写成
@@ -1624,29 +1869,59 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h):
         _ffmpeg_failure(concat_log, f"配音拼接失败, 详见 {concat_log}")
 
     ass_path = os.path.join(work_dir, "subs.ass")
-    write_text(ass_path, build_ass(cues, w, h))
+    write_text(ass_path, build_ass(cues, w, h, aigc_text=aigc_label,
+                                   aigc_seconds=aigc_badge_seconds))
     err_log = os.path.join(work_dir, "ffmpeg_final.log")
     # 明确取流: 视频只从渲染产物拿, 声音只从拼接好的 narration 拿。
     # 合成里现在挂了 <audio>, 渲染出的 silent.mp4 也可能带一层声音;
     # 不写 -map 的话 ffmpeg 会各挑一条, 轻则双配音, 重则选了没字幕的那条。
     stream_maps = ["-map", "0:v:0", "-map", "1:a:0"]
+    # AIGC 隐式标识 (§5 要求"在生成合成内容文件组件中加元数据"):
+    # 实测 `-movflags +faststart` 会把不认识的键**静默丢掉**(ffprobe 读不到、
+    # 字节里也搜不到), 必须加 use_metadata_tags 才落到 mdta atom。
+    movflags = ["-movflags", "+faststart+use_metadata_tags"]
+    aigc_meta = aigc_metadata_json(aigc_producer, silent)
+    meta_args = ["-metadata", f"{AIGC_METADATA_KEY}={aigc_meta}"]
+    ff = which("ffmpeg") or "ffmpeg"
     if not cues:
         log("⚠️ 字幕轨为空, 跳过烧录字幕(仅合成配音)")
-        cmd = ["ffmpeg", "-y", "-i", silent, "-i", narr] + stream_maps + [
-            "-c:v", "copy", "-c:a", "aac", "-shortest", "-movflags", "+faststart", final]
+        cmd = [ff, "-y", "-i", silent, "-i", narr] + stream_maps + [
+            "-c:v", "copy", "-c:a", "aac", "-shortest"] + movflags + meta_args + [final]
     else:
         # cmd.exe 把 '&' 当命令分隔符（ASS 颜色码里全是 &），而 list2cmdline
         # 不会给无空格参数加引号，所以滤镜图必须落到文件里用 -filter_script:v
         # 传，不能直接拼进命令行。
         vf_file = os.path.join(work_dir, "vf.txt")
         write_text(vf_file, f"subtitles={ffmpeg_sub_path(ass_path)}\n")
-        cmd = ["ffmpeg", "-y", "-i", silent, "-i", narr] + stream_maps + [
+        cmd = [ff, "-y", "-i", silent, "-i", narr] + stream_maps + [
             "-filter_script:v", vf_file,
-            "-c:a", "aac", "-shortest", "-movflags", "+faststart", final]
+            "-c:a", "aac", "-shortest"] + movflags + meta_args + [final]
     with open(err_log, "wb") as elf:
-        r = run(cmd, stdout=subprocess.DEVNULL, stderr=elf)
+        # 带 JSON 的这条必须过 shell=False: cmd.exe 会吃掉成对双引号, 到 ffmpeg
+        # 手里 JSON 就碎了(见 run_exe)。滤镜图已在文件里, 不再依赖 cmd 语法。
+        r = run_exe(cmd, stdout=subprocess.DEVNULL, stderr=elf)
     if r.returncode != 0 or not os.path.exists(final):
         _ffmpeg_failure(err_log, f"ffmpeg 合成失败, 详见 {err_log}")
+    # 写完立刻读回来验一次: 标识"写了"不等于"在文件里", 而缺标识的成片是违法
+    # 品而不是瑕疵品 —— 这里必须停机, 不能只在日志里抱怨一句。
+    # 比对按语义而不是按字节: ffprobe 的输出层可能给特殊字符换层壳, 而真正要
+    # 保证的是"能解析成同一份标识内容、关键字段一致"。
+    tag = ffprobe_format_tag(final, AIGC_METADATA_KEY)
+    want = json.loads(aigc_meta)["AIGC"]
+    got = None
+    if tag:
+        try:
+            got = json.loads(tag).get("AIGC")
+        except ValueError:
+            got = None
+    if not got or not all(got.get(k) == v for k, v in want.items()):
+        raise EmitterError(
+            f"成片 {final} 的 {AIGC_METADATA_KEY} 元数据未生效或不一致 "
+            f"(读回={tag!r}) —— 无标识成片不得发布; "
+            "若本机 ffmpeg 太旧, 请升级到支持 movflags use_metadata_tags 的版本")
+    log(f"  AIGC 隐式标识已核验: ProduceID={want['ProduceID']} "
+        f"Label={want['Label']} ContentProducer={want['ContentProducer']}")
+    return aigc_meta
 
 
 # ------------------------- 主流程 -------------------------
@@ -1669,7 +1944,15 @@ def main():
     ap.add_argument("--resolution", default="1080x1920", help="分辨率, 如 1080x1920(竖) 或 1920x1080(横)")
     ap.add_argument("--doctor", action="store_true", help="只做环境自检")
     ap.add_argument("--kicker", help="全片眉标(如栏目名), 不传则用版式自带标签")
+    ap.add_argument("--layout", help="全片强制点名同一版式(默认按分镜形态自动选); "
+                                     "只对当前 pack 已有的真版式有效")
     ap.add_argument("--source", help="来源/频道署名, 引文与收口版式必需")
+    ap.add_argument("--aigc-producer", default=DEFAULT_AIGC_PRODUCER,
+                    help="AIGC 标识里的生成者(ContentProducer): 名称或 27 位编码, 默认 "
+                         + DEFAULT_AIGC_PRODUCER + "。正式发布建议填账号主体名称 "
+                         "(GB 45438-2025 允许写名称; 不要填身份证号等个人敏感信息)")
+    ap.add_argument("--aigc-label", default=AIGC_LABEL_TEXT,
+                    help="显式角标文字(默认 %(default)s), 贯穿全片显示在左上角")
     ap.add_argument("--fps", type=int, default=DEFAULT_FPS, help=f"渲染帧率 (默认 {DEFAULT_FPS})")
     ap.add_argument("--quality", default=DEFAULT_QUALITY, choices=QUALITY_CHOICES,
                     help=f"渲染质量 (默认 {DEFAULT_QUALITY})")
@@ -1777,7 +2060,30 @@ def main():
         final = args.output
         os.makedirs(os.path.dirname(os.path.abspath(final)) or ".", exist_ok=True)
         log(f"→ ffmpeg 合成最终视频: {final}")
-        mux_and_burn(silent, audio_files, cues, work, final, w, h)
+        # 显式标识时长 = 全片时长(贯穿), 由 mux_and_burn 卡 ≥ AIGC_LABEL_MIN_SECONDS:
+        # 单镜短片的真实时长可以低到 MIN_SLOT_SECONDS(1s), 达不到国标 2 秒线, 必须挡。
+        badge_seconds = sum(durations)
+        aigc_meta = mux_and_burn(silent, audio_files, cues, work, final, w, h,
+                                 aigc_badge_seconds=badge_seconds,
+                                 aigc_producer=args.aigc_producer,
+                                 aigc_label=args.aigc_label)
+        # 标识台账: 发布环节(douyin-upload)要照着它做平台侧自主声明,
+        # 监管要举证时也拿这份对着成片核。只随成片走, 不进工作目录。
+        write_text(os.path.join(os.path.dirname(os.path.abspath(final)), "aigc.json"),
+                   json.dumps({
+                       "file": os.path.basename(final),
+                       "metadata_key": AIGC_METADATA_KEY,
+                       "implicit": json.loads(aigc_meta),
+                       "explicit": {
+                           "text": args.aigc_label,
+                           "position": "top-left",
+                           "font_size_px": aigc_badge_font_size(w, h),
+                           "short_side_px": min(w, h),
+                           "shown_seconds": round(badge_seconds, 3),
+                           "burned_in": True,
+                       },
+                       "resolution": f"{w}x{h}",
+                   }, ensure_ascii=False, indent=2))
 
         # ⑨ 联络表: 逐镜一帧, 人工验收比对
         build_contact_sheet(silent, shots, os.path.dirname(os.path.abspath(final)), work)

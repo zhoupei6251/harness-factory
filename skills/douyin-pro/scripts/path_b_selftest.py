@@ -63,12 +63,20 @@ PACK = pb.load_style_pack(pb.DEFAULT_STYLE)
 
 #: 12 个模板各自的 pack 对象 (用于挨个过自检; 不存在则跳过 load, 标记为 partial)。
 def _load_one_template(name):
-    """单个模板的 pack; frame.md 在但 host.html 缺则返回 None (= 待落地)。"""
+    """单个模板的 pack; 未落地(host.html 缺 / 只有 placeholder 壳)则返回 None。
+
+    `load_style_pack` 对"只有占位壳"的 pack 现在会抛 EmitterError (D7: 占位不是版式,
+    宁可加载期停机), 所以这里必须同时接 OSError 类路径与 EmitterError —— 否则
+    自检会在盘点 12 包时直接崩, 而不是老实报"这一包还没真版式"。
+    """
     pack_dir = os.path.join(pb.TEMPLATE_ROOT, name)
     host_path = os.path.join(pack_dir, "host.html")
     if not (os.path.isdir(pack_dir) and os.path.isfile(host_path)):
         return None
-    return pb.load_style_pack(name)
+    try:
+        return pb.load_style_pack(name)
+    except pb.EmitterError:
+        return None
 
 TEMPLATE_PACKS = {name: _load_one_template(name) for name in pb.ALL_TEMPLATES}
 FRAME_ONLY_TEMPLATES = {name for name, pack in TEMPLATE_PACKS.items() if pack is None}
@@ -683,10 +691,204 @@ def t_default_style_matches_first_template():
     )
 
 def t_full_loadability_progress():
-    # 报告当前已完整加载 (host<->compositions 都齐) 的 pack 数量, 便于看进度。
-    full = sum(1 for p in TEMPLATE_PACKS.values() if p is not None)
-    print(f"      12 pack 中已完整加载 (host.html 在位) 的: {full}/12")
-    # 当前期望: 1 (只有 news-coral 完整)。后续 composition 落地后此值递增。
+    # 进度指标 = **有真版式因而可选出** 的 pack 数, 不是"能加载不抛" 的 pack 数。
+    # 后者在 12 个包都放一个 placeholder.html 之后就永久 12/12(饱和指标等于没有指标),
+    # 2026-09-29 审计就是这么被绕过去的; 现在两条口径必须互相印证。
+    real = [name for name, pack in TEMPLATE_PACKS.items() if pack is not None]
+    ready = pb.ready_packs()
+    assert sorted(real) == sorted(ready), (
+        f"口径不一致: 加载成功的 {sorted(real)} != 有真版式的 {sorted(ready)}"
+    )
+    for name, pack in TEMPLATE_PACKS.items():
+        if pack is not None:
+            assert pb.PLACEHOLDER_LAYOUT not in pack["layouts"], (
+                f"{name} 的 layouts 里混进了占位版式 (D7 失效)"
+            )
+            assert pack["layouts"], f"{name} 加载成功但版式为空"
+    print(f"      可渲染 pack (有真版式): {len(real)}/{len(pb.ALL_TEMPLATES)}"
+          f" —— {', '.join(real) if real else '无'}")
+
+
+def t_placeholder_pack_stops_at_load():
+    # 只有占位壳的 pack 必须在 load_style_pack 就停机, 并点名当前谁能渲染。
+    unready = [n for n in pb.ALL_TEMPLATES if not pb.pack_has_real_layout(n)]
+    assert unready, "所有 pack 都有真版式了 —— 这条测要改成断言'无未就绪包'"
+    msg = expect_error(pb.load_style_pack, unready[0])
+    assert "还没有真版式" in msg, f"停机文案没说明原因: {msg}"
+    assert "可渲染的 pack" in msg, f"停机文案没给出可用替代: {msg}"
+
+
+# ---------------- AIGC 标识 (合规硬要求, 见 path_b_build 常量块) ----------------
+# ASS 合规样式的列位由 path_b_build 的 [V4+ Styles] Format 行定死(23 字段,
+# "Style: AIGC" 吃掉第 0 列): 下标错了不是断言失效, 就是 int() 崩在颜色串上。
+S_FONT_SIZE = 2
+S_BORDER_STYLE = 15
+S_ALIGNMENT = 18
+S_MARGIN_L = 19
+S_MARGIN_R = 20
+S_MARGIN_V = 21
+D_LAYER = 0      # "Dialogue: <Layer>" 同格
+D_START = 1
+D_END = 2
+
+
+def _aigc_ass(aigc_seconds=30.0):
+    return pb.build_ass([(0.0, 2.0, "口播字幕")], 1080, 1920,
+                        aigc_text=pb.AIGC_LABEL_TEXT, aigc_seconds=aigc_seconds)
+
+
+def t_aigc_badge_event_present_and_persistent():
+    # 显式标识: 一条 Layer 1、从 0 起到全片末的 AIGC 事件(贯穿 = 一次满足
+    # 起始/周边/中间/末尾四个位置), 且压在字幕层之上。
+    ass = _aigc_ass(aigc_seconds=11.928)
+    line = [ln for ln in ass.splitlines() if ln.startswith("Dialogue") and ",AIGC," in ln]
+    assert len(line) == 1, f"AIGC 事件应恰好 1 条, 实得 {len(line)}: {line}"
+    cols = line[0].split(",")
+    assert cols[D_LAYER] == "Dialogue: 1", (
+        f"AIGC 必须在 Layer 1(字幕层之上), 实得 {cols[D_LAYER]!r}")
+    assert cols[D_START] == "0:00:00.00", (
+        f"必须从第 0 秒起(起始画面要求), 实得 {cols[D_START]}")
+    # ASS 时间戳只到百分之一秒, 允许这一档量化差。
+    h_, m_, rest = cols[D_END].split(":")
+    sec = int(h_) * 3600 + int(m_) * 60 + float(rest)
+    assert abs(sec - 11.928) <= 0.01, f"AIGC 事件必须贯穿到全片末, 实得 {cols[D_END]}"
+
+
+def t_aigc_badge_absent_when_no_seconds():
+    # aigc_seconds<=0 (全片时长没算出来) 时不许悄悄挂一条 0 秒标识;
+    # 真正的挡在 mux_and_burn(<2s 停机), 这里只保证 build_ass 自身不产出空标。
+    ass = _aigc_ass(aigc_seconds=0.0)
+    assert ",AIGC," not in ass, "0 秒时长不该产出 AIGC 事件"
+
+
+def t_aigc_badge_style_is_top_left_and_legible():
+    # Alignment 7 = 左上; BorderStyle 1 = 描边+阴影(彩底上唯一稳妥的可读性来源);
+    # 字号按最短边推, 且推导后的**字芯**要够到国标 5% 线(留 15% 余量)。
+    style = [ln for ln in _aigc_ass().splitlines() if ln.startswith("Style: AIGC,")]
+    assert len(style) == 1, f"缺 AIGC 样式行: {style}"
+    cols = style[0].split(",")
+    assert len(cols) == 23, f"v4.00 Style 应 23 列, 实得 {len(cols)}: {style[0]}"
+    font_size = int(cols[S_FONT_SIZE])
+    border_style = int(cols[S_BORDER_STYLE])
+    alignment = int(cols[S_ALIGNMENT])
+    assert alignment == 7, f"AIGC 角标 Alignment 应为 7(左上), 实得 {alignment}"
+    assert border_style == 1, f"AIGC 角标 BorderStyle 应为 1(描边+阴影), 实得 {border_style}"
+    # 边角性: 国标要求显式标识落在"边角", 边距必须是薄边而不是居中偏移。
+    ml, mr, mv = int(cols[S_MARGIN_L]), int(cols[S_MARGIN_R]), int(cols[S_MARGIN_V])
+    assert ml == int(1080 * pb.AIGC_LABEL_MARGIN_W_FRAC) == mr, f"左右边距不符: {ml}/{mr}"
+    assert mv == int(1920 * pb.AIGC_LABEL_MARGIN_H_FRAC), f"顶边距不符: {mv}"
+    assert ml < 1080 * 0.1 and mv < 1920 * 0.1, (
+        f"标识必须贴边角, 实得 MarginL={ml} MarginV={mv}")
+    # FontSize 是 em 高, 国标量的是字芯高: 用实测字面率换算后才可比。
+    glyph_h = font_size * pb.AIGC_LABEL_GLYPH_RATIO
+    floor = min(1080, 1920) * pb.AIGC_LABEL_FLOOR_FRAC
+    assert glyph_h >= floor, (
+        f"字芯 {glyph_h:.1f}px < 国标线 {floor:.1f}px(最短边 5%): 不合规"
+    )
+    assert font_size == pb.aigc_badge_font_size(1080, 1920), "样式字号与推导函数不一致"
+
+
+def t_aigc_badge_font_size_uses_short_side():
+    # 竖屏按宽、横屏按高 —— 写死 height 会在横屏算小一档。
+    assert pb.aigc_badge_font_size(1080, 1920) == pb.aigc_badge_font_size(1920, 1080), (
+        "同一批像素的横竖屏字号必须相同(基准是最短边, 不是高度)"
+    )
+    assert pb.aigc_badge_font_size(720, 1280) < pb.aigc_badge_font_size(1080, 1920)
+
+
+#: 2026-09-29 成片实测(1080×1920 / Microsoft YaHei / 量白色像素范围): FontSize 85 时
+#: "AI 生成合成内容" 九字符横向占 522px → 总推进宽 522/85 = 6.14 em。
+#: 这一版之前这里按"每字 1 em"估, 算出 75.3cqw 就把**已经合规**的角标判成越界 ——
+#: 估算模型也得跟成片对一次表, 否则测的是自己的假设而不是渲染结果。
+AIGC_LABEL_MEASURED_ADVANCE_EM = 522 / 85
+AIGC_LABEL_WIDTH_HEADROOM = 1.10
+#: news-coral 右上壁纸序号的左边界(实测 top:3cqh / right:4cqw, 横向 62→96cqw)。
+WALLPAPER_ORDINAL_START_CQW = 62
+
+
+def t_aigc_badge_does_not_reach_wallpaper_ordinal():
+    # 左上角这条不许长过去撞上右上角壁纸序号: 两者同在顶部带, 撞了就糊成一团。
+    fs = pb.aigc_badge_font_size(1080, 1920)
+    left = int(1080 * pb.AIGC_LABEL_MARGIN_W_FRAC)
+    em_per_char = AIGC_LABEL_MEASURED_ADVANCE_EM / len(pb.AIGC_LABEL_TEXT)
+    width = fs * em_per_char * len(pb.AIGC_LABEL_TEXT) * AIGC_LABEL_WIDTH_HEADROOM
+    right_edge_cqw = (left + width) / 1080 * 100
+    assert right_edge_cqw < WALLPAPER_ORDINAL_START_CQW, (
+        f"AIGC 角标最右到 {right_edge_cqw:.1f}cqw, 会压上 "
+        f"{WALLPAPER_ORDINAL_START_CQW}cqw 的序号壁纸")
+
+
+def t_aigc_metadata_shape_follows_gb45438():
+    # 附录 E: 值 = {"AIGC":{七个要素}}, Label "1"=属于; 生产端三项传播字段留空占位。
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        f = os.path.join(d, "silent.mp4")
+        with open(f, "wb") as fh:
+            fh.write(b"x" * 1024)
+        raw = pb.aigc_metadata_json(pb.DEFAULT_AIGC_PRODUCER, f)
+    meta = json.loads(raw)
+    assert list(meta) == ["AIGC"], f"顶层必须只有 AIGC 一个键: {list(meta)}"
+    inner = meta["AIGC"]
+    assert set(inner) == {"Label", "ContentProducer", "ProduceID", "ReservedCode1",
+                          "ContentPropagator", "PropagateID", "ReservedCode2"}, (
+        f"要素集合不对: {sorted(inner)}")
+    assert inner["Label"] == pb.AIGC_LABEL_VALUE == "1"
+    assert inner["ContentProducer"] == pb.DEFAULT_AIGC_PRODUCER
+    assert len(inner["ProduceID"]) == pb.AIGC_PRODUCE_ID_BYTES, (
+        f"ProduceID 长度 {len(inner['ProduceID'])} != {pb.AIGC_PRODUCE_ID_BYTES}")
+    assert len(inner["ReservedCode1"]) == pb.AIGC_INTEGRITY_CODE_BYTES
+    assert inner["ContentPropagator"] == "" and inner["PropagateID"] == "" \
+        and inner["ReservedCode2"] == "", "传播端三个字段生产方必须留空占位"
+
+
+def t_aigc_metadata_is_ascii_only():
+    # 值必须是 ASCII: 国标要求 GB 18030 字符集, ASCII 是其子集因此合法, 而中文直写
+    # 一旦被搬进非 UTF-8 代码页就变成乱码字节 —— 乱码的标识等于没有标识。
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        f = os.path.join(d, "s.mp4")
+        with open(f, "wb") as fh:
+            fh.write(b"y" * 64)
+        raw = pb.aigc_metadata_json("某个中文主体名", f)
+    assert raw.isascii(), f"元数据 JSON 含非 ASCII 字节: {raw[:80]}"
+    assert " " not in raw, "JSON 里不许有空格(分隔符必须压掉, 命令行传输更稳)"
+    # 中文主体名走 \uXXXX 转义: 落地字节全 ASCII, 但解析回来必须还是那几个字。
+    # (反过来说: 断言"解析出来的值也 ASCII"是自欺 —— json.loads 早把转义还原了。)
+    assert "\\u" in raw, f"非 ASCII 主体名未被转义: {raw[:80]}"
+    assert json.loads(raw)["AIGC"]["ContentProducer"] == "某个中文主体名", (
+        f"转义后语义丢失: {json.loads(raw)['AIGC']['ContentProducer']!r}")
+
+
+def t_aigc_produce_id_is_content_derived():
+    # ProduceID 取渲染产物内容哈希前缀: 同一片重跑稳定, 换片必变 —— 这才叫内容编号。
+    import tempfile
+    with tempfile.TemporaryDirectory() as d:
+        a, b = os.path.join(d, "a.mp4"), os.path.join(d, "b.mp4")
+        with open(a, "wb") as fh:
+            fh.write(b"same-bytes")
+        with open(b, "wb") as fh:
+            fh.write(b"other-bytes")
+        j = lambda p: json.loads(pb.aigc_metadata_json("p", p))["AIGC"]["ProduceID"]
+        assert j(a) == j(a), "同一内容哈希必须稳定"
+        assert j(a) != j(b), "不同内容的 ProduceID 必须不同"
+
+
+def t_aigc_label_cannot_be_turned_off():
+    # 合规项不许有逃生门: 空 producer / 不足 2 秒, 都要停机而不是静默出无标片。
+    msg = expect_error(pb.mux_and_burn, "s.mp4", [], [], "/tmp", "/tmp/f.mp4",
+                       1080, 1920, aigc_badge_seconds=10.0, aigc_producer="")
+    assert "不可关闭" in msg or "AIGC" in msg, f"停机文案不点名原因: {msg}"
+    msg2 = expect_error(pb.mux_and_burn, "s.mp4", [], [], "/tmp", "/tmp/f.mp4",
+                        1080, 1920, aigc_badge_seconds=1.5)
+    assert "2" in msg2, f"短时长停机文案没说明国标 2 秒线: {msg2}"
+
+
+def t_ffprobe_tag_entry_uses_format_tags():
+    # 回归防线: `format=<键>` 取自定义元数据**不报错只返回空**, 拿它当核验等于
+    # 核验永远失败。这里锁住命令行里用的是 format_tags。
+    import inspect
+    src = inspect.getsource(pb.ffprobe_format_tag)
+    assert "format_tags=" in src, "ffprobe 取标签必须走 format_tags= 而不是 format="
 
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
