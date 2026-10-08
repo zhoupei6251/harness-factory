@@ -34,3 +34,6 @@ __pycache__/
 
 # code-route runtime artifacts (see core/routing.md runtime dir)
 .ai-runtime-artifacts/
+
+# Agent workspace data (工作记忆 / 会话数据) — 本地工作态，不入库
+.workbuddy/
