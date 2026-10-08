@@ -64,6 +64,7 @@ from pathlib import Path
 
 import aigc_mode
 import layout_selfcheck
+import commons_media as cm
 
 
 # ------------------------- 常量 (禁止魔法值) -------------------------
@@ -75,21 +76,35 @@ DEFAULT_STYLE = "news-coral"
 #: 顺序按"用途+情绪"二维分组, 默认 DEFAULT_STYLE 仍为 news-coral (人物故事型, 兼容存量稿件)。
 #: 增加新模板只动这里 + templates/hyperframes_path_b/<name>/ 落地, 不动发射器主逻辑。
 ALL_TEMPLATES = (
-    "news-coral",      # T1  人物故事 / 反转 / 单条深挖 (已有完整 7 个版式)
-    "news-ink",        # T2  调查 / 深度揭露 / 长文
-    "news-policy",     # T3  政策 / 法规 / 通知
-    "news-stat",       # T4  数据 / 排行 / 数字冲击
-    "news-onsite",     # T5  现场 / 突发 / 抢险
-    "news-bulletin",   # T6  多事件速报 / 整点新闻
-    "news-explainer",  # T7  科普 / 原理 / 图解
-    "news-alert",      # T8  应急 / 防诈 / 健康警示
-    "news-thread",     # T9  节日 / 纪念 / 专题
-    "news-takes",      # T10 观点 / 评论 / 专栏
-    "news-blast",      # T11 体育 / 比分 / 实时赛事
-    "news-world",      # T12 国际 / 战况 / 地理
+    # 12 个 master pack (T1-T12, 主气质)
+    "news-coral",         # T1  人物故事
+    "news-ink",           # T2  调查
+    "news-policy",        # T3  政策
+    "news-stat",          # T4  数据
+    "news-onsite",        # T5  现场
+    "news-bulletin",      # T6  速报
+    "news-explainer",     # T7  科普
+    "news-alert",         # T8  警示
+    "news-thread",        # T9  纪念
+    "news-takes",         # T10 观点
+    "news-blast",         # T11 体育
+    "news-world",         # T12 国际
+    # 12 个派生变体 (气质派生)
+    "news-coral-night",   "news-coral-mono",
+    "news-ink-graphite",  "news-policy-bold",
+    "news-stat-grid",     "news-onsite-urgent",
+    "news-bulletin-strip","news-explainer-blueprint",
+    "news-alert-warning", "news-thread-tribute",
+    "news-takes-column",  "news-blast-score",
+    "news-world-globe",
+    # 6 个主题包 (T13-T18)
+    "news-mosaic",        "news-dawn",
+    "news-dusk",          "news-noir",
+    "news-paper",         "news-podcast",
+    "news-polarity",      # T19 极简高反差黑白对比 (2026-09-30)
 )
 #: --style / --template 选择映射; 选模板看 news-workflow/SKILL.md 的"模板决策树"或
-#: routes/news/MEMORY.md videos[].template 字段 (12 个 pack 任何一个都合法)。
+#: routes/news/MEMORY.md videos[].template 字段 (31 个 pack 任何一个都合法)。
 
 #: 占位 composition 的文件名(=版式名)。每个新 pack 先放它凑齐三层目录, 但它
 #: **不是版式**: `load_style_pack` 直接跳过它, 于是"只有占位"的 pack 会在加载阶段
@@ -255,14 +270,63 @@ ROOT_GROUND_RE = re.compile(
 #: 设计系统色板 → 地面明暗。新版式用了没登记的颜色会在装包时就停机,
 #: 而不是让"相邻镜地面必不同"静默退化 —— 未登记的色板是设计系统的破口, 不是小事。
 GROUND_TONE_BY_HEX = {
+    # 原有 6 个 (news-coral cream + news-policy paper + cobalt)
     "#f5f0e8": TONE_LIGHT,   # cream 主地面
     "#e8e0d4": TONE_LIGHT,   # cream-dark 引用块地面
     "#1a1a1a": TONE_DARK,    # ink 地面
-    # news-policy (frame.md §2): 米白公文纸两档都归明, 暗地面走公文蓝而不是黑 ——
-    # 公文系统里没有"黑底"这一层, 翻面靠 cobalt #1F3A68(纸字在其上 9.84, 见 frame.md §2.1)。
     "#f5efe3": TONE_LIGHT,   # paper 主地面
     "#e8dfcb": TONE_LIGHT,   # paper-dark 卡衬地面(条目卡底)
     "#1f3a68": TONE_DARK,    # cobalt 地面(暗面翻面 + closer 书挡)
+    "#000000": TONE_DARK,    # auto-extended (polarity 极简纯黑)
+    "#080808": TONE_DARK,    # auto-extended (0.03 L)
+    "#0a0a0a": TONE_DARK,    # auto-extended (0.04 L)
+    "#0a0a0d": TONE_DARK,    # auto-extended (0.04 L)
+    "#0c0a08": TONE_DARK,    # auto-extended (0.04 L)
+    "#0a0a0e": TONE_DARK,    # auto-extended (0.04 L)
+    "#0a0a14": TONE_DARK,    # auto-extended (0.04 L)
+    "#0c0a14": TONE_DARK,    # auto-extended (0.04 L)
+    "#0e0a14": TONE_DARK,    # auto-extended (0.05 L)
+    "#080c14": TONE_DARK,    # auto-extended (0.05 L)
+    "#1a0808": TONE_DARK,    # auto-extended (0.05 L)
+    "#0a0c14": TONE_DARK,    # auto-extended (0.05 L)
+    "#0c0c10": TONE_DARK,    # auto-extended (0.05 L)
+    "#0c0c14": TONE_DARK,    # auto-extended (0.05 L)
+    "#1a0a08": TONE_DARK,    # auto-extended (0.05 L)
+    "#0e0e12": TONE_DARK,    # auto-extended (0.06 L)
+    "#0a1018": TONE_DARK,    # auto-extended (0.06 L)
+    "#101012": TONE_DARK,    # auto-extended (0.06 L)
+    "#0a1408": TONE_DARK,    # auto-extended (0.07 L)
+    "#08131c": TONE_DARK,    # auto-extended (0.07 L)
+    "#0a1419": TONE_DARK,    # auto-extended (0.07 L)
+    "#1a1408": TONE_DARK,    # auto-extended (0.08 L)
+    "#181818": TONE_DARK,    # auto-extended (0.09 L)
+    "#1c1c1f": TONE_DARK,    # auto-extended (0.11 L)
+    "#e8e6e1": TONE_LIGHT,    # auto-extended (0.90 L)
+    "#ece8df": TONE_LIGHT,    # auto-extended (0.91 L)
+    "#f3efe6": TONE_LIGHT,    # auto-extended (0.94 L)
+    "#f0f0f0": TONE_LIGHT,    # auto-extended (0.94 L)
+    "#fef3c7": TONE_LIGHT,    # auto-extended (0.95 L)
+    "#f0f4fa": TONE_LIGHT,    # auto-extended (0.96 L)
+    "#f0f5fa": TONE_LIGHT,    # auto-extended (0.96 L)
+    "#f8f4ee": TONE_LIGHT,    # auto-extended (0.96 L)
+    "#f5f5f0": TONE_LIGHT,    # auto-extended (0.96 L)
+    "#f5f5f5": TONE_LIGHT,    # auto-extended (0.96 L)
+    "#f8f5ee": TONE_LIGHT,    # auto-extended (0.96 L)
+    "#f9f5ed": TONE_LIGHT,    # auto-extended (0.96 L)
+    "#fff7ed": TONE_LIGHT,    # auto-extended (0.97 L)
+    "#faf8f5": TONE_LIGHT,    # auto-extended (0.97 L)
+    "#fff8e7": TONE_LIGHT,    # auto-extended (0.97 L)
+    "#f5f9fc": TONE_LIGHT,    # auto-extended (0.97 L)
+    "#faf9f6": TONE_LIGHT,    # auto-extended (0.98 L)
+    "#f0fdf4": TONE_LIGHT,    # auto-extended (0.98 L)
+    "#fafaf6": TONE_LIGHT,    # auto-extended (0.98 L)
+    "#f8fafc": TONE_LIGHT,    # auto-extended (0.98 L)
+    "#fbfaf5": TONE_LIGHT,    # auto-extended (0.98 L)
+    "#fcfaf6": TONE_LIGHT,    # auto-extended (0.98 L)
+    "#fbfbf6": TONE_LIGHT,    # auto-extended (0.98 L)
+    "#f5fdf4": TONE_LIGHT,    # auto-extended (0.98 L)
+    "#fefefe": TONE_LIGHT,    # auto-extended (1.00 L)
+    "#ffffff": TONE_LIGHT,    # auto-extended (1.00 L)
 }
 #: 色板里出现过的地面明暗集合, 用来校验可变地面版式填出来的值合法。
 GROUND_TONES = frozenset(GROUND_TONE_BY_HEX.values())
@@ -1181,6 +1245,17 @@ def fill_variables(layout: dict, scene: dict, ctx: dict) -> dict:
 
 def resolve_variable(var: dict, layout: dict, scene: dict, ctx: dict):
     var_id = var["id"]
+    # imagePath 是机器解析变量(commons_media 取图), 不走作者词链路: 有图给
+    # work_dir 相对路径, 没图给空串(布局据此收起图位)。空串不落 coerce —— coerce
+    # 拦的是"作者词填成空", 而"这一镜无图"是合法状态, 不是填不出来。
+    if var_id == "imagePath":
+        record = ctx.get("image_record")
+        return flatten(str(record["local_path"])) if record else ""
+    if var_id == "imageCredit":
+        # 屏上署名行由 commons_media.attribution_text 拼: 作者 + 许可证, 24 字封顶,
+        # 只削作者名且只削在词边界; 削不出整词就退到许可证 + 指向完整出处。
+        record = ctx.get("image_record")
+        return flatten(cm.attribution_text(record)) if record else ""
     # 1) 显式覆盖: JSON 场景里直接写了同名键, 或 CLI 给了同名 channel/source
     if var_id in scene and scene[var_id] is not None:
         return coerce(var, flatten(str(scene[var_id])), layout, var_id)
@@ -1538,6 +1613,33 @@ def choose_layout(pack: dict, scene: dict, ctx: dict) -> str:
     )
 
 
+def _resolve_shot_image(work_dir: str, shot_index: int, scene: dict,
+                        ctx: dict, log=print):
+    """为这一镜取一张真实图片(Wikimedia Commons); 任何环节失败都降级为无图。
+
+    查询词复用 commons_media.image_query 的优先级: scene.image 显式(作者写
+    false ⇒ 跳过该镜, 不许回落 kicker) > scene.kicker; 再回落 ctx.kicker
+    (--kicker 全局眉标)。返回的 record["local_path"] 是相对 work_dir 的
+    相对路径, 让 HTML 直接当 src 用, 不依赖引擎加载根。
+    """
+    if scene.get("image") is False:
+        return None
+    query = cm.image_query(scene, scene)
+    if not (isinstance(query, str) and query.strip()):
+        fallback = ctx.get("kicker")
+        query = fallback.strip() if isinstance(fallback, str) and fallback.strip() else None
+    if not query:
+        return None
+    media_dir = Path(work_dir) / "media"
+    media_dir.mkdir(parents=True, exist_ok=True)
+    dest = media_dir / f"shot_{shot_index:02d}.jpg"
+    record = cm.resolve_shot_image(query, dest, log=log)
+    if record is None:
+        return None
+    # 绝对路径转 work_dir 相对(正斜杠), HTML 引用方便
+    record["local_path"] = os.path.relpath(record["local_path"], work_dir).replace(os.sep, "/")
+    return record
+
 # ------------------------- HTML 发射 -------------------------
 def emit_host(pack: dict, mounts: list[str], audios: list[str], total: float,
               w: int, h: int) -> str:
@@ -1622,12 +1724,12 @@ def emit_audio_mount(mount_index: int, audio_path: str, work_dir: str,
 
 def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
                      ctx_base: dict, w: int, h: int,
-                     audio_files: list) -> list[dict]:
+                     audio_files: list, image_records: list) -> list[dict]:
     """逐镜选版式 + 填变量 + 生成宿主与挂载, 并把用过的版式文件复制进工作目录。"""
     mounts, audios, shots = [], [], []
     start = 0.0
     prev_ground_tone = None
-    for i, (scene, dur) in enumerate(zip(scenes, durations), 1):
+    for i, (scene, dur, image_record) in enumerate(zip(scenes, durations, image_records), 1):
         ctx = dict(ctx_base)
         ctx.update({
             "shot_no": i,
@@ -1636,6 +1738,7 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
             "is_first": i == 1,
             "is_last": i == len(scenes),
             "prev_ground_tone": prev_ground_tone,
+            "image_record": image_record,
         })
         layout_name = choose_layout(pack, scene, ctx)
         layout = pack["layouts"][layout_name]
@@ -1686,7 +1789,15 @@ def gate_layout_selfcheck(work_dir: str) -> None:
 
 
 def gate_hyperframes_check(work_dir: str) -> None:
-    """check --strict 是渲染前的硬门禁: 有 error/warning 就不许烧 GPU 时间。"""
+    """check --strict 是渲染前的硬门禁: 有 error/warning 就不许烧 GPU 时间。
+
+    **失败时必须报出真实原因**（2026-10-08 实跑 t002 修）:
+    旧实现只打「check 输出尾部: 报告无法解析: check.json」+ 一个 stderr **路径**。
+    实跑那次的真实原因是 `No index.html file found`（工作目录被系统 temp 清理掉了），
+    而 check.json / check.err.txt 两个文件当时**都是空的** —— 用户看着"无法解析"只能猜。
+    「假绿比红危险」在红这一侧同样成立: **报不出原因的拒绝等于没有拒绝**。
+    所以这里把 stderr 原文（非空行）直接打进异常消息。
+    """
     json_path = os.path.join(work_dir, "check.json")
     err_path = os.path.join(work_dir, "check.err.txt")
     with open(json_path, "wb") as out, open(err_path, "wb") as err:
@@ -1695,8 +1806,21 @@ def gate_hyperframes_check(work_dir: str) -> None:
     if r.returncode != 0:
         tail = summarize_check_json(json_path)
         log(f"  check 输出尾部: {tail}")
+        # stderr 原文（跳过空行）—— 这是"为什么失败"的唯一凭据
+        detail = read_text(err_path).strip() if os.path.exists(err_path) else ""
+        detail_lines = [ln for ln in detail.splitlines() if ln.strip()]
+        if detail_lines:
+            for line in detail_lines[-8:]:
+                log(f"  ! {line}")
+        else:
+            log("  ! hyperframes 的 stderr 是空的 —— 多半是工作目录被清了或 npx 拉包失败")
+            log(f"    (工作目录: {work_dir} | 存在 index.html: "
+                f"{os.path.isfile(os.path.join(work_dir, 'index.html'))})")
         log(f"  详细 stderr: {err_path}")
-        raise EmitterError("hyperframes check --strict 未通过, 已拒绝渲染")
+        raise EmitterError(
+            f"hyperframes check --strict 未通过, 已拒绝渲染。"
+            f"原因: {tail}"
+            + (f" | stderr: {' / '.join(detail_lines[-3:])}" if detail_lines else ""))
     log(f"✅ check --strict 通过 ({summarize_check_json(json_path)})")
 
 
@@ -2114,13 +2238,39 @@ def parse_resolution(text: str) -> tuple[int, int]:
     return w, h
 
 
+#: 渲染工作目录的默认根（2026-10-08 起，理由见 default_work_dir 的 docstring）
+DEFAULT_WORK_ROOT = Path(__file__).resolve().parents[3] / ".harness-news-runtime" / "work"
+
+
+def default_work_dir() -> str:
+    """本次渲染的工作目录，**默认落在项目内而不是系统 temp**。
+
+    为什么改（2026-10-08 实跑 t002 踩到）:
+      旧实现是 `tempfile.mkdtemp(prefix="pathb_")` → `%TEMP%\\pathb_xxxx`。
+      实跑一次完整渲染要 **15 分钟**，其中大半耗在首次 `npx -y hyperframes`
+      联网拉包上。等包拉好时，**Windows 临时目录已被系统自动清理** ——
+      实测 `index.html` 连同前 4 段的 mp3/vtt 一起消失，只剩最后一段音频，
+      hyperframes 于是报 `No index.html file found`，而发射器只说
+      「报告无法解析: check.json」—— 用户拿不到真实原因。
+
+    落在 `.harness-news-runtime/work/` 的理由:
+      - 与新闻域其他产物同域（ARCHITECTURE §6 的运行时目录约定）
+      - 已被 .gitignore 忽略，不会污染仓库
+      - **不被系统清理** —— 15 分钟的渲染跨得过去
+      - 出问题时目录还在，可以直接进去看 index.html / 逐镜 compositions
+
+    `--work-dir` 仍然可以显式覆盖（smoke 探针就是这么用的）。
+    """
+    return str(DEFAULT_WORK_ROOT / f"pathb_{os.getpid()}")
+
+
 def main():
     ap = argparse.ArgumentParser(description="Path B 免费端到端成片脚本 (设计系统驱动)")
     ap.add_argument("--input", help="脚本文件 (.txt/.md 或 .json 场景列表)")
     ap.add_argument("--output", default="output.mp4", help="最终 MP4 路径 (默认 output.mp4)")
     ap.add_argument("--template", "--style", dest="style", default=DEFAULT_STYLE,
                     choices=ALL_TEMPLATES,
-                     help="节目包 (设计系统) 名 (兼容旧名 --style); 默认 " + DEFAULT_STYLE + "; 12 个可选项: " + ", ".join(ALL_TEMPLATES) + ". 见 templates/hyperframes_path_b/ 与 news-workflow/SKILL.md 模板决策树")
+                     help="节目包 (设计系统) 名 (兼容旧名 --style); 默认 " + DEFAULT_STYLE + "; 31 个可选项: " + ", ".join(ALL_TEMPLATES) + ". 见 templates/hyperframes_path_b/ 与 news-workflow/SKILL.md 模板决策树")
     ap.add_argument("--voice", default="zh-CN-XiaoxiaoNeural", help="edge-tts 音色")
     ap.add_argument("--resolution", default="1080x1920", help="分辨率, 如 1080x1920(竖) 或 1920x1080(横)")
     ap.add_argument("--doctor", action="store_true", help="只做环境自检")
@@ -2196,7 +2346,7 @@ def main():
     log(f"[aigc] {aigc_mode.describe(aigc_posture)}")
     log(f"[aigc] 渲染层开关 → {render_cause} → {aigc_mode.RENDER_WHAT[render_mode]}")
 
-    work = args.work_dir or tempfile.mkdtemp(prefix="pathb_")
+    work = args.work_dir or default_work_dir()
     os.makedirs(work, exist_ok=True)
 
     try:
@@ -2224,8 +2374,23 @@ def main():
             "layout": args.layout,
             "overrides": {},
         }
+
+        # 逐镜取图 (best-effort: 网络/授权/尺寸/相关性任何失败都降级为该镜无图)
+        # --skip-render 与 --check-only 不打网络, 全部降级为无图。
+        if args.skip_render or args.check_only:
+            image_records = [None] * len(scenes)
+            log("图: 跳过 (--skip-render / --check-only 不取图)")
+        else:
+            image_records = []
+            for i, sc in enumerate(scenes, 1):
+                rec = _resolve_shot_image(work, i, sc, ctx_base, log=log)
+                image_records.append(rec)
+                if rec is not None:
+                    log(f"  镜{i} 图: {rec['title']} ({rec['width']}x{rec['height']}, {rec['license']})")
+                else:
+                    log(f"  镜{i} 图: 降级为无图")
         shots = emit_composition(pack, scenes, durations, work, ctx_base, w, h,
-                                 audio_files)
+                                 audio_files, image_records)
         log(f"→ 合成 HTML 已生成: {os.path.join(work, 'index.html')}")
 
         gate_layout_selfcheck(work)
@@ -2338,6 +2503,14 @@ def main():
             }
         write_text(os.path.join(os.path.dirname(os.path.abspath(final)), "aigc.json"),
                    json.dumps(sidecar, ensure_ascii=False, indent=2))
+
+        # 图片授权台账: media-manifest.json 只活在临时工作目录, 渲染完就被清 ——
+        # CC BY 的署名义务与授权追溯靠它, 必须拷到成片旁跟随成片归档。
+        media_manifest = os.path.join(work, "media", "media-manifest.json")
+        if os.path.isfile(media_manifest):
+            shutil.copyfile(media_manifest,
+                            os.path.join(os.path.dirname(os.path.abspath(final)), "media-credits.json"))
+            log("→ 图片授权台账已归档: media-credits.json")
 
         # ⑨ 联络表: 逐镜一帧, 人工验收比对
         build_contact_sheet(silent, shots, os.path.dirname(os.path.abspath(final)), work)

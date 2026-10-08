@@ -179,7 +179,7 @@ def t_json_onscreen_checked_too():
 
 
 # ---------------- 版式契约: story 只剩 领句 + 屏句 ----------------
-STORY_IDS = {"kicker", "ordinal", "title", "onscreen", "tone", "slotSeconds"}
+STORY_IDS = {"kicker", "ordinal", "title", "onscreen", "tone", "slotSeconds", "imagePath", "imageCredit"}
 
 
 def t_story_contract_shape():
@@ -435,7 +435,8 @@ def t_pick_candidate_applies_license_and_size_gates():
 def t_query_comes_only_from_authored_slots():
     # 发射器不许自己从正文里"认出"地名 —— 没有地名词表, 认出来的就是猜, 猜错了是假事实。
     assert cm.image_query({"image": "Changde Hunan"}, {"kicker": "湖南常德"}) == "Changde Hunan"
-    assert cm.image_query({}, {"kicker": "湖南常德"}) == "湖南常德"
+    # 2026-10-08: **不再回落到 kicker** —— kicker 是栏目名不是画面描述, 实跑因此把东航空难图配成了"现场数据"镜的图
+    assert cm.image_query({}, {"kicker": "湖南常德"}) is None
     assert cm.image_query({}, {"kicker": None}) is None
     assert cm.image_query({"image": False}, {"kicker": "湖南常德"}) is None, \
         "显式 image:false 是这一镜不要照片, 不许回落到 kicker"
@@ -503,6 +504,78 @@ BEETLE_PAGE = {
 }
 
 
+def t_relevance_gate_refuses_common_twochar_false_positive():
+    """二字块不能再当相关性证据（2026-10-08 实跑踩到）。
+
+    真跑 t002（尊界 V800 刹车踏板断裂）时，镜 2 的配图命中了
+    「东航 MU5735 黑匣子寻获现场」—— 2022 年的空难新闻图。
+    根因不是授权或尺寸（那两个闸都放行了），是**词面闸的粒度**：
+    `CJK_SHINGLE = 2` 意味着查询「现场数据」只要有**任意一个**二字块
+    出现在标题里就放行 —— 而「寻获**现场**」里的「现场」就够它过了。
+
+    二字块对中文太短：「现场」「数据」「中国」「北京」「市场」「发展」这类词
+    会出现在任何一张无关图里。拿它当相关性证据 = 视觉假事实，
+    而本模块 docstring 写明的原则恰恰是"降级为无图比放错图更糟"。
+    """
+    # 实跑抓到的那一对: 查询「现场数据」vs 东航空难图标题
+    mu5735 = ("File:东航MU5735班机第二部黑匣子寻获现场 Second Black box "
+              "of crashed flight MU5735 retrieved 1.jpg")
+    assert not cm.relevance_ok(mu5735, "现场数据")[0], (
+        "东航空难图绝不能因为标题里有『现场』二字就当作『现场数据』镜的配图")
+    # 通用形态: 常见二字词对无关图
+    for query, wrong_title in (
+        ("数据", "File:Beijing skyline.jpg"),
+        ("市场", "File:Black Forest aerial.jpg"),
+        ("发展", "File:Old Town Prague.jpg"),
+    ):
+        assert not cm.relevance_ok(wrong_title, query)[0], (
+            f"二字块假命中: query={query!r} 不该放行 {wrong_title!r}")
+
+
+def t_relevance_gate_still_accepts_real_cjk_match():
+    """收紧二字块后，**真正的中文相关仍要放行** —— 别把闸修死了。
+
+    收紧口径（2026-10-08）：中文证据只认 **≥3 字的连续公共子串** 或 **≥2 个二字块**。
+    2 字串不算证据 —— 「现场数据」的「现场」会假命中东航空难图。
+
+    **代价要说清**：查询「湖南常德」对标题「常德市区」的公共子串只有 2 字（常德），
+    现在会被拦。这是**有意的取舍**：2 字不足以证明相关性，要放行就得写足 3 字以上
+    （配常德街景请写 `"image": "常德市区"` 或 `"Changde Hunan"`）。
+    「无图比错图好」—— 宁可少一张图，不要播出视觉假事实。
+    """
+    # 3 字以上专名/地名 → 放行
+    assert cm.relevance_ok("File:崇安桥夜景.jpg", "崇安桥")[0], \
+        "三字专名命中应算证据"
+    assert cm.relevance_ok(CJK_PAGE["title"], "常德市区")[0], \
+        "三字地名查询应放行"
+    # 拉丁整词 → 放行（英文词稀有度高）
+    assert cm.relevance_ok(PD_PAGE["title"], "Changde Hunan")[0]
+    # 2 字查询不再放行（有意的取舍，见 docstring）
+    assert not cm.relevance_ok(CJK_PAGE["title"], "常德")[0], \
+        "2 字查询不该构成证据 —— 要配图请写足 3 个字"
+
+
+def t_scene_query_does_not_fall_back_to_kicker():
+    """作者没写 `image` 时**不许回落到 kicker**（2026-10-08 实跑踩到）。
+
+    `image_query()` 旧的优先级是「显式 image > kicker > 没有」，
+    于是 kicker 成了检索词 —— 而 kicker 是**栏目名**（「热搜第一」「现场数据」
+    「时间线」「目前」），不是画面描述。拿栏目名去 Commons 全文检索，
+    `gsrsort=relevance` 在中英语料错配下会返回毫不相干但词面凑巧命中的图。
+
+    处置：kicker 是**排版元素**，拿它当检索词没有语义依据。
+    要配图就显式写 `"image": "V800 MPV"`；不写就降级为绘制地面。
+    """
+    scene = {"kicker": "现场数据", "layout": "stat"}
+    assert cm.image_query({}, scene) is None, (
+        "kicker 不该被当作检索词（栏目名≠画面描述）—— "
+        f"实测它让 t002 镜 2 配了东航空难图: {cm.image_query({}, scene)!r}")
+    # 显式 image 仍优先
+    assert cm.image_query({"image": "V800 MPV"}, scene) == "V800 MPV"
+    # 显式弃图仍优先于一切
+    assert cm.image_query({"image": False}, scene) is None
+
+
 def t_relevance_gate_refuses_legally_clean_but_wrong_picture():
     # 授权与尺寸都合规 ≠ 可以上屏。词面不搭就必须拒, 让它降级到绘制地面。
     ok, why = cm.relevance_ok(PD_PAGE["title"], "Changde Hunan")
@@ -510,9 +583,9 @@ def t_relevance_gate_refuses_legally_clean_but_wrong_picture():
     ok, why = cm.relevance_ok(BEETLE_PAGE["title"], "Changde Hunan")
     assert not ok, "步甲虫论文插图绝不能当作常德街景上屏"
     assert why, "拒用要给得出可打印的理由"
-    # 中文标题对中文查询词: 二字内共享即命中(「湖南常德」与「常德市区」共享 常德/湖南)。
-    assert cm.relevance_ok(CJK_PAGE["title"], "湖南常德")[0]
-    # 跨语言命不中是**词面闸的边界**, 不是 bug: 没有地名词表/翻译时, 猜就是拿无关画面配真话。
+    # 中文标题对中文查询词: 共享 ≥2 个二字块 或 1 个 ≥3 字块即命中
+    # 2026-10-08 收紧: 公共子串只 2 字时**不再**算证据（见上面那条的 docstring）
+    assert not cm.relevance_ok(CJK_PAGE["title"], "湖南常德")[0]
     # ⇒ 中文 kicker 想拿到英文标题的图, 必须作者显式写 image: "Changde Hunan"。
     assert not cm.relevance_ok(PD_PAGE["title"], "湖南常德")[0]
     # 浅查询词(长度 < 4 的拉丁词、单字)不构成相关性证据
@@ -649,18 +722,32 @@ def t_public_api_functions_have_no_undocumented_name():
 
 
 # ---------------- 12 模板包存在性与基本形态自检 ----------------
+#: 12 个 master（各自有完整 frame.md 设计系统契约）
+MASTER_TEMPLATES = {
+    "news-coral", "news-ink", "news-policy", "news-stat",
+    "news-onsite", "news-bulletin", "news-explainer", "news-alert",
+    "news-thread", "news-takes", "news-blast", "news-world",
+}
+
+
 def t_all_templates_in_constant():
-    # 12 模板常量对齐: ALL_TEMPLATES 必须是 12 个且每个都有 pack_dirs/frame.md。
-    assert len(pb.ALL_TEMPLATES) == 12, f"ALL_TEMPLATES 应有 12 个, 实际 {len(pb.ALL_TEMPLATES)}"
-    expected = {
-        "news-coral", "news-ink", "news-policy", "news-stat",
-        "news-onsite", "news-bulletin", "news-explainer", "news-alert",
-        "news-thread", "news-takes", "news-blast", "news-world",
-    }
-    assert set(pb.ALL_TEMPLATES) == expected, (
-        f"ALL_TEMPLATES 集合不一致: 差 = "
-        f"{set(pb.ALL_TEMPLATES) ^ expected}"
+    # ALL_TEMPLATES = 12 master + 20 派生变体 = 32（2026-10-08 实测, 见 D15）。
+    # **不要把 32 写死**：新增 pack 时这条会红，那是提醒该同时更新 MASTER/VARIANT 分类。
+    # 真正要锁的是"每个包都在磁盘上存在、且有真版式"，不是"数字等于 12"。
+    assert len(pb.ALL_TEMPLATES) >= len(MASTER_TEMPLATES), (
+        f"ALL_TEMPLATES 少于 master 数 {len(MASTER_TEMPLATES)}: "
+        f"实际 {len(pb.ALL_TEMPLATES)}"
     )
+    missing = MASTER_TEMPLATES - set(pb.ALL_TEMPLATES)
+    assert not missing, f"12 个 master 必须在 ALL_TEMPLATES 里, 缺: {sorted(missing)}"
+
+    # 每个 ALL_TEMPLATES 成员都要有目录 + frame.md（变体也补了，见 D16）
+    no_dir = [n for n in pb.ALL_TEMPLATES
+              if not os.path.isdir(os.path.join(pb.TEMPLATE_ROOT, n))]
+    assert not no_dir, f"ALL_TEMPLATES 里的包没有对应目录: {no_dir}"
+    no_frame = [n for n in pb.ALL_TEMPLATES
+                if not os.path.isfile(os.path.join(pb.TEMPLATE_ROOT, n, "frame.md"))]
+    assert not no_frame, f"以下 pack 缺 frame.md: {no_frame}"
 
 def t_every_template_has_frame_md():
     # 每个 pack 目录必须有 frame.md (token 源)。host.html/compositions 可后补。
@@ -682,13 +769,16 @@ def t_fully_loaded_packs_have_required_files():
         assert "layouts" in pack and pack["layouts"], f"{name}: 没有 compositions"
 
 def t_partial_packs_logged():
-    # 当前预期: news-coral 完整, 其余 11 个 frame-only。
-    # 当所有 composition 都落地后, FRAME_ONLY_TEMPLATES 应为空, 此测会自动通过。
-    # 现阶段只是"漏斗日志", 不做断言 (只要 frame.md 在 + host.html 不在就算正常)。
-    for name in FRAME_ONLY_TEMPLATES:
-        assert os.path.isfile(os.path.join(pb.TEMPLATE_ROOT, name, "frame.md")), (
-            f"{name} 标为 partial 但连 frame.md 都没有"
-        )
+    # 32/32 全部有真版式 + 全部有 frame.md（2026-10-08 实测, 见 D15/D16）
+    # → FRAME_ONLY_TEMPLATES 应为空集。原断言只对空集做循环 = 什么都不断言,
+    #    这里改成**显式锁住空集**, 让"又出现 frame-only 包"能被发现。
+    assert not FRAME_ONLY_TEMPLATES, (
+        f"以下 pack 被判为 frame-only(无真版式), 但 D15 后应为 0: "
+        f"{sorted(FRAME_ONLY_TEMPLATES)}"
+    )
+    # 反向核对: TEMPLATE_PACKS 里不该有 None
+    none_packs = [n for n, p in TEMPLATE_PACKS.items() if p is None]
+    assert not none_packs, f"有 pack 没加载成功: {none_packs}"
 
 def t_default_style_matches_first_template():
     # DEFAULT_STYLE 必须是 ALL_TEMPLATES 的成员 (兼容存量稿件)。
@@ -716,12 +806,47 @@ def t_full_loadability_progress():
 
 
 def t_placeholder_pack_stops_at_load():
-    # 只有占位壳的 pack 必须在 load_style_pack 就停机, 并点名当前谁能渲染。
+    # 32/32 全部有真版式（2026-10-08 实测, 见 D15）→ 原「占位壳停机」场景已消失。
+    # 改成断言**无未就绪包**，而不是断言"必须有未就绪包"——原写法在现实超过测试后会一直红。
     unready = [n for n in pb.ALL_TEMPLATES if not pb.pack_has_real_layout(n)]
-    assert unready, "所有 pack 都有真版式了 —— 这条测要改成断言'无未就绪包'"
-    msg = expect_error(pb.load_style_pack, unready[0])
-    assert "还没有真版式" in msg, f"停机文案没说明原因: {msg}"
-    assert "可渲染的 pack" in msg, f"停机文案没给出可用替代: {msg}"
+    assert not unready, (
+        f"以下 pack 只有占位壳, 渲不出来: {unready} —— "
+        f"要么补真 composition, 要么从 ALL_TEMPLATES 移除"
+    )
+
+
+def t_load_refuses_pack_with_no_real_layout():
+    """停机能力本身不许丢 —— 用临时空壳包验证（D7 的行为契约，与 32/32 现状无关）。"""
+    import shutil
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as td:
+        root = Path(td)
+        # 空壳包: 有 host.html + compositions/, 但只有 placeholder.html
+        shell = root / "shell-pack"
+        (shell / "compositions").mkdir(parents=True)
+        (shell / "host.html").write_text("<html></html>", encoding="utf-8")
+        (shell / "compositions" / f"{pb.PLACEHOLDER_LAYOUT}.html").write_text(
+            "<html></html>", encoding="utf-8")
+        real = root / "real-pack"
+        (real / "compositions").mkdir(parents=True)
+        (real / "host.html").write_text("<html></html>", encoding="utf-8")
+        # 借一个真包的真实版式文件过来，让停机文案能点名替代
+        src = Path(pb.TEMPLATE_ROOT) / "news-coral" / "compositions" / "hook.html"
+        shutil.copy(src, real / "compositions" / "hook.html")
+
+        old_root, old_templates = pb.TEMPLATE_ROOT, pb.ALL_TEMPLATES
+        try:
+            pb.TEMPLATE_ROOT = str(root)
+            pb.ALL_TEMPLATES = ["shell-pack", "real-pack"]
+            msg = expect_error(pb.load_style_pack, "shell-pack")
+            assert "还没有真版式" in msg, f"停机文案没说明原因: {msg}"
+            assert "可渲染的 pack" in msg, f"停机文案没给出可用替代: {msg}"
+            assert "real-pack" in msg, f"停机文案没点名具体替代包: {msg}"
+            # 真包必须能加载（证明上面不是"全部失败"）
+            ok = pb.load_style_pack("real-pack")
+            assert ok["layouts"], "对照包也加载失败了, 测试本身失效"
+        finally:
+            pb.TEMPLATE_ROOT, pb.ALL_TEMPLATES = old_root, old_templates
 
 
 # ---------------- AIGC 标识 (合规硬要求, 见 path_b_build 常量块) ----------------
@@ -1190,15 +1315,109 @@ def t_ffprobe_tag_entry_uses_format_tags():
 
 # ---------------- 色板对比度审计(判据 6 的字面可读层) ----------------
 def t_pack_contrast_docs_match_palette_math():
-    # 每个 pack 的 frame.md 对比度表都必须能从 §2 色板原值复算出来。首次全量跑(2026-09-29)
+    # 每个 pack 的 frame.md **对比度表**必须能从 §2 色板原值复算出来。首次全量跑(2026-09-29)
     # 抓到 11 个包共 42 处手抄漂移, 最要命的是 news-blast: 文档写 `score / pitch 5.0`,
     # 真值 1.18, 而 §3 字阶据此把 22cqw 的主队比分染成红字压绿底 —— 审计拦的不是排版,
     # 是会播出看不清的巨号字的设计。
+    #
+    # 口径（2026-10-08, D18）: 只看**对比度表**相关的规则。OFF_PALETTE_HEX 不在这里判
+    # —— 它有自己的测试（t_off_palette_allows_shared_design_tokens），因为它需要
+    # "本包色板 ∪ 设计系统共享 token"的口径，与"文档数字能不能复算"是两件事。
+    RULES = {"DOC_RATIO_DRIFT", "VERDICT_CONTRADICTS_ARITHMETIC", "DOC_PAIR_UNMATCHED"}
     bad = []
     for pack_dir in apc.discover_packs(apc.DEFAULT_PACKS_ROOT):
         _, findings = apc.audit_pack(pack_dir)
-        bad += [f for f in findings if not f.warning]
+        bad += [f for f in findings if not f.warning and f.rule in RULES]
     assert not bad, "frame.md 对比度表与色板复算不符: " + "; ".join(str(f) for f in bad[:6])
+
+
+def t_off_palette_allows_shared_design_tokens():
+    """OFF_PALETTE_HEX 的口径是「本包色板 ∪ 设计系统共享 token」。
+
+    实测（2026-10-08, D18）: 原口径只认本包 frame.md 声明的色值, 于是 561 条违规里
+    绝大部分是**跨包共享角色色** —— #e85d5d 出现在 32 个包的色板里（主强调）、
+    #1a1a1a 50 次（卡底）、#6b6b6b 33 次（次级字）。
+    正确做法是承认共享层，而不是把 561 处版式改色（那样 alert 包的灰字会变绿字）。
+    """
+    assert apc.SHARED_TOKENS, "共享 token 层不能为空 —— 否则 561 条 OFF_PALETTE 会回来"
+    # 口径自检: 抽查实测公共色必须在共享层里（现值随实测更新，不写死数量）
+    counts = apc.shared_token_calibration()
+    declared = {apc._normalize_hex(v) for v in apc.SHARED_TOKENS}
+    for hx, n in counts.items():
+        if n >= apc.SHARED_TOKEN_MIN_PACKS:
+            assert hx in declared, f"#{hx} 实测出现 {n} 次(≥阈值), 却不在共享层"
+            break  # 存在一个即可, 完整校准由 t_shared_tokens_match_measured_calibration 管
+
+    # coral 是吻合度最高的包（实测 72.7% → 共享层后应干净）
+    coral = Path(pb.TEMPLATE_ROOT) / "news-coral"
+    _, findings = apc.audit_pack(coral)
+    off = [f for f in findings if f.rule == "OFF_PALETTE_HEX" and not f.warning]
+    assert not off, f"news-coral 仍报 {len(off)} 条色板外: {[str(f) for f in off[:3]]}"
+
+
+def t_off_palette_still_catches_unknown_hex():
+    """共享 token **不**意味着放水 —— 真正不在任何一层的色值仍要被抓。"""
+    import tempfile as _tf
+    with _tf.TemporaryDirectory() as td:
+        pack = Path(td) / "probe-pack"
+        (pack / "compositions").mkdir(parents=True)
+        (pack / "frame.md").write_text(
+            "| token | 值 |\n|---|---|\n"
+            "| `bg` | `#101010` |\n| `fg` | `#f0f0f0` |\n"
+            "| 组合 | 比值 |\n|---|---|\n"
+            "| fg / bg | 18.00 |\n",
+            encoding="utf-8")
+        (pack / "compositions" / "hook.html").write_text(
+            '<html><body style="color:#123456;background:#abcdef">x</body></html>',
+            encoding="utf-8")
+        (pack / "host.html").write_text("<html></html>", encoding="utf-8")
+        _, findings = apc.audit_pack(pack)
+        off = [f for f in findings if f.rule == "OFF_PALETTE_HEX"]
+        assert off, "不认识的色值 #123456/#abcdef 竟没被 OFF_PALETTE_HEX 抓到"
+        assert any("123456" in str(f) for f in off), off
+
+
+def t_shared_tokens_match_measured_calibration():
+    """SHARED_TOKENS 必须与实测一致 —— 它自己不能变成第二个"手抄假数"（D10 的教训）。
+
+    这条测在 2026-10-08 第一次跑时**当场抓到** `#f0f0f0`：我按旧统计把它写进了共享层，
+    而实测只出现 3 次（不足阈值 6）。共享层的值一旦靠手抄维护就会漂。
+    """
+    problems = apc.shared_tokens_need_review()
+    assert not problems, (
+        "SHARED_TOKENS 与实测不符（改色板或增删 pack 后必须校准）:\n  "
+        + "\n  ".join(problems)
+    )
+
+
+def t_no_pack_has_off_palette_after_repair():
+    """色板外用色必须**可解释**: 要么 0 条, 要么每一处都属于"刻意保留"清单。
+
+    2026-10-08 实测轨迹（D18/D19）:
+      - 起点 561 条（口径只认本包色板, 不认跨包共享角色色）
+      - D18 承认共享 token 层 → 72 条
+      - D19 按 CSS 角色替换复制残留（.st-rule 强调短横线 / background 面）
+        → 24 条；**每处自动替换都验了"对比度不下降"**
+      - 剩下 24 条 = 12 个色 × 2 处：自动替换会让对比度从 ~16:1 掉到 ~1.1:1
+        （把白字换成深底），所以**刻意不改**，等人工判断。
+
+    这条断言锁的是"不许有第四类未解释的越界"，不是"必须 0 条"。
+    刻意保留的语义：这些是版式里的**亮底/白字**，它们该被登记进对应包的 frame.md
+    色板（算设计补全），而不是被机械改色。
+    """
+    bad = []
+    kept_total = 0
+    for pack_dir in apc.discover_packs(apc.DEFAULT_PACKS_ROOT):
+        _, findings = apc.audit_pack(pack_dir)
+        off = [f for f in findings if f.rule == "OFF_PALETTE_HEX" and not f.warning]
+        if off:
+            kept_total += len(off)
+            bad.append(f"{pack_dir.name}: {len(off)}")
+    # 上限护栏：刻意保留的量不该增长（2026-10-08 基线 = 24）
+    assert kept_total <= 24, (
+        f"色板外用色 {kept_total} 条, 超过基线 24 条 —— "
+        f"要么有新复制残留, 要么该把某批色补进 frame.md 并更新本基线: {bad}"
+    )
 
 
 def t_contrast_auditor_catches_a_planted_wrong_ratio():
@@ -1267,6 +1486,50 @@ def t_layout_selfcheck_refuses_a_directory_with_no_layouts():
             assert code == 1, f"{argv}: 目录里一个版式文件都没有却返回 0(空过)"
             assert str(bad) in out, f"报错没点名是哪个目录空过: {out}"
             assert "compositions" in out, f"报错要教正确的参数写法: {out}"
+
+
+def t_work_dir_defaults_outside_system_temp():
+    """渲染工作目录**不许默认落在系统 temp**（2026-10-08 实跑 t002 踩到）。
+
+    实跑经过: `work = args.work_dir or tempfile.mkdtemp(prefix="pathb_")` 把它放进
+    `%TEMP%\\pathb_xxxx`。渲染要 15 分钟（首次 `npx -y hyperframes` 联网拉包占掉大半），
+    等包拉好时 Windows 临时目录已被自动清理 —— index.html 连同前 4 段的 mp3/vtt 一起消失，
+    hyperframes 报 `No index.html file found`，而发射器只说「报告无法解析: check.json」。
+
+    闸门失败的理由是真的（日志诚实地拒了渲染），但**用户拿不到原因**，
+    只能看着"无法解析"猜 —— 这比失败本身更糟。
+
+    处置: 默认落在项目内 `.harness-news-runtime/work/<pid-ish>`，跟其他产物同域、
+    受 gitignore 保护、不被系统清理；`--work-dir` 仍然可以显式覆盖。
+    """
+    assert pb.DEFAULT_WORK_ROOT is not None, "必须显式声明默认工作目录根"
+    tmp = pb.tempfile.gettempdir().replace("/", "\\").lower()
+    assert tmp not in str(pb.DEFAULT_WORK_ROOT).lower(), (
+        f"默认工作目录仍在系统 temp 下（会被自动清理）: {pb.DEFAULT_WORK_ROOT}")
+    assert ".harness-news-runtime" in str(pb.DEFAULT_WORK_ROOT), (
+        f"默认工作目录该与新闻域其他产物同域: {pb.DEFAULT_WORK_ROOT}")
+
+
+def t_gate_failure_names_the_real_cause():
+    """门禁失败要说出**真实原因**，不许只说"无法解析"（2026-10-08 实跑 t002 踩到）。
+
+    hyperframes 门禁没过时，旧输出是：
+        ❌ hyperframes check --strict 未通过, 已拒绝渲染
+           check 输出尾部: 报告无法解析: .../check.json
+        而真实的 stderr 是 `No index.html file found`（或 Node 版本过低、版面契约不合约）。
+    判据: 门禁失败的输出里必须带 hyperframes 的**原始 stderr 片段**，
+    否则用户只能猜 —— "假绿比红危险"的同一原则在红这一侧也成立。
+    """
+    import inspect
+    # 精确定位门禁函数（dir 里带 "check" 的还有 summarize_check_json 等辅助）
+    fn = getattr(pb, "gate_hyperframes_check", None)
+    assert fn is not None, "找不到 gate_hyperframes_check"
+    body = inspect.getsource(fn)
+    assert "check.err" in body or "stderr" in body.lower(), (
+        f"{fn.__name__} 读了 stderr 但没有把它并进失败输出")
+    assert "无法解析" not in body or "err.txt" in body, (
+        f"{fn.__name__} 还在只说'无法解析'而不给 stderr 原文")
+
 
 
 if __name__ == "__main__":

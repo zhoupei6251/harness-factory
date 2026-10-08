@@ -1,0 +1,58 @@
+<!doctype html>
+<html data-template-name="news-onsite-urgent" lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* news-coral · host 骨架 — 双花括号占位符由 path_b_build.py 填充。
+         这里故意不把占位符原样写进注释: String.replace 不认 CSS 注释,
+         写了就会把整段挂载标记复制进样式表里 (实测 index.html 出现两份 clip)。
+           COMPOSITION_ID  宿主合成 id (与 window.__timelines 的键一致)
+           W / H           画布宽高 (px)
+           TOTAL           全片秒数 = 各镜时长之和
+           SCENES          N 个挂载 clip (每镜一个, 见 README 的挂载片段格式)
+           AUDIOS          N 个挂载 audio (每镜配音一条, 0 轨)
+         宿主本身不画任何东西: 地面/版式/时间轴全在各 layout 的子合成里。 */
+      html,
+      body {
+        margin: 0;
+        background: #1a1a1a;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        container-type: size;
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+      /* 配音轨不参与版面: 抽出来给零尺寸, 免得它的行盒撑高 #root 把画面顶偏一位。
+         时间轴/可见性由 data-start + data-duration 决定, 与 CSS 无关。 */
+      audio {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="{{COMPOSITION_ID}}"
+      data-width="{{W}}"
+      data-height="{{H}}"
+      data-duration="{{TOTAL}}"
+    >
+{{SCENES}}
+{{AUDIOS}}
+    </div>
+    <script>
+      window.__timelines["{{COMPOSITION_ID}}"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

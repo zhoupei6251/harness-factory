@@ -1,0 +1,264 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "CHECKLIST"},
+    {"id": "title", "type": "string", "label": "小标题", "default": "三步做完"},
+    {"id": "step1Label", "type": "string", "label": "第1步标题", "default": "第一步"},
+    {"id": "step1Body", "type": "string", "label": "第1步说明", "default": "说明一"},
+    {"id": "step2Label", "type": "string", "label": "第2步标题", "default": "第二步"},
+    {"id": "step2Body", "type": "string", "label": "第2步说明", "default": "说明二"},
+    {"id": "step3Label", "type": "string", "label": "第3步标题", "default": "第三步"},
+    {"id": "step3Body", "type": "string", "label": "第3步说明", "default": "说明三"},
+    {"id": "imagePath", "type": "string", "label": "本镜真实图片(work_dir 相对路径, 空=无图)", "default": ""},
+    {"id": "imageCredit", "type": "string", "label": "本镜图片屏上署名(空=无图)", "default": ""},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-coral · catalog — 步骤清单: 墨底 + 珊瑚序号片 + 深珊瑚横向分隔
+           复算 (frame.md §1.1, 可用 audit_pack_contrast.py 重跑): 本版式的文字色只有
+           cream(15.34) 与 light-gray(8.03) 两种。珊瑚字在墨底其实有 5.10, 不染它是法则 L2
+           的选择(不是数学不过) —— 珊瑚一律以"形状"或"珊瑚片衬白字"出现。
+           行区几何是算出来的: 顶 42cqh / 底 20cqh(frame.md 法则 1 字幕禁入区) → 高 38cqh = 730px;
+           最坏三行 = 标题 5cqw×1.2(65) + gap 0.9cqh(17) + 说明 3.4cqw×1.45×2 行(107) = 189px,
+           加行间 2.6cqh+发丝线(52) → 前两行 241px ×2 + 末行 189px = 671px < 730px。
+           "说明"能算成 2 行是**前提**而不是运气: 发射器用 ROW_BODY_MAX_CHARS=42 卡住取材
+           (3.4cqw 在 74cqw 盒里一行 21 字), 超过就整条拒收这个版式。旧上限 64 字时说明会排到
+           三行, 241→301px, 总高 841px > 730px —— 实测清单被顶进字幕区, 那才是这条常量存在的理由。 */
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #0a0a14;
+          color: #f5f0e8;
+          font-family: "HF CJK", sans-serif;
+        }
+        
+        /* 把所有非图非署名的 root 子元素提到 z-index 1, 让 mask 不盖住任何文字
+           —— 一条 rule 覆盖 6 个 composition 的所有 wrapper */
+        #root > *:not([class$="-photo"]):not([class$="-photo-credit"]) {
+          z-index: 1;
+          /* 通用文字阴影: 让任何深浅底图上的文字都自带暗晕, WCAG AA 对比度兜底 */
+          text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.5);
+        }.cb-head {
+          position: absolute;
+          inset: 12cqh 6cqw 0 6cqw;
+          display: flex;
+          flex-direction: column;
+          gap: 1.6cqh;
+        }
+        .cb-eb {
+          align-self: flex-start;
+          background: #ffffff;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.9cqw;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          color: #e85d5d;
+          padding: 0.9cqh 1.8cqw;
+          transform-origin: 0% 50%;
+        }
+        .cb-ttl {
+          font-size: 8.4cqw;
+          font-weight: 900;
+          line-height: 1.2;
+          max-width: 80cqw;
+        }
+        .cb-rule {
+          position: absolute;
+          left: 6cqw;
+          right: 6cqw;
+          top: 38cqh;
+          height: 0.55cqh;
+          background: #d44a4a;
+          transform-origin: 0% 50%;
+        }
+        .cb-rows {
+          position: absolute;
+          inset: 42cqh 6cqw 20cqh 6cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: space-between;
+        }
+        .cb-row {
+          display: flex;
+          align-items: flex-start;
+          gap: 3cqw;
+          padding-bottom: 2.6cqh;
+          border-bottom: 0.2cqw solid rgba(245, 240, 232, 0.18);
+        }
+        .cb-row:last-child {
+          border-bottom: 0;
+          padding-bottom: 0;
+        }
+        /* 序号块: 珊瑚面 + 白字, 唯一合法的"文字压在珊瑚上"写法 */
+        .cb-no {
+          font-family: "League Gothic", sans-serif;
+          font-size: 7.4cqw;
+          line-height: 1;
+          background: #1e40af;
+          color: #ffffff;
+          padding: 0.5cqh 1.4cqw;
+        }
+        .cb-txt {
+          display: flex;
+          flex-direction: column;
+          gap: 0.9cqh;
+          max-width: 74cqw;
+        }
+        .cb-lb {
+          font-size: 5cqw;
+          font-weight: 900;
+        }
+        .cb-bd {
+          font-size: 3.4cqw;
+          color: #b0b0b0;
+          line-height: 1.45;
+        }
+
+        /* 真实图板(commons_media): 白面图框 + 图源指针。无图时整块 display:none,
+           版面与无图历史版完全一致; 有图由脚本亮板并加 .has-photo 收窄文字位。
+           面自带 background ⇒ 只做 scaleX 擦入, 禁止 opacity(法则 8)。 */
+        /* 真实图作满屏背景层(cinematic): 有图时整屏铺底, ::before 加黑色渐变 mask
+           让中段文字不被底图抢戏; 无图时 display:none, 版面与无图历史版完全一致。
+           Ken Burns 在 script 里驱动 cb-img 的 scale 1.0→1.06。Credit 移到右上角,
+           半透明黑底白字。 */
+        .cb-photo {
+          position: absolute;
+          inset: 0;
+          margin: 0;
+          padding: 0;
+          background: transparent;
+          display: none;
+          overflow: hidden;
+          z-index: 0;
+          transform-origin: 50% 50%;
+        }
+        .cb-photo::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg,
+            rgba(0,0,0,0.55) 0%,
+            rgba(0,0,0,0.5) 22%,
+            rgba(0,0,0,0.5) 60%,
+            rgba(0,0,0,0.7) 82%,
+            rgba(0,0,0,0.9) 100%);
+          pointer-events: none;
+        }
+        .cb-photo-img {
+          width: 100%;
+          height: 100%;
+          display: block;
+          object-fit: cover;
+          transform: scale(1.02);
+          transform-origin: 50% 50%;
+        }
+        .cb-photo-credit {
+          position: absolute;
+          top: 5cqh;
+          right: 3cqw;
+          z-index: 3;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 1.3cqw;
+          line-height: 1.3;
+          letter-spacing: 0.08em;
+          color: rgb(255,255,255);
+          background: rgba(0,0,0,0.7);
+          padding: 0.4cqh 1.2cqw;
+          text-align: right;
+        }
+        .has-photo .cb-ttl { max-width: 46cqw; }
+      </style>
+
+      <div id="root" data-composition-id="nc-takes-c-catalog" data-width="1080" data-height="1920">
+        <div class="cb-head" id="cb-head">
+          <div class="cb-eb" id="cb-eb" data-var-text="kicker">CHECKLIST</div>
+          <div class="cb-ttl" id="cb-ttl" data-var-text="title">三步做完</div>
+        </div>
+        <div class="cb-rule" id="cb-rule"></div>
+        <div class="cb-rows" id="cb-rows">
+          <div class="cb-row" id="cb-r1">
+            <div class="cb-no">01</div>
+            <div class="cb-txt">
+              <div class="cb-lb" data-var-text="step1Label">第一步</div>
+              <div class="cb-bd" data-var-text="step1Body">说明一</div>
+            </div>
+          </div>
+          <div class="cb-row" id="cb-r2">
+            <div class="cb-no">02</div>
+            <div class="cb-txt">
+              <div class="cb-lb" data-var-text="step2Label">第二步</div>
+              <div class="cb-bd" data-var-text="step2Body">说明二</div>
+            </div>
+          </div>
+          <div class="cb-row" id="cb-r3">
+            <div class="cb-no">03</div>
+            <div class="cb-txt">
+              <div class="cb-lb" data-var-text="step3Label">第三步</div>
+              <div class="cb-bd" data-var-text="step3Body">说明三</div>
+            </div>
+          </div>
+        </div>
+                <!-- 真实图作为满屏背景, figure 是 img 容器; credit 移出 figure, 是 root
+             直接子元素 —— 破除 figure 的 stacking context, 让 credit z=3 能与文字同级比较。
+             figure 加 data-layout-allow-overflow 标注 Ken Burns 溢出是有意的。 -->
+        <figure class="cb-photo" id="cb-photo" data-layout-allow-overflow>
+          <img class="cb-photo-img" id="cb-img" data-layout-allow-overflow alt="" />
+        </figure>
+        <figcaption class="cb-photo-credit" id="cb-credit">图源：Wikimedia Commons</figcaption>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const hasPhoto = Boolean(String(vars.imagePath || "").trim());
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const STAGGER = 0.2;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        // 片块(自带 background)只做 scaleX 擦入; 纯文字才允许淡入 —— 见 frame.md 法则 8
+        tl.fromTo("#cb-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.15);
+        tl.fromTo("#cb-ttl", { opacity: 0, y: 48 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+        tl.fromTo("#cb-rule", { scaleX: 0 }, { scaleX: 1, duration: 0.7, ease: "power2.out" }, 0.55);
+        tl.fromTo("#cb-r1", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.8);
+        tl.fromTo("#cb-r2", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.8 + STAGGER);
+        tl.fromTo("#cb-r3", { opacity: 0, x: 40 }, { opacity: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.8 + STAGGER * 2);
+        tl.to("#cb-rows", { yPercent: -3.2, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#cb-head", { yPercent: -2, duration: driftDur, ease: "none" }, driftStart);
+        // 真实图板: 有图才亮出(白面 → scaleX 擦入), 无图保持旧版面不变
+                if (hasPhoto) {
+          document.getElementById("cb-photo").style.display = "block";
+          document.getElementById("cb-img").src = vars.imagePath;
+          document.getElementById("cb-credit").textContent =
+              vars.imageCredit || "图源：Wikimedia Commons";
+          document.getElementById("root").classList.add("has-photo");
+          // 整屏图片是 asset (非 background-color 面块), 可以 opacity 淡入
+          tl.fromTo("#cb-img", { opacity: 0 }, { opacity: 1, duration: 0.8, ease: "power2.out" }, 0);
+          // Ken Burns push in: 起始 1.0 (CSS 已设) 缓慢推到 1.06, ease none 让镜头感连续
+          tl.to("#cb-img", { scale: 1.08, duration: driftStart + driftDur, ease: "power1.inOut" }, 0);
+        }
+        window.__timelines["nc-takes-c-catalog"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

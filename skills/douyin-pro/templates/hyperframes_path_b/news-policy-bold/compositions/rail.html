@@ -1,0 +1,255 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "TIMELINE"},
+    {"id": "title", "type": "string", "label": "小标题", "default": "三段时间线"},
+    {"id": "ordinal", "type": "string", "label": "壁纸序号", "default": "03"},
+    {"id": "item1Label", "type": "string", "label": "第1条标签", "default": "标签一"},
+    {"id": "item1Value", "type": "string", "label": "第1条事实", "default": "事实一"},
+    {"id": "item2Label", "type": "string", "label": "第2条标签", "default": "标签二"},
+    {"id": "item2Value", "type": "string", "label": "第2条事实", "default": "事实二"},
+    {"id": "item3Label", "type": "string", "label": "第3条标签", "default": "标签三"},
+    {"id": "item3Value", "type": "string", "label": "第3条事实", "default": "事实三"},
+    {"id": "imagePath", "type": "string", "label": "本镜真实图片(work_dir 相对路径, 空=无图)", "default": ""},
+    {"id": "imageCredit", "type": "string", "label": "本镜图片屏上署名(空=无图)", "default": ""},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-coral · rail — 事实脊线: 左侧珊瑚脊 scaleY 擦入 + 三行错峰入场
+           固定 3 行: 几何按 3 行排, 行数可变会把排版变成运行时问题 (README 记录该取舍)。 */
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #ffffff;
+          color: #1a1a1a;
+          font-family: "HF CJK", sans-serif;
+        }
+        
+        /* 把所有非图非署名的 root 子元素提到 z-index 1, 让 mask 不盖住任何文字
+           —— 一条 rule 覆盖 6 个 composition 的所有 wrapper */
+        #root > *:not([class$="-photo"]):not([class$="-photo-credit"]) {
+          z-index: 1;
+          /* 通用文字阴影: 让任何深浅底图上的文字都自带暗晕, WCAG AA 对比度兜底 */
+          text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.5);
+        }.rl-wall {
+          position: absolute;
+          top: 2cqh;
+          right: 4cqw;
+          font-family: "League Gothic", sans-serif;
+          font-size: 22cqw;
+          line-height: 0.8;
+          color: rgba(26, 26, 26, 0.12);
+          pointer-events: none;
+        }
+        .rl-head {
+          position: absolute;
+          inset: 14cqh 6cqw auto 6cqw;
+          display: flex;
+          flex-direction: column;
+          gap: 1.6cqh;
+        }
+        .rl-eb {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.9cqw;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          color: #6b6b6b;
+        }
+        .rl-ttl {
+          font-size: 8.6cqw;
+          font-weight: 900;
+          line-height: 1.2;
+          max-width: 74cqw;
+        }
+        .rl-spine {
+          position: absolute;
+          left: 6cqw;
+          top: 34cqh;
+          bottom: 20cqh;
+          width: 0.9cqw;
+          background: #0033cc;
+          transform-origin: 50% 0%;
+        }
+        .rl-rows {
+          position: absolute;
+          inset: 34cqh 6cqw 20cqh 11cqw;
+          display: flex;
+          flex-direction: column;
+          justify-content: center;
+          gap: 3.4cqh;
+        }
+        .rl-row {
+          display: flex;
+          align-items: baseline;
+          gap: 2.4cqw;
+          padding-bottom: 1.8cqh;
+          border-bottom: 0.2cqw solid rgba(26, 26, 26, 0.16);
+        }
+        .rl-no {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.8cqw;
+          font-weight: 700;
+          color: #6b6b6b;
+        }
+        .rl-lb {
+          font-size: 4.2cqw;
+          font-weight: 700;
+          flex: 1;
+        }
+        .rl-vl {
+          font-size: 5cqw;
+          font-weight: 900;
+          text-align: right;
+          max-width: 44cqw;
+        }
+
+        /* 真实图板(commons_media): 白面图框 + 图源指针。无图时整块 display:none,
+           版面与无图历史版完全一致; 有图由脚本亮板并加 .has-photo 收窄文字位。
+           面自带 background ⇒ 只做 scaleX 擦入, 禁止 opacity(法则 8)。 */
+        /* 真实图作满屏背景层(cinematic): 有图时整屏铺底, ::before 加黑色渐变 mask
+           让中段文字不被底图抢戏; 无图时 display:none, 版面与无图历史版完全一致。
+           Ken Burns 在 script 里驱动 rl-img 的 scale 1.0→1.06。Credit 移到右上角,
+           半透明黑底白字, 远离左侧脊线和三行 rail。 */
+        .rl-photo {
+          position: absolute;
+          inset: 0;
+          margin: 0;
+          padding: 0;
+          background: transparent;
+          display: none;
+          overflow: hidden;
+          z-index: 0;
+          transform-origin: 50% 50%;
+        }
+        .rl-photo::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg,
+            rgba(0,0,0,0.4) 0%,
+            rgba(0,0,0,0.5) 22%,
+            rgba(0,0,0,0.5) 55%,
+            rgba(0,0,0,0.6) 78%,
+            rgba(0,0,0,0.85) 100%);
+          pointer-events: none;
+        }
+        .rl-photo-img {
+          width: 100%;
+          height: 100%;
+          display: block;
+          object-fit: cover;
+          transform: scale(1.02);
+          transform-origin: 50% 50%;
+        }
+        .rl-photo-credit {
+          position: absolute;
+          top: 5cqh;
+          right: 3cqw;
+          z-index: 3;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 1.3cqw;
+          line-height: 1.3;
+          letter-spacing: 0.08em;
+          color: rgb(255,255,255);
+          background: rgba(0,0,0,0.7);
+          padding: 0.4cqh 1.2cqw;
+          text-align: right;
+        }
+        .has-photo .rl-ttl { max-width: 46cqw; }
+              .has-photo .rl-eb,
+        .has-photo .rl-vl { color: #ebe4d4; }
+        /* .rl-lb 在浅底 rail 行 label 区对比度差, 自带 padding + 黑底 */
+        .has-photo .rl-lb { color: #ebe4d4; padding: 0.2cqh 0.6cqw; background: rgba(0,0,0,0.55); }
+        /* .rl-no 在 .has-photo 下需要自带 padding + 黑底, 因为行号在浅底图上对比度差 */
+        .has-photo .rl-no { color: #ebe4d4; padding: 0.3cqh 0.8cqw; background: rgba(0,0,0,0.55); }
+      </style>
+
+      <div id="root" data-composition-id="nc-pol-b-rail" data-width="1080" data-height="1920">
+
+<div class="rl-wall" id="rl-wall" data-layout-ignore="true" data-var-text="ordinal">03</div>
+        <div class="rl-head" id="rl-head">
+          <div class="rl-eb" id="rl-eb" data-var-text="kicker">TIMELINE</div>
+          <div class="rl-ttl" id="rl-ttl" data-var-text="title">三段时间线</div>
+        </div>
+        <div class="rl-spine" id="rl-spine"></div>
+        <div class="rl-rows" id="rl-rows">
+          <div class="rl-row" id="rl-r1">
+            <div class="rl-no">01</div>
+            <div class="rl-lb" data-var-text="item1Label">标签一</div>
+            <div class="rl-vl" data-var-text="item1Value">事实一</div>
+          </div>
+          <div class="rl-row" id="rl-r2">
+            <div class="rl-no">02</div>
+            <div class="rl-lb" data-var-text="item2Label">标签二</div>
+            <div class="rl-vl" data-var-text="item2Value">事实二</div>
+          </div>
+          <div class="rl-row" id="rl-r3">
+            <div class="rl-no">03</div>
+            <div class="rl-lb" data-var-text="item3Label">标签三</div>
+            <div class="rl-vl" data-var-text="item3Value">事实三</div>
+          </div>
+        </div>
+        <!-- 真实图作为满屏背景, figure 是 img 容器; credit 移出 figure, 是 root
+             直接子元素 —— 破除 figure 的 stacking context, 让 credit z=3 能与脊线 / rail 行同级比较。
+             figure 加 data-layout-allow-overflow 标注 Ken Burns 溢出是有意的。 -->
+        <figure class="rl-photo" id="rl-photo" data-layout-allow-overflow>
+          <img class="rl-photo-img" id="rl-img" data-layout-allow-overflow alt="" />
+        </figure>
+        <figcaption class="rl-photo-credit" id="rl-credit">图源：Wikimedia Commons</figcaption>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const hasPhoto = Boolean(String(vars.imagePath || "").trim());
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const STAGGER = 0.16;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        tl.fromTo("#rl-wall", { opacity: 0, scale: 1.1 }, { opacity: 1, scale: 1, duration: 1.1, ease: "power2.out" }, 0);
+        tl.fromTo("#rl-eb", { opacity: 0, x: -24 }, { opacity: 1, x: 0, duration: 0.35 }, 0.15);
+        tl.fromTo("#rl-ttl", { opacity: 0, y: 50 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.3);
+        tl.fromTo("#rl-spine", { scaleY: 0 }, { scaleY: 1, duration: 0.8, ease: "power2.out" }, 0.55);
+        tl.fromTo("#rl-r1", { scaleX: 0, x: 34 }, { scaleX: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7);
+        tl.fromTo("#rl-r2", { scaleX: 0, x: 34 }, { scaleX: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7 + STAGGER);
+        tl.fromTo("#rl-r3", { scaleX: 0, x: 34 }, { scaleX: 1, x: 0, duration: 0.45, ease: "power2.out" }, 0.7 + STAGGER * 2);
+        tl.to("#rl-rows", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        tl.to("#rl-head", { yPercent: -2, duration: driftDur, ease: "none" }, driftStart);
+        // 真实图板: 有图才亮出(白面 → scaleX 擦入), 无图保持旧版面不变
+        if (hasPhoto) {
+          document.getElementById("rl-photo").style.display = "block";
+          document.getElementById("rl-img").src = vars.imagePath;
+          document.getElementById("rl-credit").textContent =
+              vars.imageCredit || "图源：Wikimedia Commons";
+          document.getElementById("root").classList.add("has-photo");
+          // 整屏图片是 asset (非 background-color 面块), 可以 opacity 淡入
+          tl.fromTo("#rl-img", { opacity: 0 }, { opacity: 1, duration: 0.8, ease: "power2.out" }, 0);
+          // Ken Burns push in: 起始 1.0 (CSS 已设) 缓慢推到 1.06, ease none 让镜头感连续
+          tl.to("#rl-img", { scale: 1.08, duration: driftStart + driftDur, ease: "power1.inOut" }, 0);
+        }
+        window.__timelines["nc-pol-b-rail"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

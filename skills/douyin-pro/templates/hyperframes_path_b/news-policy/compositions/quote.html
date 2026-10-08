@@ -1,0 +1,199 @@
+<!doctype html>
+<html
+  lang="zh-CN"
+  data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "QUOTE"},
+    {"id": "quoteBody", "type": "string", "label": "引文", "default": "引文内容"},
+    {"id": "attribution", "type": "string", "label": "归属", "default": "出处"},
+    {"id": "imagePath", "type": "string", "label": "本镜真实图片(work_dir 相对路径, 空=无图)", "default": ""},
+    {"id": "imageCredit", "type": "string", "label": "本镜图片屏上署名(空=无图)", "default": ""},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'
+>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+        /* news-coral · quote — 原话: 白卡 + 珊瑚顶边 + 巨引号 + 归属行
+           引号是装饰 (data-layout-ignore), 珊瑚只出现在这里; 卡内正文一律墨色。 */
+        @font-face {
+          font-family: "HF CJK";
+          src:
+            local("Noto Sans SC"),
+            local("NotoSansSC-VF"),
+            local("Source Han Sans SC"),
+            local("Noto Sans CJK SC"),
+            local("Microsoft YaHei"),
+            local("PingFang SC");
+          font-weight: 100 900;
+        }
+        #root {
+          position: absolute;
+          inset: 0;
+          overflow: hidden;
+          background: #e8e0d4;
+          color: #1a1a1a;
+          font-family: "HF CJK", sans-serif;
+        }
+        
+        /* 把所有非图非署名的 root 子元素提到 z-index 1, 让 mask 不盖住任何文字
+           —— 一条 rule 覆盖 6 个 composition 的所有 wrapper */
+        #root > *:not([class$="-photo"]):not([class$="-photo-credit"]) {
+          z-index: 1;
+          /* 通用文字阴影: 让任何深浅底图上的文字都自带暗晕, WCAG AA 对比度兜底 */
+          text-shadow: 0 1px 3px rgba(0,0,0,0.7), 0 0 1px rgba(0,0,0,0.5);
+        }.qt-card {
+          position: absolute;
+          inset: 22cqh 6cqw auto 6cqw;
+          background: #ffffff;
+          border-top: 0.9cqw solid #e85d5d;
+          padding: 5cqh 5cqw 6cqh;
+        }
+        .qt-mark {
+          font-family: "League Gothic", sans-serif;
+          font-size: 22cqw;
+          line-height: 0.6;
+          color: #e85d5d;
+          height: 12cqh;
+          pointer-events: none;
+        }
+        .qt-eb {
+          font-family: "JetBrains Mono", monospace;
+          font-size: 2.6cqw;
+          font-weight: 700;
+          letter-spacing: 0.16em;
+          color: #6b6b6b;
+          margin-bottom: 2.2cqh;
+        }
+        .qt-body {
+          font-size: 6.4cqw;
+          font-weight: 900;
+          line-height: 1.5;
+          letter-spacing: -0.005em;
+        }
+        .qt-at {
+          margin-top: 3.6cqh;
+          display: flex;
+          align-items: center;
+          gap: 2cqw;
+          font-size: 3.6cqw;
+          color: #6b6b6b;
+        }
+        .qt-dash {
+          width: 6cqw;
+          height: 0.7cqh;
+          background: #1f3a68;
+          transform-origin: 0% 50%;
+        }
+
+        /* 真实图板(commons_media): 白面图框 + 图源指针。无图时整块 display:none,
+           版面与无图历史版完全一致; 有图由脚本亮板并加 .has-photo 收窄文字位。
+           面自带 background ⇒ 只做 scaleX 擦入, 禁止 opacity(法则 8)。 */
+        /* 真实图作满屏背景层(cinematic): 有图时整屏铺底, ::before 加黑色渐变 mask
+           让中段文字不被底图抢戏; 无图时 display:none, 版面与无图历史版完全一致。
+           Ken Burns 在 script 里驱动 qt-img 的 scale 1.0→1.06。Credit 移到右上角,
+           半透明黑底白字。 */
+        .qt-photo {
+          position: absolute;
+          inset: 0;
+          margin: 0;
+          padding: 0;
+          background: transparent;
+          display: none;
+          overflow: hidden;
+          z-index: 0;
+          transform-origin: 50% 50%;
+        }
+        .qt-photo::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          background: linear-gradient(180deg,
+            rgba(0,0,0,0.4) 0%,
+            rgba(0,0,0,0.5) 22%,
+            rgba(0,0,0,0.5) 60%,
+            rgba(0,0,0,0.65) 82%,
+            rgba(0,0,0,0.9) 100%);
+          pointer-events: none;
+        }
+        .qt-photo-img {
+          width: 100%;
+          height: 100%;
+          display: block;
+          object-fit: cover;
+          transform: scale(1.0);
+          transform-origin: 50% 50%;
+        }
+        .qt-photo-credit {
+          position: absolute;
+          top: 5cqh;
+          right: 3cqw;
+          z-index: 3;
+          font-family: "JetBrains Mono", monospace;
+          font-size: 1.3cqw;
+          line-height: 1.3;
+          letter-spacing: 0.08em;
+          color: rgb(255,255,255);
+          background: rgba(0,0,0,0.7);
+          padding: 0.4cqh 1.2cqw;
+          text-align: right;
+        }
+        .has-photo .qt-card { right: 36cqw; }
+      </style>
+
+      <div id="root" data-composition-id="npc-quote" data-width="1080" data-height="1920">
+        <div class="qt-card" id="qt-card">
+          <div class="qt-mark" id="qt-mark" data-layout-ignore="true">&ldquo;</div>
+          <div class="qt-eb" id="qt-eb" data-var-text="kicker">QUOTE</div>
+          <div class="qt-body" id="qt-body" data-var-text="quoteBody">引文内容</div>
+          <div class="qt-at" id="qt-at">
+            <div class="qt-dash" id="qt-dash"></div>
+            <div id="qt-attribution" data-var-text="attribution">出处</div>
+          </div>
+        </div>
+                <!-- 真实图作为满屏背景, figure 是 img 容器; credit 移出 figure, 是 root
+             直接子元素 —— 破除 figure 的 stacking context, 让 credit z=3 能与文字同级比较。
+             figure 加 data-layout-allow-overflow 标注 Ken Burns 溢出是有意的。 -->
+        <figure class="qt-photo" id="qt-photo" data-layout-allow-overflow>
+          <img class="qt-photo-img" id="qt-img" data-layout-allow-overflow alt="" />
+        </figure>
+        <figcaption class="qt-photo-credit" id="qt-credit">图源：Wikimedia Commons</figcaption>
+      </div>
+
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const hasPhoto = Boolean(String(vars.imagePath || "").trim());
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        const tl = gsap.timeline({ paused: true });
+        // 卡片自带 white 背景 → 只做位移不做淡入 (法则 8: 面用 transform, 墨才用 opacity);
+        // 卡内文字随后逐条打印, 于是入场是"纸先到、字后印"。
+        tl.fromTo("#qt-card", { y: 60 }, { y: 0, duration: 0.55, ease: "power3.out" }, 0);
+        tl.fromTo("#qt-mark", { opacity: 0, scale: 1.3 }, { opacity: 1, scale: 1, duration: 0.8, ease: "power2.out" }, 0.2);
+        tl.fromTo("#qt-eb", { opacity: 0, x: -20 }, { opacity: 1, x: 0, duration: 0.35 }, 0.35);
+        tl.fromTo("#qt-body", { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: 0.6, ease: "power2.out" }, 0.5);
+        tl.fromTo("#qt-at", { opacity: 0, y: 24 }, { opacity: 1, y: 0, duration: 0.45 }, 0.95);
+        tl.fromTo("#qt-dash", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power2.out" }, 1.05);
+        tl.to("#qt-card", { yPercent: -2.2, duration: driftDur, ease: "none" }, driftStart);
+        // 真实图板: 有图才亮出(白面 → scaleX 擦入), 无图保持旧版面不变
+                if (hasPhoto) {
+          document.getElementById("qt-photo").style.display = "block";
+          document.getElementById("qt-img").src = vars.imagePath;
+          document.getElementById("qt-credit").textContent =
+              vars.imageCredit || "图源：Wikimedia Commons";
+          document.getElementById("root").classList.add("has-photo");
+          // 整屏图片是 asset (非 background-color 面块), 可以 opacity 淡入
+          tl.fromTo("#qt-img", { opacity: 0 }, { opacity: 1, duration: 0.8, ease: "power2.out" }, 0);
+          // Ken Burns push in: 起始 1.0 (CSS 已设) 缓慢推到 1.06, ease none 让镜头感连续
+          tl.to("#qt-img", { scale: 1.06, duration: driftStart + driftDur, ease: "none" }, 0);
+        }
+        window.__timelines["npc-quote"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

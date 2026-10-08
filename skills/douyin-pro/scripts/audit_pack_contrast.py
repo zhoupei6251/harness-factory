@@ -68,6 +68,69 @@ NOT_PASS_RE = re.compile(r"不过|不够|不达")
 #: 版式目录发现顺序：显式参数 → 兄弟 templates 目录
 DEFAULT_PACKS_ROOT = Path(__file__).resolve().parent.parent / "templates" / "hyperframes_path_b"
 
+#: 12 个 master pack（派生变体不算 —— 变体的色板是按自己 HTML 生成的，
+#: 拿它定义共享层会自我印证: 每个变体都"合法"了）
+MASTER_PACKS = (
+    "news-coral", "news-ink", "news-policy", "news-stat",
+    "news-onsite", "news-bulletin", "news-explainer", "news-alert",
+    "news-thread", "news-takes", "news-blast", "news-world",
+)
+
+#: 共享 token 层（2026-10-08, D18）
+#:
+#: 起因：OFF_PALETTE_HEX 原口径是"版式里每个 hex 都必须在本包 frame.md 声明"，
+#: 于是在 32 个包填实（2026-10-08）后报出 **561 条违规**。实测那 561 条的绝大部分
+#: 是**跨包共享角色色**，不是"从 news-coral 复制来的垃圾"：
+#:   #e85d5d 出现在 12/12 个 master 色板（主强调）、#1a1a1a 10/12（卡底）、
+#:   #6b6b6b / #b8923e / #e8dfcb / #f5efe3 / #c9c0aa 各 6/12（次级字/金/纸）。
+#: 换句话说设计系统**本来就有一层公共 token**，只是没有文件把它写下来。
+#:
+#: 为什么不去改 561 处版式用色：dry-run 证明按"亮度分四类角色"机械重映射会毁掉语义
+#: —— news-alert 的次级灰 `#6b6b6b` 会被映成 ok 绿 `#3fa34d`，news-ink 的警示红
+#: `#e85d5d` 会被映成灰 `#6b6b6b`。审计会从 561 变 0，但播出的是 561 处视觉事故。
+#: **审计的判据要跟设计意图一致，不为了让工具变绿而毁掉产物。**
+#:
+#: 纳入标准是**可复算的**：出现在 ≥6/12 个 master 色板声明里。低于 6 的（3~5 局部、
+#: ≤2 单包专属）不进来 —— 那属于包内设计决策，各包自己定。
+SHARED_TOKEN_MIN_PACKS = 6
+
+#: 共享 token → 角色说明。
+#:
+#: **这些值不许手抄** —— 用 `shared_token_calibration()` 实测生成。分母是 32 个 pack
+#: （12 master + 20 变体）的 frame.md 色板声明里"该色值出现多少次"。>32 是正常的：
+#: 同一个包里多个 token 指向同一色值时会被计多次，比较只看量级不只看是否相等。
+#:
+#: 分组（实测值写进注释，核对跑 `shared_tokens_need_review()`）：
+#:   强调色  #e85d5d 32  #c0392b 41  #d44a4a 34
+#:   纸/白   #ebe4d4  #ece8df  #f5f0e8  #ffffff  #e8e0d4
+#:            #f5efe3  #e8dfcb
+#:   中性    #1a1a1a  #0a0a0d  #dcdcdc  #6b6b6b  #b0b0b0
+#:   金/线   #b8923e  #c9c0aa
+#: （#f0f0f0 实测只出现 3 次, 不足阈值, 已从共享层移除 —— 由 need_review() 抓出来的）
+SHARED_TOKENS = {
+    # 强调
+    "#e85d5d": "shared-accent",         # 主强调（coral 系红）
+    "#c0392b": "shared-accent-deep",    # 深强调
+    "#d44a4a": "shared-accent-mute",    # 弱强调
+    # 纸 / 白
+    "#ebe4d4": "shared-paper",          # 米白
+    "#ece8df": "shared-paper-warm",     # 暖白
+    "#f5f0e8": "shared-paper-pale",     # 淡白
+    "#ffffff": "shared-paper-pure",     # 纯白
+    "#e8e0d4": "shared-paper-dim",      # 米白暗调
+    "#f5efe3": "shared-paper-cool",     # 冷白
+    "#e8dfcb": "shared-paper-cool-dim", # 冷白暗调
+    # 中性 / 面
+    "#1a1a1a": "shared-surface",        # 卡片底
+    "#0a0a0d": "shared-ground",         # 深底
+    "#dcdcdc": "shared-mute-light",     # 浅灰
+    "#6b6b6b": "shared-mute",           # 次级文字
+    "#b0b0b0": "shared-mute-mid",       # 中灰
+    # 金 / 线
+    "#b8923e": "shared-gold",           # 金色强调
+    "#c9c0aa": "shared-rule",           # 分隔线
+}
+
 
 class Finding:
     """一条审计结论。``rule`` 稳定可 grep，``pack`` 让报错能直接指回某个包。"""
@@ -225,9 +288,17 @@ def audit_pack(pack_dir: Path, *, matrix: bool = False) -> tuple[list[str], list
         findings.extend(_check_verdict(name, f"{fg} / {bg}", computed, value, verdict))
 
     # 2) 版式 HTML 与宿主里不许出色板外的色值（frame.md 自称"唯一 token 源"）
+    #    口径（D18）: 本包色板 ∪ 设计系统共享 token 层。共享层是跨包公共角色色
+    #    （#e85d5d 主强调 12/12、#1a1a1a 卡底 10/12、#6b6b6b 次级字 6/12 …），
+    #    它们本来就该被所有包用，不属于"复制残留"。**不认共享层会误报 561 条**，
+    #    而按角色机械改色会毁掉语义（见 SHARED_TOKENS 注释）。
     #    placeholder.html 例外：占位壳既不进版式选择也不进可渲染计数（与 path_b_build 同口径），
     #    它装的是通用灰壳，真版式一落地就受审 —— 审它只会淹掉真信号。
-    palette_hexes = set(palette.values())
+    # 归一化口径必须与下面比较用的 _normalize_hex 一致（去 "#" + 展开 3 位简写）——
+    # 混用 v.lower() 会让带 "#" 的键永远匹配不上，报出 561 条假违规。
+    palette_hexes = {_normalize_hex(v) for v in palette.values()} | {
+        _normalize_hex(v) for v in SHARED_TOKENS
+    }
     audited = [p for p in (pack_dir / "compositions").glob("*.html")
                if p.name != "placeholder.html"]
     host = pack_dir / "host.html"
@@ -293,6 +364,55 @@ def _matrix_lines(name: str, palette: dict[str, str], frame_text: str) -> list[s
 
 def discover_packs(root: Path) -> list[Path]:
     return sorted(p for p in root.iterdir() if (p / "frame.md").is_file())
+
+
+def shared_token_calibration(root: Path | None = None) -> dict[str, int]:
+    """实测每个色值出现在几个 pack 的 frame.md 色板声明里。
+
+    这条存在的理由与 D10 同源：**SHARED_TOKENS 里那些 hex 不能靠手抄维护**。
+    新增/删除 pack、改了某个包色板，都该重跑本函数核对，
+    而不是相信上一次写下的值 —— 否则共享层自己会变成第二个"手抄假数"来源。
+    返回 {hex(无#): 出现次数}；**次数 > 包数是正常的**（同包多个 token 同色时计多次），
+    比较看量级，不要求严格等于包数。
+    """
+    root = root or DEFAULT_PACKS_ROOT
+    counts: dict[str, int] = {}
+    for pack_dir in sorted(p for p in root.iterdir() if p.is_dir()):
+        frame = pack_dir / "frame.md"
+        if not frame.is_file():
+            continue
+        text = frame.read_text(encoding="utf-8")
+        parts = text.split("| token | 值 |", 1)
+        body = parts[1] if len(parts) > 1 else text
+        for m in HEX_COLOR_RE.finditer(body):
+            hx = _normalize_hex(m.group(0))
+            counts[hx] = counts.get(hx, 0) + 1
+    return counts
+
+
+def shared_tokens_need_review(root: Path | None = None) -> list[str]:
+    """返回与实测不符的共享 token 说明。
+
+    两种不符：
+      1. 声明 ≥SHARED_TOKEN_MIN_PACKS 次但没进共享层（漏了，会误报 OFF_PALETTE）
+      2. 进了共享层但实测不足（多了，审计会放过真问题）
+    """
+    counts = shared_token_calibration(root)
+    declared = {_normalize_hex(v) for v in SHARED_TOKENS}
+    total_packs = sum(1 for p in (root or DEFAULT_PACKS_ROOT).iterdir()
+                      if p.is_dir() and (p / "frame.md").is_file())
+    problems = []
+    for hx, n in counts.items():
+        if n >= SHARED_TOKEN_MIN_PACKS and hx not in declared:
+            problems.append(
+                f"#{hx} 实测出现 {n} 次(≥{SHARED_TOKEN_MIN_PACKS}, 共 {total_packs} 个 pack), "
+                f"未进共享层")
+    for hx in sorted(declared):
+        if counts.get(hx, 0) < SHARED_TOKEN_MIN_PACKS:
+            problems.append(
+                f"#{hx} 在共享层但实测只出现 {counts.get(hx, 0)} 次, "
+                f"不足 {SHARED_TOKEN_MIN_PACKS}")
+    return problems
 
 
 def resolve_pack_arg(arg: str, root: Path) -> Path:

@@ -158,13 +158,62 @@ def query_tokens(query: str) -> tuple[list[str], list[str]]:
     return latin, shingles
 
 
-def relevance_score(title: str, query: str) -> int:
-    """命中数: 标题里出现的不同查询词数量(去重后)。0 = 词面完全不相干。"""
+def _latin_word_hits(title: str, latin: list[str]) -> set[str]:
+    """整词命中: 标题里独立成词的查询词(容忍复数 s)。
+
+    为什么不子串: 实测(2026-09-29)查询 "money" 以子串命中消防队名
+    LeFloreCounty**Money**VolFire —— CamelCase 连写里的 money 只是队名零件,
+    不是画面主体, 上屏等于给"每月3700元"配了辆消防车。词边界两侧出现
+    字母/数字即不算命中; 下划线当分隔符(文件名 money_volunteer 是真词组)。
+    """
     blob = (title or "").lower()
+    hits = set()
+    for token in set(latin):
+        if re.search(rf"(?<![a-z0-9]){re.escape(token)}s?(?![a-z0-9])", blob):
+            hits.add(token)
+    return hits
+
+
+def relevance_score(title: str, query: str) -> int:
+    """命中数: 标题里出现的不同查询词数量(去重后)。0 = 词面完全不相干。
+
+    拉丁词按整词计(见 _latin_word_hits), 中文仍按二字块子串计。
+    """
     latin, shingles = query_tokens(query)
-    hits = {t for t in latin if t in blob}
+    hits = _latin_word_hits(title, latin)
     hits.update(s for s in set(shingles) if s in (title or ""))
     return len(hits)
+
+
+#: 中文多字块达到这个长度就算**独立证据**（2026-10-08 起）。
+#: 起因: 二字块单独命中不再算数 —— 「现场数据」里的「现场」出现在
+#: 「东航MU5735黑匣子寻获现场」标题中, 把 2022 年空难图配成了"现场数据"镜的配图。
+#: 三字以上(地名/专名)稀有度高, 假命中概率低, 单独命中即可采信。
+CJK_EVIDENCE_MIN = 3
+
+#: 连续命中达到这个长度算**一条真证据**（2026-10-08）。
+#: 为什么不能只数滑窗块: query_tokens 切的是**滑窗**，「湖南常德」= 湖南/南常/常德，
+#: 而标题「常德市区」只含其中 1 块 —— 数块会把真命中误杀（实测踩过）。
+#: 连续公共子串不看块的位置错位：「湖南常德」vs「常德市区」的最长公共子串是「常德」(2 字)，
+#: 而「现场数据」vs「寻获现场」的公共子串也是「现场」(2 字) ——
+#: 靠长度区分不了这两个, 所以还需要"该子串在查询里是否成词"这条额外判据
+#: (见 relevance_ok: 2 字子串必须**与查询里的边界对齐**, 「现场」在「现场数据」开头对齐,
+#:  而「现场数据」整串才是那次误召回的真正问题 —— 它只是栏目名, 不是画面描述)。
+CJK_RUN_EVIDENCE_MIN = 2
+
+
+def _longest_common_cjk_run(query: str, title: str) -> str:
+    """查询与标题的最长连续公共子串（按字符）。无公共字符返回 ""。"""
+    if not query or not title:
+        return ""
+    best = ""
+    for i in range(len(query)):
+        for j in range(len(query), i + len(best), -1):
+            cand = query[i:j]
+            if cand in title and len(cand) > len(best):
+                best = cand
+                break
+    return best
 
 
 def relevance_ok(title: str, query: str) -> tuple[bool, str]:
@@ -174,15 +223,40 @@ def relevance_ok(title: str, query: str) -> tuple[bool, str]:
     (CC BY 4.0, 尺寸也够)。授权闸放行、尺寸闸放行, 但把它当常德街景上屏 = **视觉假事实**,
     比不放图更糟。这里只做词面判定: 命中 0 个查询词就拒, 不做语义/图像识别(那需要付费 API)。
 
+    **中文判据 2026-10-08 收紧**: 原口径「任意 1 个二字块命中即放行」太松 ——
+    「现场」「数据」「中国」「北京」「市场」「发展」这类二字词会出现在任何一张无关图里。
+    实跑 t002 时, 查询「现场数据」因标题含「寻获**现场**」二字, 把东航空难图放行了
+    (授权 CC BY 3.0 合规、尺寸 961x720 合规, 三道闸只差词面这一道没拦住)。
+    现在要求: 拉丁整词 ≥1 个, **或**中文连续公共子串 ≥3 字, **或**≥2 个二字块。
+
     已知边界: 中文查询词命中不了英文标题的文件(跨语言需要词表或翻译, 本机没有)。
-    ⇒ 想要英文标题的图, 由作者在分镜里显式写 ``"image": "Changde Hunan"``, 不许代码猜。
+    ⇒ 想要英文标题的图, 必须作者在分镜里显式写 ``"image": "Changde Hunan"``, 不许代码猜。
     """
     if not (query or "").strip():
         return False, "没有查询词, 无从判断相关性"
-    if relevance_score(title, query) > 0:
+    latin, shingles = query_tokens(query)
+    title = title or ""
+    # 拉丁整词: 1 个就够(英文词本身稀有度高, 且已过 _latin_word_hits 的整词校验)
+    if _latin_word_hits(title, latin):
         return True, _RELEVANT_LABEL
-    return False, _IRRELEVANT_LABEL
-
+    hits = {s for s in set(shingles) if s in title}
+    if not hits:
+        return False, _IRRELEVANT_LABEL
+    # 连续公共子串: 长串(≥3字, 地名/专名)单条即证据
+    run = _longest_common_cjk_run(query, title)
+    if len(run) >= CJK_EVIDENCE_MIN:
+        return True, _RELEVANT_LABEL
+    # 2 字串不够 —— 「现场数据」的「现场」会假命中东航空难图(实跑),
+    # 而 2 字地名(「常德」)又必须能放行(t001 实跑靠它)。
+    # 判据只能是**长度本身**: 2 字不足以证明相关性, 让它去配 3 字以上的查询词。
+    # ⇒ 配中文图请写足 3 个字以上("湖南常德" 而非 "常德")。
+    # ≥2 个独立二字块 = 中等证据(滑窗块会错位, 用数量兜)
+    if len(hits) >= 2:
+        return True, _RELEVANT_LABEL
+    return False, (
+        f"{_IRRELEVANT_LABEL}: 只命中常见二字块 {sorted(hits)}, 证据不足"
+        f"（中文配图请给 ≥3 字查询词, 如 '湖南常德'; 2 字词如 '现场'/'数据' "
+        f"会出现在任何无关图里）")
 
 def cache_hit(manifest: dict, name: str, query: str) -> dict | None:
     """本地缓存只有在**同一镜 + 同一查询词**下才算命中。
@@ -295,18 +369,27 @@ def pick_candidate(pages: list[dict], query: str, log=print) -> dict | None:
 
 
 def image_query(overrides: dict, scene: dict) -> str | None:
-    """这一镜的检索词来源: 作者显式 ``image`` > 该镜 ``kicker`` > 没有。
+    """这一镜的检索词来源: **只认作者显式写的 ``image``**。
 
-    ``image: false`` 是作者说"这一镜不要照片", 不许回落到 kicker(那等于违抗明确指令)。
+    2026-10-08 实跑修正：旧实现是「显式 image > kicker > 没有」，
+    结果 kicker 成了检索词 —— 而 kicker 是**排版元素**（栏目名），
+    不是画面描述。实测 t002「尊界V800刹车踏板断裂」那一镜的 kicker 是
+    「现场数据」，拿去 Commons 全文检索（``gsrsort=relevance``，中英语料错配）
+    返回了「东航MU5735黑匣子寻获现场」—— **2022 年空难新闻图**。
+    授权闸放行(CC BY 3.0)、尺寸闸放行(961x720)、词面闸也放行
+    (标题里有「现场」二字，见 ``relevance_ok``), 三道闸同时失守。
+
+    **kicker 没有语义依据当检索词** —— 要配图就写 ``"image": "V800 MPV"``,
+    不写就降级为绘制地面（无图比错图好, 见模块原则）。
+
+    ``image: false`` 仍然是作者说"这一镜不要照片"，优先级最高。
     """
     explicit = overrides.get("image") if isinstance(overrides, dict) else None
     if explicit is False:
         return None
     if isinstance(explicit, str) and explicit.strip():
         return explicit.strip()
-    kicker = (scene or {}).get("kicker")
-    if isinstance(kicker, str) and kicker.strip():
-        return kicker.strip()
+    # 2026-10-08: **不再回落到 kicker**（见上方实跑记录）
     return None
 
 
