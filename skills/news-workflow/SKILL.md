@@ -11,6 +11,7 @@ domain: news
 category: news.workflow
 skills:
   - "news-collect"
+  - "news-curate"
   - "hot-topic-content-maker"
   - "media-short-video-copy"
   - "viral-script-writer"
@@ -30,25 +31,38 @@ skills:
 
 ## 步骤 0：选题裁决（先做这个决定）
 
-**先采集，再裁决**。采集层是 `news-collect`（零成本：百度热搜 board API + feedx 中文媒体 RSS，
-一条命令把线索写进 `.harness-news-runtime/hotboard/<date>.json`）；`hot-topic-content-maker` 只用来做选题裁决与脚本导向。
+**先采集，再策展，最后裁决**。采集层是 `news-collect`（零成本：百度热搜 board API + feedx 中文媒体 RSS，
+一条命令把线索写进 `.harness-news-runtime/hotboard/<date>.json`）；策展层是 `news-curate`（按台账去重 +
+免费信号排序，产出带理由的候选清单）；`hot-topic-content-maker` 只用来做最终裁决与脚本导向。
 
 | 场景 | 用什么 |
 |------|--------|
 | 手上没素材，要看今天什么在热 | `python skills/news-collect/scripts/collect.py --limit 12 --print`（只要新料再加 `--max-age-days 3`）|
-| 从线索里定 1 条并推到脚本 | **hot-topic-content-maker**（裁决/脚本导向；**不调它的热榜查询**，见下）|
-| 用户自己带来了热点/素材 | 跳过采集，直接进步骤 1 |
+| **要候选清单，且不要重复推已发过的** | `python skills/news-curate/scripts/curate.py --record-history --top 10 --print` |
+| 从候选里定 1 条并推到脚本 | **hot-topic-content-maker**（裁决/脚本导向；**不调它的热榜查询**，见下）|
+| 用户自己带来了热点/素材 | 跳过采集与策展，直接进步骤 1 |
 
 ⛔ **新闻域不使用 `hot-topic-content-maker` 的热榜查询**：那一步按次扣 Beatra 付费额度
 （抖音热榜 6 credits，抖音/小红书按话题搜索各 60 credits）。本路线硬约束是零付费创作 —— 采集一律走 `news-collect`。
 
+### 候选清单上必须先看两件事
+
+1. **⚠STALE** —— 陈旧（>7 天）条目多半是采集源滞后，**不是今天的新闻**，别发。
+   实测（2026-10-08）：`thepaper` 镜像最新条目在 297 天前、`zaobao` 48 天前，只有 `bbc-zh` 是当天的。
+   全部候选都带 STALE 时策展会给一条警告 —— 那是"今天源挂了"的信号，不是"今天没新闻"。
+2. **⚠REVIEW** —— L2 相似度提示这条**疑似台账里已有同一事件**（不同媒体换了说法）。
+   **必须人工确认一次**再决定发不发：自动去重只挡得住"同媒体复读同一标题"（见 `skills/news-curate/SKILL.md` §4）。
+
 采集到的是**线索，不是事实**，三个实测的坑（细节见 `skills/news-collect/SKILL.md` §4/§5/§9）：
-`hot` 字段恒为空（没有真热度值，只能看榜内 `rank`）；百度条目的 url 是搜索结果页不是原文；
-feedx 三个源新鲜度从「当天」到「9 个月前」都有 → 按 `feed_stats` / `age_days` 先筛一遍。
+`hot` 字段恒为空（没有真热度值，排序只用榜内 `rank`；**RSS 源的 rank 是 feed 内序号、不是热度**）；
+百度条目的 url 是搜索结果页不是原文；
+feedx 三个源新鲜度从「当天」到「297 天前」都有 → 按 `feed_stats` / `age_days` 先筛一遍，
+或直接用策展层的 STALE 标记。
 裁决结果仍必须进步骤 3 的 fact-check 硬门禁，本层不豁免任何东西。
 
 裁决后在 MEMORY `topics` 记录 `id + title + source`，**`status: researching`**；
-`source` 写成可回溯形式，例如 `百度热搜榜 #3（news-collect 采集于 2026-09-29）`。
+`source` 写成可回溯形式，例如 `百度热搜榜 #3（news-collect 采集于 2026-10-08）`。
+**并回写台账** `routes/news/ledger.jsonl`（追加一行，状态改 `selected`）—— 见硬性规则 9。
 
 ---
 
@@ -75,15 +89,17 @@ feedx 三个源新鲜度从「当天」到「9 个月前」都有 → 按 `feed_
 
 回填 MEMORY `videos[].template: <pack_name>`。
 
-**当前进度**（12 pack = frame.md / host.html / compositions/*.html 三层齐全度）：
-- `news-coral`: 完整（7 个真 composition）
-- `news-policy`: 完整（5 个真 composition：hook / story / catalog / rail / closer）
-- 上面两包即自检报告的 `可渲染 pack (有真版式): 2/12 —— news-coral, news-policy`
-- 其余 10 个: frame.md + host.html + 只有 `placeholder.html`（占位壳，**不参与选择**）
-- ⚠️ 决策树命中不可渲染的包时：政策/法规/通知类改落 `news-policy`，其余改落 `news-coral`，
-  或按该包 frame.md 契约补真 composition。
-  `load_style_pack` 会在**加载阶段**就停机并点名可渲染替代（不会等到渲染第 1 镜）
-- 校验（三道闸，全绿才算过；脚本都在 `skills/douyin-pro/scripts/`，仓库根执行）：
+**当前进度**（2026-10-08 实测，32 个 pack 全部齐全）：
+- **32/32 全部有真版式**：12 master + 20 派生变体，每个 `compositions/` 7 个真 composition
+- `placeholder.html` 全删；`load_style_pack` 32/32 成功；`layout_selfcheck.py` 32 包 234 文件 0 违规
+- 20 个派生变体已补 `frame.md`（含 `derived_from` 派生声明）
+- **决策树可以放心用** —— 命中任何一格都渲得出来，不再需要"不可渲染就 fallback"那套绕路
+- ⚠️ 本节原写「2/12 可渲染、其余 10 包仅占位」是**陈旧数据已作废**（见 ARCHITECTURE.md D15）
+- ⚠️ **改版式用色时**：`audit_pack_contrast.py` 口径是「本包色板 ∪ 共享 token 层」，
+  `SHARED_TOKENS` 是跨包公共角色色（实测出现 ≥6 次）、**不许手抄** ——
+  改完用 `shared_tokens_need_review()` 核对（D18）。`#root` 地面色另受 `GROUND_TONE_BY_HEX`
+  约束，改它等于改整片的底。
+- 校验（三道闸
   - `path_b_selftest.py` → 末行 `[selftest] 全绿 N/N`（**项数以脚本输出为准**，别在文档里抄数：
     61→63→66 这三级台阶全是加断言造成的手抄漂移），并报告 `可渲染 pack (有真版式): X/12`
   - `audit_pack_contrast.py` → `对比度审计通过：12 个 pack 的 frame.md 色板与文档一致`
@@ -111,6 +127,24 @@ feedx 三个源新鲜度从「当天」到「9 个月前」都有 → 按 `feed_
 产物：`.harness-news-runtime/articles/<topic_id>-script.md`，回填 MEMORY `drafts[]`。
 
 **模板契约提示**：脚本里加 `屏: <整句>` 单独行（即 markdown `onscreen:`）让 path_b_build 的 `check_onscreen` 闸门放行（不被配音念出来的那一句单独上屏）。每个 pack 的 frame.md 第 3 节有字阶约定，照着写。
+
+### ⚠️ 出稿后必跑契约预检（渲染前，2026-10-08 起）
+
+```bash
+python routes/news/scripts/check_scene_contract.py .harness-news-runtime/articles/<id>-scenes.json
+```
+
+**为什么这一步不能省**（t002 实跑踩到）：`title` **不进配音**，而 `stat` / `closer` / `quote`
+**没有标题位**（实测 news-coral 七个版式里这三个没有）—— 标题既不上屏也不出声，
+而 `path_b_build` 只在**渲染 15 分钟之后**打一条 ⚠。预检在写稿那一刻就说清，并给修法。
+
+预检会报四类问题：
+1. `title` 在无标题位的版式上（→ 并进 `body`，或换 `catalog`/`hook`/`rail`/`story`）
+2. 条目数超出该版式固定行数（末尾条目不上屏）
+3. 传了 `onscreenAccent` 但 `onscreen` 没写 `｜` 分隔标记（强调段会被覆盖）
+4. `body` 为空（配音直接停机）
+
+**auto 自检**：`--demo` 用内置反例验证预检器本身还会犯（3 反例必报 + 1 干净稿不误报）。
 
 ---
 
@@ -226,6 +260,27 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
    **开关买到的是调试自由，不是免标识的成品**
 8. **采集只走 `news-collect`**：热点线索来自本地可复跑的免费采集器，**不**调用任何按次扣费的榜单/搜索接口
    （Beatra 热榜 6 / 话题搜索 60 credits）。付费不是本路线的可选项，缺源就补免费源而不是花钱
+9. **台账状态迁移只有本工作流写**（单一写者，`routes/news/ledger.jsonl` 追加语义）：
+   | 时机 | 追加行 |
+   |---|---|
+   | 步骤 0 裁决完 | `status: selected` + `topic_id` |
+   | 步骤 2 出稿 | `status: drafted` + `draft_id` |
+   | 步骤 4 渲完 | `status: rendered` + `video_id` + `output` |
+   | 步骤 5 发布后 | `status: published` + `published_at` |
+
+   `curate.py` **只写 `candidate`**，它没有信息判断别的状态（见 `skills/news-curate/SKILL.md` §5）。
+   **台账当前状态 = 最后一行**，不是首行 —— 状态迁移必须追加行，不许原地改。
+   `norm_key` 必须由**完整标题**算（`cu.norm_key(title)`）：手敲前缀会让 L1 静默失效、去重形同虚设。
+
+   **回写一律走 CLI**（2026-10-08 起），别手敲 `python -c` —— 它保证沿用同事件主键、值拼错即停机：
+
+   ```bash
+   python skills/news-curate/scripts/ledger.py mark --status <selected|drafted|rendered|published> \
+     --norm-key "<完整标题算出的归一化键>" [--topic-id t002] [--video-id v009] [--output <路径>]
+   ```
+
+   `mark --status published` 会在缺省时自动补 `published_at` 为当天。发完跑一次
+   `python skills/news-curate/scripts/ledger.py check` 确认主键没撞车（撞车 = 明天的去重会认错事件）。
 
 ---
 

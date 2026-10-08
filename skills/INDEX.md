@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 48 active + 51 archived = 99 skills
+Total: 49 active + 51 archived = 100 skills
 
-## Active (48)
+## Active (49)
 
 | Skill | Description |
 |-------|-------------|
@@ -20,7 +20,7 @@ Total: 48 active + 51 archived = 99 skills
 | douyin-copy-extract | 粘贴抖音、快手、小红书、视频号公开可访问的短视频分享链接，一键提取标题、简介、口播文案，提供原版、优化朗读版、精简浓缩版，并支持违禁敏感词提醒与口播时长参考，排版整洁纯净，一键复制即用。 |
 | douyin-pro | 抖音短视频双路径生产体系（单 Skill 版）。Path A[付费·高质量]：策略大脑→（可选：素材混剪/AI高光提取）→脚本优化→AI生图/素材准备→配音渲染（百炼/GPT-SoVITS/CosyV |
 | douyin-upload | 当 agent 需要通过已安装的 `sau` CLI 完成抖音登录、cookie 校验、视频上传或图文发布时使用这个 skill。该 skill 适用于已经安装 `social-auto-upload |
-| fact-check | 事实核查 skill，对新闻内容进行多源交叉验证 |
+| fact-check | 事实核查：多源交叉验证稿件里的每个数字/引语/时间点，产出带"存疑项处置"与"时效性风险"的核查单。news-workflow 的硬门禁——不通过就不许进渲染。route=news 且稿件进 rend |
 | find-skills | Helps users discover and install agent skills when they ask questions |
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |
 | get-callers | 获取调用指定符号的所有代码。触发：想知道谁在调用某个方法、分析依赖、评估影响。 |
@@ -33,6 +33,7 @@ Total: 48 active + 51 archived = 99 skills
 | lsp-query | 通过 Language Server Protocol（typescript-language-server / pyright / gopls 等）做结构化代码查询：定义、引用、悬停信息、符号、代码 |
 | media-short-video-copy | 短视频文案工作流 skillset 入口：竞品文案提取 → 多平台脚本创作 → 爆款标题生成，串联 6 个技能完成短视频文案生产 |
 | news-collect | 零成本热点采集：百度热搜 board API + feedx 中文媒体 RSS，一条命令把"今天什么在热"落成选题线索 JSON，喂给 news-workflow 步骤 0。stdlib-only，无 |
+| news-curate | 选题策展层：按台账去重已发/在途事件（零成本，不重复生成），只用免费信号给线索排序，产出带理由的今日候选清单。route=news 且采集跑完、选稿之前使用。产出是候选，不是已核实事实。 |
 | news-generator | 新闻写作技能包：根据热点/素材生成新闻稿件 |
 | news-polish | 新闻稿件润色技能：去AI味、提升可读性、专业化表达 |
 | news-workflow | 新闻域总工作流入口（v2 单轨）：选题 → 模板决策 → 脚本 → 事实核查 → 成片 → 发布。所有 path = Path B（免费·零云费）。route=news 且任务跨多阶段时使用。 |
