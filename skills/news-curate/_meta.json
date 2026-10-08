@@ -1,0 +1,13 @@
+{
+  "slug": "news-curate",
+  "category": "news.research",
+  "domain": "news",
+  "tags": [
+    "news",
+    "dedup",
+    "curate",
+    "ledger",
+    "zero-cost"
+  ],
+  "purpose": "选题策展层：按台账去重已发/在途事件（零成本，不重复生成），并只用免费信号给线索排序，产出带理由的今日候选清单"
+}
