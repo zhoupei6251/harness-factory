@@ -49,6 +49,7 @@ Path B 全链路串联脚本 · 抖音短视频生产专家团
 """
 
 import argparse
+import glob
 import hashlib
 import html
 import json
@@ -500,6 +501,55 @@ def write_timings(out_path: str) -> None:
     write_text(out_path, json.dumps(payload, ensure_ascii=False, indent=2))
     log("⏱ 分段计时: " + " | ".join(f"{s}={t:.1f}s" for s, t in _TIMINGS)
         + f" | 合计 {total:.1f}s → {out_path}")
+
+
+# ------------------------- hyperframes 可执行定位 (提速组件①, 规格 2026-10-09) -------------------------
+_HF_PREFIX: list[str] | None = None
+_HF_SOURCE: str = ""
+
+
+def hyperframes_candidates(force_bin: str | None = None,
+                           root: str | None = None,
+                           npx_root: str | None = None) -> list[tuple[list[str], str]]:
+    """候选调用前缀, 按优先级: 旗标 > 项目 node_modules > npx 缓存(逐个)。全空 = 空表。"""
+    out: list[tuple[list[str], str]] = []
+    if force_bin:
+        out.append(([force_bin], f"旗标 --hyperframes-bin={force_bin}"))
+    root = root or os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", ".."))
+    for name in ("hyperframes.cmd", "hyperframes"):
+        cand = os.path.join(root, "node_modules", ".bin", name)
+        if os.path.isfile(cand):
+            out.append(([cand], f"项目 node_modules ({name})"))
+            break
+    npx_root = npx_root or os.path.join(os.environ.get("LOCALAPPDATA", ""),
+                                        "npm-cache", "_npx")
+    for name in ("hyperframes.cmd", "hyperframes"):
+        for b in sorted(glob.glob(os.path.join(npx_root, "*", "node_modules", ".bin", name))):
+            out.append(([b], f"npx 缓存 ({b})"))
+    return out
+
+
+def resolve_hyperframes(force_bin: str | None = None,
+                        root: str | None = None,
+                        npx_root: str | None = None) -> tuple[list[str], str]:
+    """返回 (调用前缀, 真出处)。探测全缺时回落 npx -y(现场拉包, 每次 5-15 分钟)。"""
+    cands = hyperframes_candidates(force_bin, root=root, npx_root=npx_root)
+    if cands:
+        return cands[0]
+    return ["npx", "-y", "hyperframes"], "回落 npx -y hyperframes (每次重装, 慢)"
+
+
+def hf_init(force_bin: str | None = None) -> list[str]:
+    """初始化并缓存调用前缀; 每次真跑只打一行出处日志。"""
+    global _HF_PREFIX, _HF_SOURCE
+    if _HF_PREFIX is None or force_bin:
+        _HF_PREFIX, _HF_SOURCE = resolve_hyperframes(force_bin)
+        log(f"[hf] hyperframes 出处: {_HF_SOURCE}")
+    return _HF_PREFIX
+
+
+def hf_argv(*args: str) -> list[str]:
+    return hf_init() + [str(a) for a in args]
 
 
 def which(tool: str) -> str | None:
@@ -1834,8 +1884,8 @@ def gate_hyperframes_check(work_dir: str) -> None:
     json_path = os.path.join(work_dir, "check.json")
     err_path = os.path.join(work_dir, "check.err.txt")
     with open(json_path, "wb") as out, open(err_path, "wb") as err:
-        r = run(["npx", "-y", "hyperframes", "check", ".", "--strict", "--json",
-                 f"--caption-zone={CAPTION_ZONE}"], cwd=work_dir, stdout=out, stderr=err)
+        r = run(hf_argv("check", ".", "--strict", "--json",
+                        f"--caption-zone={CAPTION_ZONE}"), cwd=work_dir, stdout=out, stderr=err)
     if r.returncode != 0:
         tail = summarize_check_json(json_path)
         log(f"  check 输出尾部: {tail}")
@@ -2014,7 +2064,7 @@ def doctor():
 
     if which("npx"):
         log("→ 运行 'npx hyperframes doctor' 检查 Chrome 是否就绪:")
-        run(["npx", "-y", "hyperframes", "doctor"])
+        run(hf_argv("doctor"))
     log("=== 自检结束: " + ("全部就绪 ✅" if ok else "有缺失项, 见上方 ❌") + " ===")
     return ok
 
@@ -2337,6 +2387,8 @@ def main():
                     help=f"渲染质量 (默认 {DEFAULT_QUALITY})")
     ap.add_argument("--gpu", action="store_true", help="用 GPU 光栅化 (--browser-gpu, 本机 Intel Arc 实测可用)")
     ap.add_argument("--work-dir", help="指定中间文件目录(存在则复用, 且不清理)")
+    ap.add_argument("--hyperframes-bin",
+                    help="显式指定 hyperframes 可执行(跳过自动探测); 排查与新机器用")
     ap.add_argument("--check-only", action="store_true", help="只发射+版式自检+check 门禁, 不渲染")
     ap.add_argument("--skip-gate", action="store_true",
                     help="跳过 check 门禁(仅限排查门禁本身, 成片不认)")
@@ -2344,6 +2396,9 @@ def main():
     ap.add_argument("--keep", action="store_true", help="保留中间文件")
     ap.add_argument("--timing-out", help="分段计时 JSON 落点(默认 <成片目录>/timing.json)")
     args = ap.parse_args()
+
+    if args.hyperframes_bin:
+        hf_init(args.hyperframes_bin)
 
     if args.check_only or args.skip_render:
         # 这两条路存在的意义就是留给人复看中间产物, 收尾删目录等于白跑
@@ -2451,8 +2506,9 @@ def main():
             log("→ HyperFrames 渲染画面 (首次会下载 Chrome, 请耐心等待)")
             # `-q` 是短选项, 引擎不替短选项剥 `=`: 实测 `-q=delivery` 把字面量 "=delivery"
             # 当值送进校验, 直接 "Invalid quality" 退出。带 `=` 必须写长选项 `--quality=`。
-            render_cmd = ["npx", "-y", "hyperframes", "render", "-c", "index.html",
-                          "-o", "silent.mp4", "-f", str(args.fps), f"--quality={args.quality}"]
+            render_cmd = hf_argv("render", "-c", "index.html",
+                                 "-o", "silent.mp4", "-f", str(args.fps),
+                                 f"--quality={args.quality}")
             if args.gpu:
                 render_cmd.append("--browser-gpu")
             # HyperFrames 要求入口文件必须留在项目目录内("Invalid composition path")，

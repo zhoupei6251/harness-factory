@@ -1548,6 +1548,46 @@ def t_timed_records_stages_and_writes_json():
         assert any(s["stage"] == "demo-stage" for s in data["stages"])
 
 
+def t_hyperframes_probe_order_and_fallback():
+    """可执行定位: 旗标 > 项目 node_modules > npx 缓存 > 回落 npx -y, 每档带真出处。"""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        root = os.path.join(td, "proj")
+        npx = os.path.join(td, "npx")
+        os.makedirs(os.path.join(root, "node_modules", ".bin"))
+        os.makedirs(os.path.join(npx, "h1", "node_modules", ".bin"))
+        local_bin = os.path.join(root, "node_modules", ".bin", "hyperframes.cmd")
+        cache_bin = os.path.join(npx, "h1", "node_modules", ".bin", "hyperframes.cmd")
+        for p in (local_bin, cache_bin):
+            open(p, "w").close()
+
+        cands = pb.hyperframes_candidates(None, root=root, npx_root=npx)
+        assert cands[0][0] == [local_bin], "项目 node_modules 必须排在 npx 缓存之前"
+        assert any(c[0] == [cache_bin] for c in cands), "npx 缓存里的可执行必须被发现"
+        assert all(c[1] for c in cands), "每档候选都要有真出处"
+
+        forced = pb.hyperframes_candidates("X:/custom/hf", root=root, npx_root=npx)
+        assert forced[0][0] == ["X:/custom/hf"], "旗标必须压过一切探测"
+        assert "旗标" in forced[0][1]
+
+        empty = os.path.join(td, "empty")
+        os.makedirs(empty)
+        argv, source = pb.resolve_hyperframes(None, root=empty, npx_root=empty)
+        assert argv == ["npx", "-y", "hyperframes"], "探测全缺时回落 npx -y"
+        assert "回落" in source
+
+
+def t_no_call_site_hardcodes_npx():
+    """check / render / doctor 三处调用点不许再写死 npx -y hyperframes。"""
+    import inspect
+    gate_src = inspect.getsource(pb.gate_hyperframes_check)
+    main_src = inspect.getsource(pb.main)
+    for name, src in (("gate_hyperframes_check", gate_src), ("main", main_src)):
+        assert '"-y", "hyperframes"' not in src, f"{name} 还在写死 npx -y hyperframes"
+    assert 'hf_argv("check"' in gate_src, "gate_hyperframes_check 必须走 hf_argv"
+    assert 'hf_argv("render"' in main_src, "渲染命令必须走 hf_argv"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]
