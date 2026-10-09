@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cp, mkdtemp, readdir, realpath, rm, stat } from "node:fs/promises";
+import { cp, mkdtemp, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { tmpdir } from "node:os";
@@ -47,6 +47,8 @@ const EXPECTED = [
   ".codebuddy/rules/project_rules.md",
   ".codebuddy/rules/ENTRY.md",
   ".codebuddy/rules/ROOT.md",
+  ".qoder/rules/ENTRY.md",
+  ".qoder/rules/ROOT.md",
   ".ai-runtime-artifacts/specs",
   ".ai-runtime-artifacts/plans",
   ".ai-runtime-artifacts/decisions",
@@ -67,6 +69,7 @@ const ROOT_MUST_SURVIVE = [
   ".codex",
   ".trae",
   ".codebuddy",
+  ".qoder",
   ".ai-runtime-artifacts",
   ".harness-novel-runtime",
   ".harness-news-runtime",
@@ -162,6 +165,50 @@ try {
       console.log(`[ok]   ${e} created in temp root`);
     } else {
       console.log(`[FAIL] ${e} missing in temp root`);
+      fail = 1;
+    }
+  }
+
+  // Required-tooling clause must survive into every native entry, and NEVER.md
+  // must carry the two forbidden rows (spec: docs/superpowers/specs/
+  // 2026-10-09-required-tooling-design.md §1).
+  const NATIVE_ENTRIES = [
+    "CLAUDE.md",
+    "AGENTS.md",
+    ".trae/rules/project_rules.md",
+    ".codebuddy/rules/project_rules.md",
+  ];
+  const ENTRY_MARKERS = ["Tooling (required", "降级", "Tooling（本端接入）"];
+  for (const entry of NATIVE_ENTRIES) {
+    const body = await readFile(resolve(tempRoot, entry), "utf-8");
+    const missing = ENTRY_MARKERS.filter((m) => !body.includes(m));
+    if (missing.length === 0) {
+      console.log(`[ok]   ${entry} carries required-tooling clause`);
+    } else {
+      console.log(`[FAIL] ${entry} missing markers: ${missing.join(", ")}`);
+      fail = 1;
+    }
+  }
+
+  // AGENTS.md is shared by codex and qoder: both deltas must survive the merge,
+  // and the qoder delta must not be overwritten by a later single-platform run.
+  const agents = await readFile(resolve(tempRoot, "AGENTS.md"), "utf-8");
+  for (const delta of ["Codex platform rules", "Qoder platform rules"]) {
+    if (agents.includes(delta)) {
+      console.log(`[ok]   AGENTS.md merges the ${delta.toLowerCase()}`);
+    } else {
+      console.log(`[FAIL] AGENTS.md missing the ${delta} delta`);
+      fail = 1;
+    }
+  }
+
+  // core/NEVER.md is loaded by priority, not concatenated into native entries.
+  const neverBody = await readFile(resolve(tempRoot, "core", "NEVER.md"), "utf-8");
+  for (const marker of ["change code without evidence", "skip the lazy ladder"]) {
+    if (neverBody.includes(marker)) {
+      console.log(`[ok]   core/NEVER.md forbids "${marker}"`);
+    } else {
+      console.log(`[FAIL] core/NEVER.md missing forbidden row "${marker}"`);
       fail = 1;
     }
   }

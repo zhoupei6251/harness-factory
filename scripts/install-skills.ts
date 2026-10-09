@@ -10,18 +10,19 @@ const SKILLS_DIR = resolve(ROOT, "skills");
 const TARGETS = {
   codex: join(homedir(), ".codex", "skills"),
   claude: join(homedir(), ".claude", "skills"),
+  qoder: join(homedir(), ".qoder", "skills"),
 } as const;
 
 type TargetKey = keyof typeof TARGETS;
 
 function parseArgs(argv: string[]): { platforms: TargetKey[] } {
-  const valid: TargetKey[] = ["codex", "claude"];
+  const valid: TargetKey[] = ["codex", "claude", "qoder"];
   const platforms = new Set<TargetKey>();
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === "--platform" && valid.includes(argv[i + 1] as TargetKey)) {
       platforms.add(argv[++i] as TargetKey);
     } else if (argv[i] === "-h" || argv[i] === "--help") {
-      console.log("Usage: install-skills.ts [--platform codex|claude] (default: all)");
+      console.log("Usage: install-skills.ts [--platform codex|claude|qoder] (default: all)");
       process.exit(0);
     } else if (argv[i] === "--platform") {
       console.error(`Unknown platform: ${argv[i + 1]}`);
