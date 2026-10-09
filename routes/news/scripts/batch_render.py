@@ -16,9 +16,10 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-BUILD = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "skills",
+# SCRIPT_DIR = <根>/routes/news/scripts, 上溯 3 级才到仓库根
+BUILD = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..", "skills",
                                      "douyin-pro", "scripts", "path_b_build.py"))
-DEFAULT_TIMING_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..",
+DEFAULT_TIMING_DIR = os.path.abspath(os.path.join(SCRIPT_DIR, "..", "..", "..",
                                                   ".harness-news-runtime", "tmp", "timing"))
 
 

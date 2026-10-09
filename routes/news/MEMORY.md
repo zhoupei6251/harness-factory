@@ -298,6 +298,10 @@ videos:
 
 ## In progress
 in_progress:
+  - render_speed: 已达标（2026-10-09）—— 4 条批渲摊薄 28.7s/条（≤180s/条），冷/热跑与决策门数字见
+    `.harness-news-runtime/verifications/2026-10-09-render-speedup-verification.md`；批量出片用
+    `python routes/news/scripts/batch_render.py --manifest <清单.json> --jobs 3`（清单每条必带 source/aigc-producer）；
+    前置：Node ≥22（本机跑前先把 nvm 的 v23.11.1 以 PATH 前缀注入，默认 20.9.0 过不了 hyperframes 门禁）
   - current_phase: publishing
     topic_id: t001
     blocker: 一把锁 —— 抖音账号未登录（`sau douyin check` 返回 valid 前不发）。原第二把锁
@@ -315,4 +319,4 @@ in_progress:
           （skills/douyin-upload + 本机 .venv/Scripts/sau.exe，见其 references/local-env.md）
 
 ## Last updated
-last_updated: 2026-09-29
+last_updated: 2026-10-09
