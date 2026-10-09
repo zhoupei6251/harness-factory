@@ -1531,6 +1531,22 @@ def t_gate_failure_names_the_real_cause():
         f"{fn.__name__} 还在只说'无法解析'而不给 stderr 原文")
 
 
+def t_timed_records_stages_and_writes_json():
+    """分段计时: 每个 stage 记一次耗时, write_timings 落 JSON 且合计 >= 0。"""
+    import tempfile
+    before = len(pb._TIMINGS)
+    with pb.timed("demo-stage"):
+        pass
+    assert len(pb._TIMINGS) == before + 1, "timed 上下文退出后必须记一条"
+    assert pb._TIMINGS[-1][0] == "demo-stage", "stage 名不许被改写"
+    with tempfile.TemporaryDirectory() as td:
+        out = os.path.join(td, "timing.json")
+        pb.write_timings(out)
+        data = json.loads(open(out, encoding="utf-8").read())
+        assert data["stages"], "timing.json 必须有 stages 数组"
+        assert data["total_seconds"] >= 0
+        assert any(s["stage"] == "demo-stage" for s in data["stages"])
+
 
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())

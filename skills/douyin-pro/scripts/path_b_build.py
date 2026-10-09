@@ -59,6 +59,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from datetime import timedelta
 from pathlib import Path
 
@@ -467,6 +468,38 @@ def run_exe(cmd, **kw):
         # MSVCRT 的 argv 解析正好是它的逆运算, `"` 会原样回到 argv 里。
         return subprocess.run(cmd_list, **kw)
     return subprocess.run(cmd_list, **kw)
+
+
+# ------------------------- 分段计时 (提速实测基线, 规格 2026-10-09) -------------------------
+_TIMINGS: list[tuple[str, float]] = []
+
+
+class timed:
+    """阶段计时上下文: with timed("dub"): ... → 退出时把 (stage, 秒) 记进 _TIMINGS。"""
+
+    def __init__(self, stage: str):
+        self.stage = stage
+
+    def __enter__(self):
+        self.t0 = time.perf_counter()
+        return self
+
+    def __exit__(self, exc_type, exc, tb):
+        _TIMINGS.append((self.stage, time.perf_counter() - self.t0))
+        return False
+
+
+def write_timings(out_path: str) -> None:
+    """把分段计时落 JSON 并打一行摘要。"""
+    total = sum(t for _, t in _TIMINGS)
+    payload = {
+        "stages": [{"stage": s, "seconds": round(t, 2)} for s, t in _TIMINGS],
+        "total_seconds": round(total, 2),
+    }
+    os.makedirs(os.path.dirname(os.path.abspath(out_path)) or ".", exist_ok=True)
+    write_text(out_path, json.dumps(payload, ensure_ascii=False, indent=2))
+    log("⏱ 分段计时: " + " | ".join(f"{s}={t:.1f}s" for s, t in _TIMINGS)
+        + f" | 合计 {total:.1f}s → {out_path}")
 
 
 def which(tool: str) -> str | None:
@@ -2309,6 +2342,7 @@ def main():
                     help="跳过 check 门禁(仅限排查门禁本身, 成片不认)")
     ap.add_argument("--skip-render", action="store_true", help="只生成音频+HTML, 不渲染(调试用)")
     ap.add_argument("--keep", action="store_true", help="保留中间文件")
+    ap.add_argument("--timing-out", help="分段计时 JSON 落点(默认 <成片目录>/timing.json)")
     args = ap.parse_args()
 
     if args.check_only or args.skip_render:
@@ -2350,23 +2384,25 @@ def main():
     os.makedirs(work, exist_ok=True)
 
     try:
-        scenes = parse_input(read_text(args.input))
-        if not scenes:
-            log("❌ 输入未解析出任何分镜")
-            sys.exit(1)
-        log(f"解析到 {len(scenes)} 个分镜 | 设计系统 {args.style} | {w}x{h}")
+        with timed("parse"):
+            scenes = parse_input(read_text(args.input))
+            if not scenes:
+                log("❌ 输入未解析出任何分镜")
+                sys.exit(1)
+            log(f"解析到 {len(scenes)} 个分镜 | 设计系统 {args.style} | {w}x{h}")
 
-        pack = load_style_pack(args.style)
-        register_indexed_derivers(
-            set().union(*(contract_ids(l) for l in pack["layouts"].values()))
-        )
+            pack = load_style_pack(args.style)
+            register_indexed_derivers(
+                set().union(*(contract_ids(l) for l in pack["layouts"].values()))
+            )
 
-        if args.skip_render:
-            # 没有配音就没有真实时长, 用文本估算保证发射链路照样能验
-            audio_files, sub_files = [], []
-            durations = [estimate_duration(sc["body"]) for sc in scenes]
-        else:
-            audio_files, sub_files, durations = synthesize_audio(scenes, args.voice, work)
+        with timed("dub"):
+            if args.skip_render:
+                # 没有配音就没有真实时长, 用文本估算保证发射链路照样能验
+                audio_files, sub_files = [], []
+                durations = [estimate_duration(sc["body"]) for sc in scenes]
+            else:
+                audio_files, sub_files, durations = synthesize_audio(scenes, args.voice, work)
 
         ctx_base = {
             "kicker": args.kicker,
@@ -2375,157 +2411,166 @@ def main():
             "overrides": {},
         }
 
-        # 逐镜取图 (best-effort: 网络/授权/尺寸/相关性任何失败都降级为该镜无图)
-        # --skip-render 与 --check-only 不打网络, 全部降级为无图。
-        if args.skip_render or args.check_only:
-            image_records = [None] * len(scenes)
-            log("图: 跳过 (--skip-render / --check-only 不取图)")
-        else:
-            image_records = []
-            for i, sc in enumerate(scenes, 1):
-                rec = _resolve_shot_image(work, i, sc, ctx_base, log=log)
-                image_records.append(rec)
-                if rec is not None:
-                    log(f"  镜{i} 图: {rec['title']} ({rec['width']}x{rec['height']}, {rec['license']})")
-                else:
-                    log(f"  镜{i} 图: 降级为无图")
-        shots = emit_composition(pack, scenes, durations, work, ctx_base, w, h,
-                                 audio_files, image_records)
-        log(f"→ 合成 HTML 已生成: {os.path.join(work, 'index.html')}")
+        with timed("images"):
+            # 逐镜取图 (best-effort: 网络/授权/尺寸/相关性任何失败都降级为该镜无图)
+            # --skip-render 与 --check-only 不打网络, 全部降级为无图。
+            if args.skip_render or args.check_only:
+                image_records = [None] * len(scenes)
+                log("图: 跳过 (--skip-render / --check-only 不取图)")
+            else:
+                image_records = []
+                for i, sc in enumerate(scenes, 1):
+                    rec = _resolve_shot_image(work, i, sc, ctx_base, log=log)
+                    image_records.append(rec)
+                    if rec is not None:
+                        log(f"  镜{i} 图: {rec['title']} ({rec['width']}x{rec['height']}, {rec['license']})")
+                    else:
+                        log(f"  镜{i} 图: 降级为无图")
+        with timed("emit"):
+            shots = emit_composition(pack, scenes, durations, work, ctx_base, w, h,
+                                     audio_files, image_records)
+            log(f"→ 合成 HTML 已生成: {os.path.join(work, 'index.html')}")
 
-        gate_layout_selfcheck(work)
-        if args.check_only:
-            gate_hyperframes_check(work)
-            log(f"✅ 发射与门禁通过 (未渲染)。工程目录: {os.path.abspath(work)}")
-            sys.exit(0)
-        if args.skip_render:
-            log("⏭  --skip-render 已设, 跳过门禁与渲染。中间文件在: " + work)
-            sys.exit(0)
-        if args.skip_gate:
-            log("⚠️  --skip-gate 已设, 跳过 check 门禁 (成片不视为合格)")
-        else:
-            gate_hyperframes_check(work)
+        with timed("gate"):
+            gate_layout_selfcheck(work)
+            if args.check_only:
+                gate_hyperframes_check(work)
+                log(f"✅ 发射与门禁通过 (未渲染)。工程目录: {os.path.abspath(work)}")
+                sys.exit(0)
+            if args.skip_render:
+                log("⏭  --skip-render 已设, 跳过门禁与渲染。中间文件在: " + work)
+                sys.exit(0)
+            if args.skip_gate:
+                log("⚠️  --skip-gate 已设, 跳过 check 门禁 (成片不视为合格)")
+            else:
+                gate_hyperframes_check(work)
 
-        # ⑥ HyperFrames 渲染静帧视频
-        silent = os.path.join(work, "silent.mp4")
-        log("→ HyperFrames 渲染画面 (首次会下载 Chrome, 请耐心等待)")
-        # `-q` 是短选项, 引擎不替短选项剥 `=`: 实测 `-q=delivery` 把字面量 "=delivery"
-        # 当值送进校验, 直接 "Invalid quality" 退出。带 `=` 必须写长选项 `--quality=`。
-        render_cmd = ["npx", "-y", "hyperframes", "render", "-c", "index.html",
-                      "-o", "silent.mp4", "-f", str(args.fps), f"--quality={args.quality}"]
-        if args.gpu:
-            render_cmd.append("--browser-gpu")
-        # HyperFrames 要求入口文件必须留在项目目录内("Invalid composition path")，
-        # 因此以 work 为 cwd、传相对路径，而不是传 Temp 下的绝对路径。
-        r = run(render_cmd, cwd=work)
-        if r.returncode != 0 or not os.path.exists(silent):
-            raise EmitterError(
-                "HyperFrames 渲染失败。常见原因: 未装 Chrome(运行 npx hyperframes browser ensure) "
-                "/ 未装 ffmpeg / 网络受限")
+        with timed("render"):
+            # ⑥ HyperFrames 渲染静帧视频
+            silent = os.path.join(work, "silent.mp4")
+            log("→ HyperFrames 渲染画面 (首次会下载 Chrome, 请耐心等待)")
+            # `-q` 是短选项, 引擎不替短选项剥 `=`: 实测 `-q=delivery` 把字面量 "=delivery"
+            # 当值送进校验, 直接 "Invalid quality" 退出。带 `=` 必须写长选项 `--quality=`。
+            render_cmd = ["npx", "-y", "hyperframes", "render", "-c", "index.html",
+                          "-o", "silent.mp4", "-f", str(args.fps), f"--quality={args.quality}"]
+            if args.gpu:
+                render_cmd.append("--browser-gpu")
+            # HyperFrames 要求入口文件必须留在项目目录内("Invalid composition path")，
+            # 因此以 work 为 cwd、传相对路径，而不是传 Temp 下的绝对路径。
+            r = run(render_cmd, cwd=work)
+            if r.returncode != 0 or not os.path.exists(silent):
+                raise EmitterError(
+                    "HyperFrames 渲染失败。常见原因: 未装 Chrome(运行 npx hyperframes browser ensure) "
+                    "/ 未装 ffmpeg / 网络受限")
 
-        # ⑦ 动量审计 (判据 3): 每镜尾段仍在变化才算过
-        audit_motion(silent, shots, work)
+        with timed("motion"):
+            # ⑦ 动量审计 (判据 3): 每镜尾段仍在变化才算过
+            audit_motion(silent, shots, work)
 
-        # ⑧ 拼音频 + 烧字幕
-        cues = collect_cues(sub_files, durations, caption_line_chars(w, h))
-        log(f"字幕轨: {len(cues)} 条")
-        merged = ["WEBVTT", ""]
-        for s, e, text in cues:
-            merged += [f"{vtt_time(s)} --> {vtt_time(e)}", text.replace("\\N", "\n"), ""]
-        write_text(os.path.join(work, "subs.vtt"), "\n".join(merged))  # 备查/可上传平台
-        final = args.output
-        os.makedirs(os.path.dirname(os.path.abspath(final)) or ".", exist_ok=True)
-        log(f"→ ffmpeg 合成最终视频: {final}")
-        # 显式标识时长 = 开场 AIGC_LABEL_ON_SECONDS 秒(不足则等于全片时长),
-        # 由 mux_and_burn 卡 ≥ AIGC_LABEL_MIN_SECONDS: 单镜短片的真实时长可以低到
-        # MIN_SLOT_SECONDS(1s), 达不到国标 2 秒线, 必须挡。
-        # (这条线只在真烧角标那一档生效 —— no-badge 没有画面标识, 见 D14)
-        badge_seconds = aigc_badge_seconds(sum(durations))
-        aigc_meta = mux_and_burn(silent, audio_files, cues, work, final, w, h,
-                                 aigc_badge_seconds=badge_seconds,
-                                 aigc_producer=args.aigc_producer,
-                                 aigc_label=args.aigc_label,
-                                 render=render_mode, render_cause=render_cause)
-        # 标识台账: 发布环节(douyin-upload)要照着它做平台侧自主声明,
-        # 监管要举证时也拿这份对着成片核。只随成片走, 不进工作目录。
-        # glyph_height_px 是**合规线上真正被量的那个数**(字芯高, 不是 em 高),
-        # 落进台账就不用举证时再让人重算一遍字面率。
-        # 草稿的台账**故意不含 metadata_key / implicit / explicit 三段** ——
-        # 缺什么就记什么缺, 而不是写一堆 false 装作"标识在只是没开";
-        # check_publishable.py 认这三段的存在性, 草稿因此过不了发布闸门。
-        # no-badge(D14)反过来: ② 在、① 被点名关掉, 所以 explicit 段**必须存在**并写明
-        # burned_in=false + 谁关的(disabled_by) + 怎么开回来(to_enable)。
-        # 「关了什么记什么关」与「缺什么记什么缺」是两件事 —— 台账留空等于让下一个人
-        # 猜这版是没烧还是烧丢了。
-        badge_fs = aigc_badge_font_size(w, h)
-        if is_draft:
-            to_publish = ("去掉 --draft 重渲一次, 让 ①② 落进成片" if args.draft else
-                          "把 routes/news/aigc-mode.json 的 render 改回 full"
-                          "(或渲染时加 --deliver)再重渲一次, 让 ①② 落进成片")
-            sidecar = {
-                "file": os.path.basename(final),
-                "switch": render_cause,
-                "draft": {
-                    "reason": f"草稿渲染[{render_cause}]: ① 画面角标与 ② 隐式元数据都没有",
-                    "burned_in": False,
-                    "to_publish": to_publish,
-                },
-                "resolution": f"{w}x{h}",
-            }
-        else:
-            if render_mode == "full":
-                explicit = {
-                    "text": args.aigc_label,
-                    "position": "bottom-left",
-                    "font_size_px": badge_fs,
-                    "glyph_height_px": round(badge_fs * AIGC_LABEL_GLYPH_RATIO, 1),
-                    "short_side_px": min(w, h),
-                    "margin_v_px": aigc_badge_margin_v(w, h),
-                    "shown_seconds": round(badge_seconds, 3),
-                    "burned_in": True,
+        with timed("mux"):
+            # ⑧ 拼音频 + 烧字幕
+            cues = collect_cues(sub_files, durations, caption_line_chars(w, h))
+            log(f"字幕轨: {len(cues)} 条")
+            merged = ["WEBVTT", ""]
+            for s, e, text in cues:
+                merged += [f"{vtt_time(s)} --> {vtt_time(e)}", text.replace("\\N", "\n"), ""]
+            write_text(os.path.join(work, "subs.vtt"), "\n".join(merged))  # 备查/可上传平台
+            final = args.output
+            os.makedirs(os.path.dirname(os.path.abspath(final)) or ".", exist_ok=True)
+            log(f"→ ffmpeg 合成最终视频: {final}")
+            # 显式标识时长 = 开场 AIGC_LABEL_ON_SECONDS 秒(不足则等于全片时长),
+            # 由 mux_and_burn 卡 ≥ AIGC_LABEL_MIN_SECONDS: 单镜短片的真实时长可以低到
+            # MIN_SLOT_SECONDS(1s), 达不到国标 2 秒线, 必须挡。
+            # (这条线只在真烧角标那一档生效 —— no-badge 没有画面标识, 见 D14)
+            badge_seconds = aigc_badge_seconds(sum(durations))
+            aigc_meta = mux_and_burn(silent, audio_files, cues, work, final, w, h,
+                                     aigc_badge_seconds=badge_seconds,
+                                     aigc_producer=args.aigc_producer,
+                                     aigc_label=args.aigc_label,
+                                     render=render_mode, render_cause=render_cause)
+            # 标识台账: 发布环节(douyin-upload)要照着它做平台侧自主声明,
+            # 监管要举证时也拿这份对着成片核。只随成片走, 不进工作目录。
+            # glyph_height_px 是**合规线上真正被量的那个数**(字芯高, 不是 em 高),
+            # 落进台账就不用举证时再让人重算一遍字面率。
+            # 草稿的台账**故意不含 metadata_key / implicit / explicit 三段** ——
+            # 缺什么就记什么缺, 而不是写一堆 false 装作"标识在只是没开";
+            # check_publishable.py 认这三段的存在性, 草稿因此过不了发布闸门。
+            # no-badge(D14)反过来: ② 在、① 被点名关掉, 所以 explicit 段**必须存在**并写明
+            # burned_in=false + 谁关的(disabled_by) + 怎么开回来(to_enable)。
+            # 「关了什么记什么关」与「缺什么记什么缺」是两件事 —— 台账留空等于让下一个人
+            # 猜这版是没烧还是烧丢了。
+            badge_fs = aigc_badge_font_size(w, h)
+            if is_draft:
+                to_publish = ("去掉 --draft 重渲一次, 让 ①② 落进成片" if args.draft else
+                              "把 routes/news/aigc-mode.json 的 render 改回 full"
+                              "(或渲染时加 --deliver)再重渲一次, 让 ①② 落进成片")
+                sidecar = {
+                    "file": os.path.basename(final),
+                    "switch": render_cause,
+                    "draft": {
+                        "reason": f"草稿渲染[{render_cause}]: ① 画面角标与 ② 隐式元数据都没有",
+                        "burned_in": False,
+                        "to_publish": to_publish,
+                    },
+                    "resolution": f"{w}x{h}",
                 }
             else:
-                explicit = {
-                    "burned_in": False,
-                    "disabled_by": render_cause,
-                    "to_enable": ("去掉 --no-badge 重渲一次(或加 --deliver), 让 ① 落进成片"
-                                  if args.no_badge else
-                                  "把 routes/news/aigc-mode.json 的 render 改回 full"
-                                  "(或渲染时加 --deliver)再重渲一次, 让 ① 落进成片"),
+                if render_mode == "full":
+                    explicit = {
+                        "text": args.aigc_label,
+                        "position": "bottom-left",
+                        "font_size_px": badge_fs,
+                        "glyph_height_px": round(badge_fs * AIGC_LABEL_GLYPH_RATIO, 1),
+                        "short_side_px": min(w, h),
+                        "margin_v_px": aigc_badge_margin_v(w, h),
+                        "shown_seconds": round(badge_seconds, 3),
+                        "burned_in": True,
+                    }
+                else:
+                    explicit = {
+                        "burned_in": False,
+                        "disabled_by": render_cause,
+                        "to_enable": ("去掉 --no-badge 重渲一次(或加 --deliver), 让 ① 落进成片"
+                                      if args.no_badge else
+                                      "把 routes/news/aigc-mode.json 的 render 改回 full"
+                                      "(或渲染时加 --deliver)再重渲一次, 让 ① 落进成片"),
+                    }
+                sidecar = {
+                    "file": os.path.basename(final),
+                    "switch": render_cause,
+                    "metadata_key": AIGC_METADATA_KEY,
+                    "implicit": json.loads(aigc_meta),
+                    "explicit": explicit,
+                    "resolution": f"{w}x{h}",
                 }
-            sidecar = {
-                "file": os.path.basename(final),
-                "switch": render_cause,
-                "metadata_key": AIGC_METADATA_KEY,
-                "implicit": json.loads(aigc_meta),
-                "explicit": explicit,
-                "resolution": f"{w}x{h}",
-            }
-        write_text(os.path.join(os.path.dirname(os.path.abspath(final)), "aigc.json"),
-                   json.dumps(sidecar, ensure_ascii=False, indent=2))
+            write_text(os.path.join(os.path.dirname(os.path.abspath(final)), "aigc.json"),
+                       json.dumps(sidecar, ensure_ascii=False, indent=2))
 
-        # 图片授权台账: media-manifest.json 只活在临时工作目录, 渲染完就被清 ——
-        # CC BY 的署名义务与授权追溯靠它, 必须拷到成片旁跟随成片归档。
-        media_manifest = os.path.join(work, "media", "media-manifest.json")
-        if os.path.isfile(media_manifest):
-            shutil.copyfile(media_manifest,
-                            os.path.join(os.path.dirname(os.path.abspath(final)), "media-credits.json"))
-            log("→ 图片授权台账已归档: media-credits.json")
+        with timed("finalize"):
+            # 图片授权台账: media-manifest.json 只活在临时工作目录, 渲染完就被清 ——
+            # CC BY 的署名义务与授权追溯靠它, 必须拷到成片旁跟随成片归档。
+            media_manifest = os.path.join(work, "media", "media-manifest.json")
+            if os.path.isfile(media_manifest):
+                shutil.copyfile(media_manifest,
+                                os.path.join(os.path.dirname(os.path.abspath(final)), "media-credits.json"))
+                log("→ 图片授权台账已归档: media-credits.json")
 
-        # ⑨ 联络表: 逐镜一帧, 人工验收比对
-        build_contact_sheet(silent, shots, os.path.dirname(os.path.abspath(final)), work)
+            # ⑨ 联络表: 逐镜一帧, 人工验收比对
+            build_contact_sheet(silent, shots, os.path.dirname(os.path.abspath(final)), work)
 
-        # 发射事实落盘, 复盘时能对着成片看每镜填了什么
-        write_text(os.path.join(work, "shots.json"),
-                   json.dumps(shots, ensure_ascii=False, indent=2))
-        if args.work_dir:
-            shutil.copyfile(os.path.join(work, "shots.json"),
-                            os.path.join(os.path.dirname(os.path.abspath(final)), "shots.json"))
+            # 发射事实落盘, 复盘时能对着成片看每镜填了什么
+            write_text(os.path.join(work, "shots.json"),
+                       json.dumps(shots, ensure_ascii=False, indent=2))
+            if args.work_dir:
+                shutil.copyfile(os.path.join(work, "shots.json"),
+                                os.path.join(os.path.dirname(os.path.abspath(final)), "shots.json"))
         log(f"✅ 完成! 最终视频: {os.path.abspath(final)}")
     except (EmitterError, FileNotFoundError, OSError) as exc:
         log(f"❌ {exc}")
         sys.exit(1)
     finally:
+        write_timings(args.timing_out
+                      or os.path.join(os.path.dirname(os.path.abspath(args.output)), "timing.json"))
         if not args.keep and not args.work_dir:
             shutil.rmtree(work, ignore_errors=True)
         else:
