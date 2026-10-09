@@ -1,6 +1,6 @@
 # Harness Factory
 
-Clean skeleton for shipping harness rules to 4 AI platforms (Claude / Codex / Trae / WorkBuddy) across 3 routes (code / novel / news).
+Clean skeleton for shipping harness rules to 5 AI platforms (Claude / Codex / Trae / WorkBuddy / Qoder) across 3 routes (code / novel / news).
 
 ## Why
 
@@ -16,10 +16,10 @@ npm run typecheck   # TypeScript 7 native compiler
 npm run validate    # check schemas + skills
 npm run doctor      # verify required external tools (codebase-memory-mcp, ponytail) — bootstrap runs this automatically
 npm run bootstrap -- --platform all --route code
-npm run skills:install  # link skills into ~/.codex/skills + ~/.claude/skills
+npm run skills:install  # link skills into ~/.codex/skills + ~/.claude/skills + ~/.qoder/skills
 ```
 
-This projects `core/ENTRY.md` and `platforms/<plat>/rules/ENTRY.md` to `.claude/`, `.codex/`, `.trae/`, `.codebuddy/`, creates runtime dirs, and writes `./MEMORY.md` from the route template.
+This projects `core/ENTRY.md` and `platforms/<plat>/rules/ENTRY.md` to `.claude/`, `.codex/`, `.trae/`, `.codebuddy/`, `.qoder/`, creates runtime dirs, and writes `./MEMORY.md` from the route template. Codex and Qoder share one native entry (`AGENTS.md`); bootstrap merges both deltas instead of letting one overwrite the other.
 
 ## Toolchain
 
@@ -80,7 +80,7 @@ Skills are split into two tiers:
 
 ## Tooling
 
-Two recommended external tools — both local, free, no API keys. Full per-platform install guide: [`references/tooling.md`](references/tooling.md).
+Two **required** external tools for code-domain work (prose-only output is exempt) — both local, free, no API keys. Full per-platform install guide: [`references/tooling.md`](references/tooling.md).
 
 - **codebase-memory-mcp** — code knowledge-graph MCP (tree-sitter + Hybrid LSP). Root `.mcp.json` is committed, so Claude Code offers it automatically on first open; the `query-symbol` / `get-callers` / `analyze-impact` skills (10 total) depend on it.
 - **[ponytail](https://github.com/DietrichGebert/ponytail)** — "laziest senior dev" decision ladder enforced before code generation; complements `core/NEVER.md` and rules R2 / R8. Claude Code: `/plugin marketplace add DietrichGebert/ponytail` + `/plugin install ponytail@ponytail`.

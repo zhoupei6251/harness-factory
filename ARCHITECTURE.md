@@ -10,7 +10,7 @@
 |---|---|
 | Source files (excl `.git` + `node_modules`) | 441 |
 | Core governance docs | 8 |
-| Platform adapters | 4 (claude, codex, trae, workbuddy) — all with placeholder rules |
+| Platform adapters | 5 (claude, codex, trae, workbuddy, qoder) — codex + qoder share the `AGENTS.md` native entry, merged by bootstrap |
 | Routes | 3 (code, novel, news) — all with MEMORY templates |
 | Skills | 97 (46 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
 | MCP servers | 1 (codebase-memory only; wired via committed root `.mcp.json` + `mcp-config/` snippet — see `references/tooling.md`) |

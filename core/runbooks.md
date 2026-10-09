@@ -6,13 +6,18 @@
 2. Verify with `npm run validate`
 3. Edit `ENTRY.md` to reflect project-specific behavior
 
-## Install recommended tooling (per machine, one-time)
+## Install required tooling (code domain, per machine, one-time)
 
 Full guide: `references/tooling.md`. Both tools are local and free — no API keys.
+**Required for code-domain work** (TS / scripts / tests / config / rules files); prose-only output (novel / news drafts) is exempt.
 
 1. **codebase-memory-mcp** — Claude Code: root `.mcp.json` is already committed, accept the enable prompt on first open. Other platforms / static-binary install: see `references/tooling.md`
 2. **ponytail** — Claude Code: `/plugin marketplace add DietrichGebert/ponytail` then `/plugin install ponytail@ponytail`. Codex / Cursor / Gemini / instruction-only adapters: see `references/tooling.md`
 3. Verify: ask the agent to call `list_projects` (MCP connected) and run `/ponytail-help` (plugin loaded)
+   — on instruction-only adapters (Qoder / Trae / WorkBuddy) there is no `/ponytail-help` command; verify instead
+   that `~/.<plat>/skills/ponytail/SKILL.md` exists and the agent can recite the ladder
+4. If a tool is missing or disconnected, the agent must degrade to Read / Grep and state it in the reply:
+   `[codebase-memory-mcp 不可用，已降级] 原因：<...>；替代手段：<...>` — never skip silently
 
 ## Add a skill
 
@@ -25,7 +30,8 @@ Full guide: `references/tooling.md`. Both tools are local and free — no API ke
 
 1. Create `platforms/<name>/` with `rules/ENTRY.md` and any platform-specific config
 2. Update `schemas/platform.schema.json` enum
-3. Update `scripts/bootstrap.ts` (`Platform` type + `PLATFORM_DIR` map)
+3. Update `scripts/bootstrap.ts` (`Platform` type + `PLATFORMS` + `PLATFORM_DIR` + `PLATFORM_NATIVE_ENTRY`); a native entry shared with an existing platform merges both deltas
+4. Update `ENTRY.md` Platform mapping and `tests/bootstrap.test.ts` (`EXPECTED`, `ROOT_MUST_SURVIVE`)
 
 ## Bug fix
 

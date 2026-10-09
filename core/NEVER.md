@@ -14,3 +14,5 @@
 | over-abstract on first use | complexity | wait for 2nd occurrence |
 | multi-line if without braces | bug-prone | always brace |
 | "大概"/"差不多" in code | slop | exact match or fail |
+| change code without evidence | guessing | query graph first; if MCP down, degrade and say so |
+| skip the lazy ladder | over-build | ponytail ladder first; if unavailable, say so |
