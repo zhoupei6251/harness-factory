@@ -317,7 +317,17 @@ git commit -m "test(harness): 断言证据活指针可解析且不落在 runtime
 - 一次性跑产物（草稿、日志、临时脚本）永不进仓库；跑完即弃的迁移脚本也一并弃。
 ```
 
-- [ ] **Step 3: 给 core/routing.md 路由表加 Evidence dir 列**
+- [ ] **Step 3: 修 `:312` 那条已经说不成立的旧结论**
+
+Task 1 的评审实测出这条残留：`routes/news/ARCHITECTURE.md:312` 写着
+
+`- ✅ 验证记录的留存口径写进 §6（契约证据进 \`scripts/\` 受版本管理，文档不再指向 gitignore 路径）`
+
+而新口径是「验证单进 `routes/news/evidence/`、脚本按被检对象分家」。整行替换为：
+
+`- ✅ 验证记录的留存口径写进 §6（验证单进 \`routes/news/evidence/\`；证据脚本按被检对象分家，路契约脚本进 \`routes/news/scripts/\`）`
+
+- [ ] **Step 4: 给 core/routing.md 路由表加 Evidence dir 列**
 
 把 `core/routing.md:3-7` 的表整体替换为：
 
@@ -332,12 +342,14 @@ git commit -m "test(harness): 断言证据活指针可解析且不落在 runtime
 
 （列名里直接写进 never tracked / tracked，是为了让「证据不在 runtime 目录」这条规则在路由表上自我说明，不依赖读者去 news 域翻。）
 
-- [ ] **Step 4: 跑测试确认没破断言**
+- [ ] **Step 5: 跑测试确认没破断言**
 
 Run: `npm test`
 Expected: 全绿。⚠️ 注意 `validateEvidence()` 会扫描改后的 `ARCHITECTURE.md`：Step 1 新写的说明句里不得出现 `.harness-news-runtime/verifications/` 字样（本步骤文本只提 `routes/news/evidence/`，符合）。
 
 - [ ] **Step 5: Commit**
+
+- [ ] **Step 6: Commit**
 
 ```bash
 git add routes/news/ARCHITECTURE.md core/routing.md
