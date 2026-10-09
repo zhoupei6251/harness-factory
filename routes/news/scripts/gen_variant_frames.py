@@ -42,9 +42,11 @@ MASTERS = [
     "news-thread", "news-takes", "news-blast", "news-world",
 ]
 
-#: 变体 → 派生自哪个 master。命名惯例后缀决定归属, 例: -night/-mono → news-coral。
+#: 变体 → 派生自哪个 master。命名惯例后缀决定归属, 例: -mono → news-coral。
+#: （2026-10-09 删除 news-coral-night: 它是唯一"零独有色"的变体, 13 色全被其他包覆盖,
+#:  暗底能力由同样派生自 news-coral 的 news-dusk / news-noir 承接。见 ARCHITECTURE D23。）
 VARIANT_BASE = {
-    "news-coral-night": "news-coral", "news-coral-mono": "news-coral",
+    "news-coral-mono": "news-coral",
     "news-ink-graphite": "news-ink", "news-policy-bold": "news-policy",
     "news-stat-grid": "news-stat", "news-onsite-urgent": "news-onsite",
     "news-bulletin-strip": "news-bulletin",
@@ -60,7 +62,6 @@ VARIANT_BASE = {
 
 #: 变体的视觉气质一句话（写进 frame.md 供选包时读）
 VARIANT_NOTE = {
-    "news-coral-night": "夜店感深红（coral 基调 + 深蓝黑底 + 暗红强调）",
     "news-coral-mono": "单色灰（coral 基调 + 去饱和）",
     "news-ink-graphite": "墨石墨（ink 基调 + 更冷的黑）",
     "news-policy-bold": "政策加粗（policy 基调 + 高对比蓝）",

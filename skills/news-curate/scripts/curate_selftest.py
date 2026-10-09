@@ -528,11 +528,21 @@ def t_decide_pack_covers_every_real_template():
 
 
 def t_all_template_names_is_derived_not_hardcoded():
-    """模板清单必须从 path_b_build 读，不许自己抄一份 —— 抄的那份迟早过期。"""
-    assert len(cu.ALL_TEMPLATE_NAMES) == 32, (
-        f"从 ALL_TEMPLATES 读出 {len(cu.ALL_TEMPLATE_NAMES)} 个, 预期 32")
+    """模板清单必须从 path_b_build 读，不许自己抄一份 —— 抄的那份迟早过期。
+
+    **这条断言自己也不写死总数**：它原先是 `== 32`，于是 D23 删一个 pack 时红的是
+    测试而不是代码 —— "防手抄"的闸自己手抄了一份，正是 D20 要拦的病。该锁的事实是
+    "清单 == 渲染器认的集合"，数量由那个集合决定。
+    """
+    import path_b_build as pb
+    assert set(cu.ALL_TEMPLATE_NAMES) == set(pb.ALL_TEMPLATES), (
+        f"curate 的清单与 path_b_build.ALL_TEMPLATES 不是同一集合: "
+        f"多 {sorted(set(cu.ALL_TEMPLATE_NAMES) - set(pb.ALL_TEMPLATES))} / "
+        f"少 {sorted(set(pb.ALL_TEMPLATES) - set(cu.ALL_TEMPLATE_NAMES))}")
+    assert len(cu.ALL_TEMPLATE_NAMES) == len(pb.ALL_TEMPLATES), (
+        f"数量 {len(cu.ALL_TEMPLATE_NAMES)} != ALL_TEMPLATES {len(pb.ALL_TEMPLATES)} —— 有重复")
     assert "news-polarity" in cu.ALL_TEMPLATE_NAMES, \
-        "news-polarity（第 32 个, 易漏的主题包）不在清单里"
+        "news-polarity（主题包，最易漏登记的那个）不在清单里"
     # 反向: 改成硬编码就一定会被这条抓到
     assert cu.ALL_TEMPLATE_NAMES is not cu._HARDCODED_LIST, \
         "ALL_TEMPLATE_NAMES 不该是手抄的列表"

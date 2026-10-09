@@ -46,14 +46,15 @@ drafts:
   #   word_count: (count)
   #   fact_check: (passed | flagged)
 
-## 模板决策树（32 个 pack，数量现算见 D20）
+## 模板决策树（31 个 pack，数量现算见 D20）
 
 按稿件特征词选视觉气质。t001（拾荒老人）= 人物故事型 → `news-coral`。
 
-**32/32 全部可渲染**（2026-10-08 实测，本节原写的「2/12 可渲染 + 其余 10 包仅占位」
+**31/31 全部可渲染**（2026-10-08 实测，本节原写的「2/12 可渲染 + 其余 10 包仅占位」
 以及「18 个派生变体骨架未独立填实」**均已作废**）：每个包 `compositions/` 7 个真 composition、
-`placeholder.html` 全删、`load_style_pack` 32/32 成功、
-`layout_selfcheck.py` 32 包 234 文件 0 违规。20 个派生变体已补 `frame.md`（含 `derived_from` 派生声明）。
+`load_style_pack` 31/31 成功、
+`layout_selfcheck.py` 逐包 0 违规（检查的文件数由命令现报，不抄在这里）。派生变体与主题包都补了
+`frame.md`（含 `derived_from` 派生声明）。
 
 > ⚠️ 改色板用色时：`audit_pack_contrast.py` 口径是「本包色板 ∪ 共享 token 层」，
 > `SHARED_TOKENS` 不许手抄（用 `shared_tokens_need_review()` 核对）；`#root` 地面色另受
@@ -62,7 +63,6 @@ drafts:
 | 触发词 | pack | 视觉气质 |
 |---|---|---|
 | 故事 / 人物 / 感人 / 心酸 / 老人 / 孩子 | `news-coral` （主） | （master · 主气质） |
-|  | `news-coral-night` （主） | coral 基调 · 夜店感深红（深蓝黑底 + 暗红强调） |
 |  | `news-coral-mono` （主） | coral 基调 · 单色灰（去饱和） |
 |  | `news-mosaic` （备） | coral 基调 · 马赛克拼贴（多色块） |
 |  | `news-dusk` （备） | coral 基调 · 黄昏紫 |

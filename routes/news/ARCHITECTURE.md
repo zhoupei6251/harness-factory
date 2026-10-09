@@ -12,7 +12,7 @@
 | 产物 | 文字 / 视频 二选一 | 只视频 |
 | 路径 | Path A / Path B 二选一 | 只 Path B（免费·零云费）|
 | 脚本润色 | 单独 news-polish + humanizer-zh 阶段 | 并入脚本生成器（不另设阶段）|
-| 模板选择 | 没有（所有视频共用一个 PPT 模板）| 32 pack 决策树（按新闻形态，2026-10-08 补齐变体后从 12 扩到 32，见 D15/D20）|
+| 模板选择 | 没有（所有视频共用一个 PPT 模板）| 31 pack 决策树（按新闻形态，2026-10-08 从 12 扩到 32，2026-10-09 删 `news-coral-night` 后为 31，见 D15/D20/D23）|
 | 入口步骤数 | 7（含两轨切换 + Path 选择）| 3（含模板决策）|
 | 文档位置 | 跨多个文件且互相引用 | 6 步全部在 news-workflow/SKILL.md |
 
@@ -133,9 +133,13 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 - `compositions/*.html`: 实际版式（hook / closer / 内容卡 …）
 
 **当前状态**（2026-10-08 实测，**推翻旧文档的 2/12 说法**）:
-- **32 个 pack 全部有真版式**：12 master + 20 派生变体，每个 `compositions/` 7 个真 composition
-- `placeholder.html` 已全删；`load_style_pack` **32/32 成功**；`layout_selfcheck.py` 32 包 234 文件 **0 条违规**
-- 20 个派生变体已补 `frame.md`（含 `derived_from` 派生声明，D16）
+- **31 个 pack 全部有真版式**：12 master + 19 派生变体/主题包，每个 `compositions/` 7 个真 composition
+- `load_style_pack` **31/31 成功**；`layout_selfcheck.py` 逐包 **0 条违规**（检查文件数由命令现报，不抄在这里）
+- 19 个派生变体/主题包都补了 `frame.md`（含 `derived_from` 派生声明，D16）
+- ⚠️ **`placeholder.html` 并没有"全删"**（2026-10-09 实测纠正本节的旧说法）：10 个 master 包
+  （alert/blast/bulletin/explainer/ink/onsite/stat/takes/thread/world）各留 1 个。它是**惰性**的
+  —— `load_style_pack` 跳过 `PLACEHOLDER_LAYOUT`，所以不影响渲染，但"已全删"这句是错的，
+  留着只会让下一个人以为变体包才需要检查。
 - ⚠️ **色板审计仍有 24 条 OFF_PALETTE_HEX，是刻意保留的**：这些色自动替换会让对比度从
   ~16:1 掉到 ~1.1:1（把白字换成深底），属于"该补进 frame.md 算设计补全"而非"改色"。
   `t_no_pack_has_off_palette_after_repair` 锁的是"不许有第四类未解释越界"，基线 24（D19）
@@ -156,6 +160,7 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 | D20 | **pack 数量一律现算，不许手抄** | 你问「不是 31 个吗」—— 查下来 `decide_pack.py` 的 `PACK_BUCKETS` **正好覆盖 32 个、一个不缺**，错的只是 `--list` 输出与 `pack-decision.md` 标题里手写的「31」。这已是本项目第二次被"手抄数字悄悄过期"咬（D15 的「2/12」同一个病）。修法**不是把 31 改成 32**（下次加包又漂），而是：`decide_pack.py` 加 `all_template_names()` 从 `path_b_build.ALL_TEMPLATES` 现算 + 脱节当场告警；`curate.py` 加 `ALL_TEMPLATE_NAMES` 同源读取；4 条断言锁住 —— 决策表集合必须等于真实模板 / 清单不许退化成手抄 / MEMORY 决策树必须列全 32 行 / 文档里"总量口吻"的 pack 数必须等于真实值（**局部计数如"12 个 master"不管**，混进去只会逼人加豁免名单，形同虚设）。**顺带修一个真缺口**：MEMORY 决策树表原来只画 `primary` = 27 行，**漏掉 5 个只在 `secondary` 出现的包**（表格是选包第一眼看的地方，漏一个等于那个包选不到）—— 修表脚本里的 `assert len(rows)==len(ALL_TEMPLATES)` 专门拦这种漏 |
 | D21 | **首次实跑 t002 暴露的 5 个缺口**（2026-10-08，全部已修） | 静态检查全绿的情况下跑通一条真新闻，暴露的都是"检查不出来、只有真跑才会现形"的问题：<br>**① 配图拿 kicker 当检索词** → `image_query` 旧优先级「显式 image > kicker > 没有」，而 kicker 是**栏目名**（"现场数据"/"时间线"），拿它检索 Commons 得出「东航MU5735黑匣子寻获现场」——**2022 年空难图**，且授权闸(CC BY 3.0)、尺寸闸(961x720)、词面闸**三道同时放行**。改成只认显式 `image`（不写就降级无图）。<br>**② 词面闸对中文太松** → `CJK_SHINGLE=2`，任意 1 个二字块命中即放行，而"现场/数据/北京/市场"会出现在任何无关图里。收紧成「≥3 字连续公共子串 或 ≥2 个二字块」。**代价**：2 字地名（"常德"）不再放行 —— 有意取舍，无图比错图好。<br>**③ 渲染工作目录落在系统 temp** → `tempfile.mkdtemp()` + 15 分钟渲染（大半耗在 `npx` 拉包）等包拉好时 Windows 已清空 temp，`index.html` 连同前 4 段音频消失。改落 `.harness-news-runtime/work/`（`DEFAULT_WORK_ROOT`）。<br>**④ 门禁失败不报真话** → hyperframes 失败只说「报告无法解析: check.json」+ 给个 stderr **路径**，而 stderr 当时是空的。现在把 stderr 原文并进异常消息，并打工作目录 + index.html 是否存在。**"报不出原因的拒绝等于没有拒绝"。**<br>**⑤ 静默丢内容** → `title` 不进配音、而 `stat`/`closer`/`quote` 没有标题位 ⇒ 标题既不上屏也不出声，只有一条 ⚠。根因是**写稿时没看版式契约**，所以新增 `routes/news/scripts/check_scene_contract.py` 把这件事挪到写稿那一刻（`--demo` 自带 3 反例 + 1 不误报）。 |
 | D22 | **台账主键撞车修复 + 状态回写 CLI**（2026-10-08） | 用户诉求「每次把发的新闻记住，不能重复生成」的落地点是**台账主键**，而它从第一天就是坏的：`curate.py` 的 `main()` 里 `entries` 只读一次，循环内反复调 `next_ledger_id(entries)` —— 同一份快照每次算出同一个 id，于是同批 43 个**不同事件全写成 `n0002`**（实测 `ledger.py check` 报「主键 n0002 被 43 个不同事件共用」）。去重靠 `norm_key` 没塌，但 `matched_ledger_id`、状态回写、`--sync-from-memories` 这类按 id 的引用会**指向错误的事件**。修法：`max_ledger_num(entries)+1` 起算的**运行时计数器**逐条自增 + 同一事件多源命中去重（按 `norm_key` 保首条）；顺手把「发布后回写 `published`」从手抄 `python -c` 固化成 `scripts/ledger.py mark`（沿用同事件主键、值拼错即停机、找不到目标不凭空追加）。已经存在的脏数据做了一次**一次性迁移**（按首现顺序重编，同事件沿用同 id，45 行 44 事件 → `n0001…n0044`）—— 这是唯一一次对台账原地改写，理由是"修坏掉的主键"不可能靠追加完成。断言 `t_new_candidates_get_unique_incrementing_ids` 锁住批量追加不许撞车，`t_ledger_mark_*` / `t_ledger_check_detects_id_collision` 锁住回写语义 |
+| D23 | **删除 `news-coral-night`，pack 32 → 31**（2026-10-09，用户要求"32 个里删一个"，由我按实测挑选） | **判据不是"哪个最难看"，是"哪个删掉后能力不减少"**，三条都可复算：① **独有色 = 0** —— 按各包 `frame.md` 色板 token 表算"只出现在本包的色值"，全库只有 4 个包是 0（`news-bulletin`/`news-coral`/`news-takes`/`news-coral-night`），前三个是 master（删了丢体裁锚点）且 coral 是 `DEFAULT_STYLE`（43 处引用），**只有 coral-night 既零独有色、又占可牺牲的变体位**；② **色板是真子集** —— 它的 13 色 ⊂ 其余 19 个包的 16 色，父包 `news-coral` 的 8 色也 ⊂ 它，即它没给系统带来任何一个色；③ **能力有承接** —— 暗底需求由同样派生自 `news-coral` 且**带独有色**的 `news-dusk`（`#7c3aed`）/`news-noir`（`#080808`）承担，而 `news-dusk` 本来就在 `decide_pack.py` 的人物/故事 `secondary` 里。它自己的来历就是反面教材（`routes/news/MEMORY.md` v008：「从 news-coral 完整复制 7 comp + host，替换 ground + accent」），这正是模板 v2 设计 D1/D2 要治的同质化。<br>**反证照实记**：`t001-v8` 曾用它真出过片（`render_status: done`），所以它不是死包 —— 但删模板不动历史成片，那条记录仍成立。<br>**顺手清掉三处手抄数**（D20 的病，之前没人抓）：`path_b_build.py` help 里硬写的「31 个可选项」、`ALL_TEMPLATES` 上方「12 个 master / 12 个派生变体 / 6 个主题包」的分组数、`fix_decision_table.py` 生成块里的「234 文件」与「20 个派生变体」—— 全改成现算或直接删掉数字（**没人断言的数字就是死数字**）。<br>**顺带修了一条"防手抄"的闸自己手抄**：`curate_selftest.t_all_template_names_is_derived_not_hardcoded` 原写 `== 32`，删包时红的是测试不是代码；改成断言"清单集合 == `path_b_build.ALL_TEMPLATES`"，数量由那个集合决定。<br>**纠正一处文档假话**：ARCHITECTURE/SKILL 都写着「`placeholder.html` 全删」，实测 10 个 master 包各留 1 个（惰性，`load_style_pack` 跳过，不影响渲染）。说法已改成实测口径。<br>影响面：包体 9 文件/104K（`git rm`，工作树干净可逆）+ 6 处代码引用（`path_b_build.py:95`、`decide_pack.py:12/36/231`、`fix_decision_table.py:31`、`gen_variant_frames.py:47/63`）+ 3 份文档总量口径（D20 的 `t_no_doc_claims_a_wrong_pack_count` 逐行点名，改完由它验收） |
 | D1 | 单条线 (视频 only) | 用户最终产物是视频；text track 是 dead-end 投入 |
 | D2 | Path B only | 用户只做免费；Path A 留在 `douyin-pro/SKILL.md` 标注为"非新闻领域可启用"，不在新闻工作流中 |
 | D3 | 12 pack 决策树 | 一份脚本可对应 12 种视觉气质；决策由稿件特征词驱动，不靠人挑 |
@@ -369,7 +374,8 @@ $ python skills/douyin-pro/scripts/verify_aigc_badge.py --work <no-badge>/work -
   一行可回：把 `aigc-mode.json` 的 `render` 改回 `full`（或渲染加 `--deliver`），③ 的开关即恢复可用
 - ✅ 发布链路：`--declaration 内容由AI生成` 已对齐上游源码，成功凭据写进 skill
 - ✅ 占位包改为**加载期停机**（不再拖到渲染第 1 镜；能力保留，构造空壳包即可验）
-- ✅ **32/32 pack 全部有真版式**（2026-10-08 实测，D15）—— 旧记录里的「2/12」「⏳ 10 pack 待补」
+- ✅ **31/31 pack 全部有真版式**（2026-10-08 实测 32 个时 D15；2026-10-09 删 `news-coral-night`
+  后为 31，见 D23）—— 旧记录里的「2/12」「⏳ 10 pack 待补」
   是**陈旧数据**，已作废；真数据见 §4「当前状态」
 - ✅ 20 个派生变体补 `frame.md` + 派生声明（D16）；色板审计覆盖面 12 → 32 个包
 - ✅ 561 条 OFF_PALETTE 收敛到 24 条（D18 共享 token 层 + D19 按 CSS 角色替换残留）

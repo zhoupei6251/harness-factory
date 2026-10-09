@@ -28,7 +28,6 @@ import path_b_build as pb  # noqa: E402
 
 #: 变体的视觉气质一句话（从名字读，不另维护一份表）
 VARIANT_NOTE = {
-    "news-coral-night": "coral 基调 · 夜店感深红（深蓝黑底 + 暗红强调）",
     "news-coral-mono": "coral 基调 · 单色灰（去饱和）",
     "news-ink-graphite": "ink 基调 · 墨石墨（更冷的黑）",
     "news-policy-bold": "policy 基调 · 政策加粗（高对比蓝）",
@@ -52,7 +51,7 @@ VARIANT_NOTE = {
 
 
 def build_table() -> str:
-    """画全 32 行。
+    """画全每一行 —— 行数 == `len(pb.ALL_TEMPLATES)`，由下面的 assert 拦，不在文案里写死。
 
     **primary + secondary 都必须进表**（2026-10-08 踩过：只画 primary = 27 行，
     漏掉 5 个只在 secondary 出现的包 —— 表格是选包第一眼看的地方，
@@ -95,8 +94,9 @@ def main() -> int:
 
 **{total}/{total} 全部可渲染**（2026-10-08 实测，本节原写的「2/12 可渲染 + 其余 10 包仅占位」
 以及「18 个派生变体骨架未独立填实」**均已作废**）：每个包 `compositions/` 7 个真 composition、
-`placeholder.html` 全删、`load_style_pack` {total}/{total} 成功、
-`layout_selfcheck.py` {total} 包 234 文件 0 违规。20 个派生变体已补 `frame.md`（含 `derived_from` 派生声明）。
+`load_style_pack` {total}/{total} 成功、
+`layout_selfcheck.py` 逐包 0 违规（检查的文件数由命令现报，不抄在这里）。派生变体与主题包都补了
+`frame.md`（含 `derived_from` 派生声明）。
 
 > ⚠️ 改色板用色时：`audit_pack_contrast.py` 口径是「本包色板 ∪ 共享 token 层」，
 > `SHARED_TOKENS` 不许手抄（用 `shared_tokens_need_review()` 核对）；`#root` 地面色另受

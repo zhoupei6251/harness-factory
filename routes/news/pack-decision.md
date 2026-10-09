@@ -19,7 +19,7 @@
 
 | 主类别 | Primary pack | Secondary pack | 适用热点 |
 |--------|--------------|----------------|----------|
-| 人物/故事 | `news-coral` | `news-coral-night`, `news-coral-mono` | 单主角 / 反转 / 感人 / 老人 / 家人 / 回忆 |
+| 人物/故事 | `news-coral` | `news-coral-mono`, `news-dusk` | 单主角 / 反转 / 感人 / 老人 / 家人 / 回忆 |
 | 调查/揭露 | `news-ink` | `news-ink-graphite` | 调查 / 卧底 / 暗访 / 追踪 / 内幕 / 黑幕 |
 | 政策/法规 | `news-policy` | `news-policy-bold` | 新规 / 政策 / 办法 / 通知 / 施行 / 公文 |
 | 数据/排行 | `news-stat` | `news-stat-grid` | 排行 / TOP / 同比 / 指数 / 榜单 |
@@ -41,7 +41,7 @@
 - `news-podcast` — 观点的"音频"风格
 
 **其他调色板派生**（不进入决策表，但在 batch 决策有需要时可手动指定）：
-- `news-coral-mono` / `news-coral-night`
+- `news-coral-mono`
 - `news-ink-graphite` / `news-policy-bold` / `news-stat-grid` / `news-onsite-urgent`
 - `news-bulletin-strip` / `news-explainer-blueprint` / `news-alert-warning`
 - `news-thread-tribute` / `news-takes-column` / `news-blast-score` / `news-world-globe`
@@ -62,7 +62,7 @@ python routes/news/scripts/decide_pack.py "国务院新规出台" --type policy 
 python routes/news/scripts/decide_pack.py "地震现场直击救援" --type breaking --length 30
 
 # 解释某个 pack
-python routes/news/scripts/decide_pack.py --explain news-coral-night
+python routes/news/scripts/decide_pack.py --explain news-coral-mono
 ```
 
 **输出**：
@@ -103,14 +103,14 @@ python routes/news/scripts/decide_pack.py --explain news-coral-night
 ## 例
 输入: "老人捡垃圾 21 年账户 42 万"
 - 查表: 人物/故事 → news-coral
-- 但 t001 已经是 news-coral → 用户明确要求差异化时, 换 news-coral-night (夜店感) 或 news-coral-mono (单色)
+- 但 t001 已经是 news-coral → 用户明确要求差异化时, 换 news-dusk (黄昏暗底) 或 news-coral-mono (单色)
 ```
 
 ---
 
 ## 六、何时不自动决策
 
-- 用户明确说"用 news-coral-night" → 跳过决策, 直接用
+- 用户明确说"用 news-coral-mono" → 跳过决策, 直接用
 - 主题跨多类别(例: "国务院新规 + 感人故事") → 决策给最高分, **agent 提醒用户** 是否混合两个 pack
 - 新增 pack 类别 → 更新 `decide_pack.py` `PACK_BUCKETS` + 同步 SKILL.md
 

@@ -89,10 +89,12 @@ feedx 三个源新鲜度从「当天」到「297 天前」都有 → 按 `feed_s
 
 回填 MEMORY `videos[].template: <pack_name>`。
 
-**当前进度**（2026-10-08 实测，32 个 pack 全部齐全）：
-- **32/32 全部有真版式**：12 master + 20 派生变体，每个 `compositions/` 7 个真 composition
-- `placeholder.html` 全删；`load_style_pack` 32/32 成功；`layout_selfcheck.py` 32 包 234 文件 0 违规
-- 20 个派生变体已补 `frame.md`（含 `derived_from` 派生声明）
+**当前进度**（2026-10-09 复核，31 个 pack 全部齐全；原 32 个，删了零独有色的 `news-coral-night`，见 ARCHITECTURE D23）：
+- **31/31 全部有真版式**：12 master + 19 派生变体/主题包，每个 `compositions/` 7 个真 composition
+- `load_style_pack` 31/31 成功；`layout_selfcheck.py` 逐包 0 违规（检查文件数由命令现报，不抄在这里）
+- ⚠️ 本节原写「`placeholder.html` 全删」**不准确**：10 个 master 包各留 1 个，它是惰性的
+  （`load_style_pack` 跳过 `PLACEHOLDER_LAYOUT`，不影响渲染），但别把它当"已清理"的证据
+- 19 个派生变体/主题包都补了 `frame.md`（含 `derived_from` 派生声明）
 - **决策树可以放心用** —— 命中任何一格都渲得出来，不再需要"不可渲染就 fallback"那套绕路
 - ⚠️ 本节原写「2/12 可渲染、其余 10 包仅占位」是**陈旧数据已作废**（见 ARCHITECTURE.md D15）
 - ⚠️ **改版式用色时**：`audit_pack_contrast.py` 口径是「本包色板 ∪ 共享 token 层」，

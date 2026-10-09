@@ -74,11 +74,12 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_ROOT = os.path.join(os.path.dirname(SCRIPT_DIR), "templates", "hyperframes_path_b")
 DEFAULT_STYLE = "news-coral"
 
-#: 12 个节目包 (设计系统 = 模板 = style; 三者同义, --template 与 --style 都接这同一组值)。
+#: 节目包 (设计系统 = 模板 = style; 三者同义, --template 与 --style 都接这同一组值)。
+#: **这里不写总数** —— 数量一律 `len(ALL_TEMPLATES)` 现算 (决策 D20: 手抄 pack 数会悄悄过期)。
 #: 顺序按"用途+情绪"二维分组, 默认 DEFAULT_STYLE 仍为 news-coral (人物故事型, 兼容存量稿件)。
 #: 增加新模板只动这里 + templates/hyperframes_path_b/<name>/ 落地, 不动发射器主逻辑。
 ALL_TEMPLATES = (
-    # 12 个 master pack (T1-T12, 主气质)
+    # master pack (T1-T12, 主气质)
     "news-coral",         # T1  人物故事
     "news-ink",           # T2  调查
     "news-policy",        # T3  政策
@@ -91,22 +92,21 @@ ALL_TEMPLATES = (
     "news-takes",         # T10 观点
     "news-blast",         # T11 体育
     "news-world",         # T12 国际
-    # 12 个派生变体 (气质派生)
-    "news-coral-night",   "news-coral-mono",
-    "news-ink-graphite",  "news-policy-bold",
-    "news-stat-grid",     "news-onsite-urgent",
-    "news-bulletin-strip","news-explainer-blueprint",
-    "news-alert-warning", "news-thread-tribute",
-    "news-takes-column",  "news-blast-score",
-    "news-world-globe",
-    # 6 个主题包 (T13-T18)
+    # 派生变体 (气质派生)
+    "news-coral-mono",    "news-ink-graphite",
+    "news-policy-bold",   "news-stat-grid",
+    "news-onsite-urgent", "news-bulletin-strip",
+    "news-explainer-blueprint", "news-alert-warning",
+    "news-thread-tribute","news-takes-column",
+    "news-blast-score",   "news-world-globe",
+    # 主题包 (T13-T19)
     "news-mosaic",        "news-dawn",
     "news-dusk",          "news-noir",
     "news-paper",         "news-podcast",
     "news-polarity",      # T19 极简高反差黑白对比 (2026-09-30)
 )
 #: --style / --template 选择映射; 选模板看 news-workflow/SKILL.md 的"模板决策树"或
-#: routes/news/MEMORY.md videos[].template 字段 (31 个 pack 任何一个都合法)。
+#: routes/news/MEMORY.md videos[].template 字段 (ALL_TEMPLATES 里任何一个都合法)。
 
 #: 占位 composition 的文件名(=版式名)。每个新 pack 先放它凑齐三层目录, 但它
 #: **不是版式**: `load_style_pack` 直接跳过它, 于是"只有占位"的 pack 会在加载阶段
@@ -2353,7 +2353,10 @@ def main():
     ap.add_argument("--output", default="output.mp4", help="最终 MP4 路径 (默认 output.mp4)")
     ap.add_argument("--template", "--style", dest="style", default=DEFAULT_STYLE,
                     choices=ALL_TEMPLATES,
-                     help="节目包 (设计系统) 名 (兼容旧名 --style); 默认 " + DEFAULT_STYLE + "; 31 个可选项: " + ", ".join(ALL_TEMPLATES) + ". 见 templates/hyperframes_path_b/ 与 news-workflow/SKILL.md 模板决策树")
+                     help="节目包 (设计系统) 名 (兼容旧名 --style); 默认 " + DEFAULT_STYLE
+                     + "; " + str(len(ALL_TEMPLATES)) + " 个可选项: "
+                     + ", ".join(ALL_TEMPLATES)
+                     + ". 见 templates/hyperframes_path_b/ 与 news-workflow/SKILL.md 模板决策树")
     ap.add_argument("--voice", default="zh-CN-XiaoxiaoNeural", help="edge-tts 音色")
     ap.add_argument("--resolution", default="1080x1920", help="分辨率, 如 1080x1920(竖) 或 1920x1080(横)")
     ap.add_argument("--doctor", action="store_true", help="只做环境自检")

@@ -9,7 +9,7 @@ decide_pack.py - 新闻域 pack 决策工具
   python routes/news/scripts/decide_pack.py "国务院新规" --type policy --length 60
   python routes/news/scripts/decide_pack.py "地震现场救援" --type breaking --length 30
   python routes/news/scripts/decide_pack.py --list   # 列出全部 pack 分类
-  python routes/news/scripts/decide_pack.py --explain news-coral-night   # 解释某个 pack
+  python routes/news/scripts/decide_pack.py --explain news-coral-mono     # 解释某个 pack
 
 设计: 关键词权重 + 类别 bucket + 调性匹配 + 长度适配
 
@@ -33,7 +33,7 @@ _REPO_ROOT = Path(__file__).resolve().parents[3]
 PACK_BUCKETS = {
     "person_story": {  # 人物/故事
         "label": "人物/故事",
-        "primary": ["news-coral", "news-coral-night", "news-coral-mono"],
+        "primary": ["news-coral", "news-coral-mono"],
         "secondary": ["news-mosaic", "news-dusk"],
         "keywords": {
             "故事": 3, "人物": 3, "老人": 2, "孩子": 2, "他": 1, "她": 1,
@@ -228,7 +228,7 @@ def decide(text: str, type_hint: str = None, length: int = 60) -> dict:
     if not scores:
         return {
             "primary": "news-coral",
-            "alternatives": ["news-coral-night", "news-explainer"],
+            "alternatives": ["news-dusk", "news-explainer"],
             "reason": "未匹配关键词, 默认主版(人物故事型) -- 适合 80% 内容",
             "scores": {},
             "shots": LENGTH_TO_SHOTS.get(length, 5),

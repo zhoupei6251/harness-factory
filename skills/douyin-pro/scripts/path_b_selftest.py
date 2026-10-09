@@ -731,8 +731,8 @@ MASTER_TEMPLATES = {
 
 
 def t_all_templates_in_constant():
-    # ALL_TEMPLATES = 12 master + 20 派生变体 = 32（2026-10-08 实测, 见 D15）。
-    # **不要把 32 写死**：新增 pack 时这条会红，那是提醒该同时更新 MASTER/VARIANT 分类。
+    # ALL_TEMPLATES = 12 master + 派生变体/主题包（2026-10-09 起为 19 个，删了 news-coral-night，
+    # 见 ARCHITECTURE D23）。**总数不写死在文案里**：新增/删除 pack 时这条不该红，
     # 真正要锁的是"每个包都在磁盘上存在、且有真版式"，不是"数字等于 12"。
     assert len(pb.ALL_TEMPLATES) >= len(MASTER_TEMPLATES), (
         f"ALL_TEMPLATES 少于 master 数 {len(MASTER_TEMPLATES)}: "
