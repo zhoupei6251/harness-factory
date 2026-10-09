@@ -56,31 +56,38 @@ if (probe.status === 0 && /codebase-memory-mcp/.test(probe.stdout ?? "")) {
   );
 }
 
-const codexConfig = join(HOME, ".codex", "config.toml");
+// MCP wiring is OR-ed across platforms: a Qoder-only or Claude-only machine has
+// no reason to fail bootstrap. The project `.mcp.json` counts on its own, but is
+// labelled separately — it ships with the repo, so it proves the snippet is
+// present, not that any client on this machine was actually wired.
 const claudeMcp = join(ROOT, ".mcp.json");
-const codexWired = await exists(codexConfig)
-  && /mcp_servers\.codebase_memory/.test(await readFile(codexConfig, "utf-8"));
+const codexWired = await exists(join(HOME, ".codex", "config.toml"))
+  && /mcp_servers\.codebase_memory/.test(await readFile(join(HOME, ".codex", "config.toml"), "utf-8"));
+const qoderWired = await exists(join(HOME, ".qoder-cn", "settings.json"))
+  && /codebase_memory/.test(await readFile(join(HOME, ".qoder-cn", "settings.json"), "utf-8"));
 const claudeWired = await exists(claudeMcp)
   && /codebase_memory/.test(await readFile(claudeMcp, "utf-8"));
-if (codexWired && claudeWired) {
-  ok("codebase-memory-mcp wired (codex config.toml + project .mcp.json)");
+const clients = [codexWired && "codex", qoderWired && "qoder"].filter(Boolean).join(" + ");
+if (clients || claudeWired) {
+  ok(`codebase-memory-mcp wired (client config: ${clients || "none"}; project .mcp.json: ${claudeWired ? "present" : "absent"})`);
 } else {
   missing(
-    `codebase-memory-mcp config (codex: ${codexWired ? "ok" : "missing"}, claude: ${claudeWired ? "ok" : "missing"})`,
-    "append mcp-config/codebase-memory.codex.toml to ~/.codex/config.toml; keep .mcp.json at repo root",
+    "codebase-memory-mcp config (no platform wiring found)",
+    "codex: append mcp-config/codebase-memory.codex.toml to ~/.codex/config.toml · qoder: top-level mcpServers in ~/.qoder-cn/settings.json (Windows command=npx.cmd) · claude: keep .mcp.json at repo root",
   );
 }
 
 const ponytailPaths = [
   join(HOME, ".codex", "skills", "ponytail", "SKILL.md"),
   join(HOME, ".claude", "skills", "ponytail", "SKILL.md"),
+  join(HOME, ".qoder", "skills", "ponytail", "SKILL.md"),
 ];
 if (await ponytailPaths.reduce(async (acc, path) => (await acc) || exists(path), Promise.resolve(false))) {
   ok("ponytail skills installed");
 } else {
   missing(
     "ponytail",
-    "git clone https://github.com/DietrichGebert/ponytail and copy its skills/* into ~/.codex/skills/ (or /plugin marketplace add DietrichGebert/ponytail in Claude Code)",
+    "git clone https://github.com/DietrichGebert/ponytail and copy its skills/* into ~/.codex/skills/, ~/.claude/skills/ or ~/.qoder/skills/ (in Claude Code: /plugin marketplace add DietrichGebert/ponytail)",
   );
 }
 

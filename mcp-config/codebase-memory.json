@@ -4,8 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "codebase-memory-mcp",
-        "--ui=true"
+        "codebase-memory-mcp"
       ],
       "env": {
         "NODE_ENV": "production"
