@@ -299,7 +299,7 @@ videos:
 ## In progress
 in_progress:
   - render_speed: 已达标（2026-10-09）—— 4 条批渲摊薄 28.7s/条（≤180s/条），冷/热跑与决策门数字见
-    `.harness-news-runtime/verifications/2026-10-09-render-speedup-verification.md`；批量出片用
+    `routes/news/evidence/2026-10-09-render-speedup-verification.md`；批量出片用
     `python routes/news/scripts/batch_render.py --manifest <清单.json> --jobs 3`（清单每条必带 source/aigc-producer）；
     前置：Node ≥22（本机跑前先把 nvm 的 v23.11.1 以 PATH 前缀注入，默认 20.9.0 过不了 hyperframes 门禁）
   - current_phase: publishing

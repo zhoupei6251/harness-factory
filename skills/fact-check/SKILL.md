@@ -76,7 +76,7 @@ AIGC 标识解决不了这个问题：角标只声明"这是 AI 生成的"，不
 
 ## 6. 产物：核查单（必写，不许口头过）
 
-落 `.harness-news-runtime/verifications/<date>-<topic_id>-fact-check.md`，五节：
+落 `routes/news/evidence/<date>-<topic_id>-fact-check.md`，五节：
 
 1. **多源交叉表** —— 来源 / 性质 / 一致点，**并判断独立性**
 2. **逐项核对表** —— 稿件每个数字一行：表述 / 核查结果 / 来源编号 / 判定（✅ / ⚠️单源 / ❌）

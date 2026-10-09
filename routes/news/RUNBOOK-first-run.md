@@ -87,7 +87,7 @@
 
 | # | 缺口 | 影响 | 建议 | 状态 |
 |---|---|---|---|---|
-| 1 | **hyperframes 极慢**（单次 check > 13 分钟，主耗在 Google Fonts 拉字体） | 每条片子 15-25 分钟，一天出不了几条 | 字体已缓存 276M（`~/.cache/hyperframes`）；第二次应快很多。**实测确认**：第二次跑是否降到分钟级 | **已实测+已处置**：热跑单条 65.9s，4 条批渲摊薄 28.7s/条（历史基线快约 14-23 倍），数字见 `.harness-news-runtime/verifications/2026-10-09-render-speedup-verification.md` |
+| 1 | **hyperframes 极慢**（单次 check > 13 分钟，主耗在 Google Fonts 拉字体） | 每条片子 15-25 分钟，一天出不了几条 | 字体已缓存 276M（`~/.cache/hyperframes`）；第二次应快很多。**实测确认**：第二次跑是否降到分钟级 | **已实测+已处置**：热跑单条 65.9s，4 条批渲摊薄 28.7s/条（历史基线快约 14-23 倍），数字见 `routes/news/evidence/2026-10-09-render-speedup-verification.md` |
 | 2 | **`npx -y hyperframes` 每次重装** | 每次多耗 5-15 分钟 | hyperframes 0.8.141 已在 `~/AppData/Local/npm-cache/_npx/702923228c2ce1e6/`。`npm install --no-save` 会卡在 esbuild postinstall（网络）。**建议**：`path_b_build` 加 `--hyperframes-bin` 参数，或探测 npx 缓存直接调 | **已修：`hf_argv` 可执行定位**（旗标 > 项目 node_modules > npx 缓存 > 回落 npx -y） |
 | 3 | **edge-tts 依赖不在 PATH 校验范围** | 新机器上第一次跑会失败 | `install_path_b_deps.py --check` **根本没查 edge-tts**（它查的是 Path B 之外的东西）。应加进去 | **陈述过期**：`install_path_b_deps.py` 第 [2/5] 步本就校验 edge-tts（2026-10-09 复核） |
 

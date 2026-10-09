@@ -99,5 +99,5 @@ $ python skills/douyin-pro/scripts/layout_selfcheck.py skills/douyin-pro/templat
    > **订正（同日 · D14）**：本条后半已经成真 —— 用户本人点头的是**改判据**（「判据放宽：交付件可以不带 ① …
    > 烧角标的代码留着」），不是删能力。`path_b_build.py` 因此被改过：烧角标那段**一行没删**，
    > 外面加了三档 `full / no-badge / draft` 的分派；D8/D11/硬规则 7 的口径同步放宽为「② + ③ 齐活」。
-   > 凭据见 `.harness-news-runtime/verifications/2026-09-29-aigc-no-badge-rail-D14-verification-lite.md`。
+   > 凭据见 `routes/news/evidence/2026-09-29-aigc-no-badge-rail-D14-verification-lite.md`。
    > 本条前半仍然成立：那条无出处的 `pm` 消息始终没有被当成指令执行。

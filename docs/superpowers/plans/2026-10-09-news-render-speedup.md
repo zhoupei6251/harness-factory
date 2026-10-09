@@ -29,7 +29,7 @@
 | `routes/news/RUNBOOK-first-run.md` | 修改 | 验收后回写 P0 #1/#2/#3 状态（#3 的"没查 edge-tts"陈述已过期，见 Task 6） |
 | `routes/news/MEMORY.md` | 修改 | 验收后回写提速状态与摊薄实测值 |
 | `.harness-news-runtime/tmp/timing/*.json` | 产出 | 冷/热跑分段计时报告（gitignore 内，一次性跑动产物） |
-| `.harness-news-runtime/verifications/2026-10-09-render-speedup-*.md` | 产出 | 吞吐验收验证单（**契约证据，`git add -f` 拉进版本管理**） |
+| `routes/news/evidence/2026-10-09-render-speedup-*.md` | 产出 | 吞吐验收验证单（**契约证据，`git add -f` 拉进版本管理**） |
 
 ---
 
@@ -625,7 +625,7 @@ git commit -m "feat(news): batch_render 并行发射器（失败隔离 + 摊薄�
 ### Task 6: 吞吐验收 + 文档回写
 
 **Files:**
-- 产出: `.harness-news-runtime/verifications/2026-10-09-render-speedup-verification.md`（`git add -f` 进版本管理）
+- 产出: `routes/news/evidence/2026-10-09-render-speedup-verification.md`（`git add -f` 进版本管理）
 - Modify: `routes/news/RUNBOOK-first-run.md`、`routes/news/MEMORY.md`
 
 - [ ] **Step 1: 真批渲 4 条计时**
@@ -665,10 +665,10 @@ Expected: 4 条闸门全退出码 0（提示带 `--declaration 内容由AI生成
 
 - [ ] **Step 3: 验证单落盘（契约证据，必须进版本管理）**
 
-写 `.harness-news-runtime/verifications/2026-10-09-render-speedup-verification.md`，含：冷/热跑逐段秒数表、Task 3 决策门结论、字体处置分支（A/B/C + 依据）、4 条批渲的墙钟与摊薄值、闸门输出摘要。用 `git add -f` 显式拉入：
+写 `routes/news/evidence/2026-10-09-render-speedup-verification.md`，含：冷/热跑逐段秒数表、Task 3 决策门结论、字体处置分支（A/B/C + 依据）、4 条批渲的墙钟与摊薄值、闸门输出摘要。用 `git add -f` 显式拉入：
 
 ```powershell
-git add -f .harness-news-runtime/verifications/2026-10-09-render-speedup-verification.md
+git add routes/news/evidence/2026-10-09-render-speedup-verification.md
 ```
 
 - [ ] **Step 4: 文档回写**
@@ -684,7 +684,7 @@ git add -f .harness-news-runtime/verifications/2026-10-09-render-speedup-verific
 
 ```powershell
 git add routes/news/RUNBOOK-first-run.md routes/news/MEMORY.md
-git add -f .harness-news-runtime/verifications/2026-10-09-render-speedup-verification.md
+git add routes/news/evidence/2026-10-09-render-speedup-verification.md
 git commit -m "docs(news): 出片提速验收回写（摊薄实测 + RUNBOOK P0 状态修正）"
 ```
 

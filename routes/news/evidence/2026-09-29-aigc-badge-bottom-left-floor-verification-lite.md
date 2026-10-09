@@ -218,7 +218,7 @@ EXIT=1
 不成立的是 §2.3 里**时序表的后两行采样点**：`t=27.00s` 与 `t=49.79s` 属于 50.0s 的旧探针，
 换成现 fixture 后总时长 43.0s，采样点变成 `t=23.50s / 42.81s`（判定不变：窗口外）。
 新的复现命令与完整输出见
-`.harness-news-runtime/verifications/2026-09-29-aigc-switch-draft-rail-and-publish-gate-verification-lite.md`。
+`routes/news/evidence/2026-09-29-aigc-switch-draft-rail-and-publish-gate-verification-lite.md`。
 
 另记一条机器前提：`npx -y hyperframes` 需 **Node ≥ 22**。本机 nvm 曾被切到 20.9.0，
 此时 §5 的 check 门禁产出空 `check.json` + `HyperFrames requires Node.js >= 22`，
@@ -242,5 +242,5 @@ local t=0 选字幕，那样得到的基准帧与裸抽帧逐像素相同）；�
 也已换成合法输入形态（总时长变成 43.0s）。所以本记录「窗口外 0.0%」这一判据的**现行凭据是新那次的
 `t=23.50s` → 3px、`t=42.81s` → 0px**（同一台机器、同一份受版本管理的 fixture、带字幕的同刻基准）。
 完整命令、新旧对照与空档停机真实触发的那一次，见
-`.harness-news-runtime/verifications/2026-09-29-aigc-switch-draft-rail-and-publish-gate-verification-lite.md` §4。
+`routes/news/evidence/2026-09-29-aigc-switch-draft-rail-and-publish-gate-verification-lite.md` §4。
 

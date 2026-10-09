@@ -207,7 +207,7 @@ $ python skills/douyin-pro/scripts/layout_selfcheck.py \
 > 改为 **`render=no-badge · declaration=required`** —— 第二个开关（③）在这一档被判据重新打开，
 > 因为画面没标时 ② 过抖音转码即失、③ 是唯一活到平台侧的那一件。本节三点事实照旧成立
 > （没执行删码、消息无出处、工作树里那段代码一行没少），凭据见
-> `.harness-news-runtime/verifications/2026-09-29-aigc-no-badge-rail-D14-verification-lite.md`。
+> `routes/news/evidence/2026-09-29-aigc-no-badge-rail-D14-verification-lite.md`。
 
 ## 9. 产物位置（`.harness-news-runtime/` 被 gitignore，本记录是它们的证据）
 

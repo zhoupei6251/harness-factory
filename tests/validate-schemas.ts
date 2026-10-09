@@ -2,11 +2,32 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
+import { execFileSync } from "node:child_process";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const SCHEMAS_DIR = resolve(ROOT, "schemas");
 const SKILLS_DIR = resolve(ROOT, "skills");
+
+// Runtime dirs are ignorable by contract (see core/routing.md). Anything tracked
+// under one is an ad-hoc `git add -f` rescue that the next clone will lose.
+const RUNTIME_DIRS = [".harness-news-runtime", ".harness-novel-runtime", ".ai-runtime-artifacts"];
+
+function trackedFiles(): string[] {
+  return execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf-8" })
+    .split(/\r?\n/)
+    .filter(Boolean);
+}
+
+async function validateRuntimeDirs(): Promise<void> {
+  const offenders = trackedFiles().filter((p) => RUNTIME_DIRS.some((d) => p.startsWith(`${d}/`)));
+  if (offenders.length === 0) {
+    console.log(`[ok]   no tracked file under a runtime dir (${RUNTIME_DIRS.join(", ")})`);
+  } else {
+    for (const p of offenders) console.log(`[FAIL] runtime content must not be tracked: ${p}`);
+    fail = 1;
+  }
+}
 
 let fail = 0;
 
@@ -90,6 +111,7 @@ async function validateArchiveSkills(): Promise<void> {
 await validateSchemas();
 await validateSkills();
 await validateArchiveSkills();
+await validateRuntimeDirs();
 
 if (fail === 0) {
   console.log("");
