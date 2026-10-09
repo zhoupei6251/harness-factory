@@ -151,9 +151,9 @@ sed -i 's#\.harness-news-runtime/verifications/#routes/news/evidence/#g' \
 sed -i 's#git add -f routes/news/evidence/#git add routes/news/evidence/#g' \
   docs/superpowers/plans/2026-10-09-news-render-speedup.md
 
-git grep -n "harness-news-runtime/verifications" -- . ':!docs/superpowers/specs' | cat
+git grep -n "harness-news-runtime/verifications" -- . ':!docs/superpowers' | cat
 ```
-Expected: 最后一条 `git grep` **无输出**（specs 目录下的本计划 spec 允许命中，故排除）。若有输出，逐行改到空为止。
+Expected: 最后一条 `git grep` **无输出**。豁免范围是**整个** `docs/superpowers/`（spec + plan 都是执行记录，plan 正文里那些反向 sed 与自测处方**必须**保留旧路径字符串才跑得起来），与断言①的扫描口径同源。若活文档（`routes/` `skills/` `core/` `platforms/` `ARCHITECTURE.md`）里还有命中，逐行改到空为止。
 
 - [ ] **Step 6: 跑测试转绿**
 
@@ -579,14 +579,16 @@ installDir 全是指向不存在路径、version 为空串，而 douyin-pro 已�
 npm test
 git ls-files | grep -E "^\.(harness-news|harness-novel|ai-runtime)" ; echo "runtime-tracked exit=$?"
 git ls-files routes/news/evidence | wc -l
-git grep -n "harness-news-runtime/verifications" | cat
+git grep -n "harness-news-runtime/verifications" -- . ':!docs/superpowers' | cat
+git grep -c "harness-news-runtime/verifications" -- docs/superpowers | cat
 npm run typecheck
 ```
 Expected（按 spec §9 六条）：
 1. `npm test` 绿，且输出里含三条 `[ok]`（runtime dir / evidence pointers / ARCHITECTURE counts）。
 2. `grep -E` 无输出，`runtime-tracked exit=1`（grep 没命中才返回 1）。
 3. evidence 计数 `9`。
-4. `git grep` 只命中 `docs/superpowers/specs/2026-10-09-file-artifact-class-contract-design.md` 的历史叙述，**不命中任何可执行命令**。
+4. 旧路径在**活文档里零命中**（第一条 grep 无输出：`routes/` `skills/` `core/` `platforms/` `ARCHITECTURE.md` 都不再指向它）；第二条 grep 只命中 `docs/superpowers/**` —— spec 的问题陈述与本 plan 的反向-sed 自测处方，属执行记录，必须保留旧字符串才成立。
+   ⚠️ 这条判据对 spec §9 第 4 条「不命中任何可执行命令」做了**口径收窄**：判据被理解为「活文档里不许有指向退役路径的指针」，而不是「任何文件都不许出现该字符串」—— 后一种写法会让自测处方无法自我表达。裁定记在 ledger，最终汇报里回呈用户。
 5. `typecheck` 无错误。
 6. 三条断言各做过一次破坏性自测（Step 记录在 Task 2/4 与下方 Step 3）。
 
