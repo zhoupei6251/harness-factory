@@ -199,10 +199,12 @@ contrast: inherits|self-proofs|requires-chip|none · seek_safe: by-construction 
   ~~原文理由"否则两条路径时序不同会破坏同稿同片"~~ 被 P2-0 实测否掉：同一句连跑两次 `WordBoundary`，词数与逐词文本全同，`start`/`duration` 差 max **0.000s** —— 服务给词级时序是确定的。落盘的真理由换两条：① **降级路径与真路径时序确实不同**，不落盘就无法证明一支片子走的是哪条、也无法复现；② 配音段实测 **12.1–12.9s** 是网络往返，重跑门禁/重渲染不该再花一次网络，更不该在微软服务抖动时把已合格的稿子变成失败。复用键 = (归一化正文, voice) 的哈希，哈希不匹配必须重配 —— 不许拿旧 cues 配新稿。
 - **禁入区协商**：`grid.safe.bottom` 由 `subtitle.position` 反算；但抖音右侧点赞栏要求左右各留 6%，此宽度约束硬，与字幕归谁渲染无关。
 
-**P2-3 / P2-4 已落地**（2026-10-10，`path_b_selftest` 140/140）：字幕真正收进 HyperFrames，成为每镜一个 2 轨子合成（`compositions/subtitle-<i>.html`，透明 `#root`、`@font-face "HF CJK"` 走本机 CJK 族、白字黑描边 `text-shadow` 八向、词级入场 `fromTo opacity 0→1` 累积 + 每 cue 一次退场）。四条锁定口径与实现：
+**P2-3 / P2-4 已落地**（2026-10-10，`path_b_selftest` 141/141；Node≥22 机器过真渲染闸）：字幕真正收进 HyperFrames，成为每镜一个 2 轨子合成（`compositions/subtitle-<i>.html`，透明 `#root`、`@font-face "HF CJK"` 走本机 CJK 族、词级入场 `fromTo opacity 0→1` 累积 + 每 cue 一次退场）。**填充/描边随本镜地面 tone 翻面**（浅面墨字 `#1f1b16`＋白描边、深面白字 `#ffffff`＋黑描边），强调 `#B45309` 两 tone 通用。四条锁定口径与实现：
 
 1. **裁决 17 落地**：词级只管入场（累积不消失），退场按整条 cue 一次做；数字常量单一真源在发射器（`SUBTITLE_*`）。
 2. **禁入区维持 20cqh、AIGC 角标不动**：`CAPTION_RESERVE_CQH` **不改**（20.0）。原"收到 2 行 / 17cqh"的收口**推迟到 P4/P5** —— 量过角标几何后确认：烧录字幕块底固定在 `h−MarginV`、三行字幕顶边实测 1568px（81.7cqh），把禁入区塌到 17cqh 会物理吃掉 AIGC 角标唯一的竖向落点（角标带从 92px 缩到 34px < 角标实测 65.7px）。裁决 2 的"角标留 ASS"与这条几何耦合，不能提前解。
+   - **字幕填充色改"随地面翻色"（2026-10-10，推翻原"统一白字+黑描边"）**：`check --strict` 实测白字在旗舰暖纸浅地面 `rgb(234,229,217)` 上对比 **1.26:1**、不过 WCAG AA 3:1（深地面则过）。原口径能成立的前提是字幕由 ASS 在 HyperFrames **之后**烧、引擎看不见它；收进体系后地面 tone 就成了变量。owner 选定"随地面翻色"：`_subtitle_palette(tone)` 浅→墨字白边、深→白字黑边；强调 `#B45309` 在旗舰所有地面上实测 ≥3（浅纸 3.8–4.4、墨面 3.4），不随 tone 变。cobalt 深地面（号外/竞技族，非本旗舰包）上强调仅 2.24:1，列为 **P5 铺该族时的待办**，非本轮阻塞。
+   - **字幕 `#sc-wrap` 打 `data-layout-allow-caption-zone`**：引擎的 `--caption-zone=y0=0.80` 是给"烧录字幕预留、体系内容别怼进去"的，现在字幕本身就是体系里故意落在 lower-third 的那一层，不打此标记 `check` 会把每条字幕判成 `caption_zone_collision`（实测 29 条）。这是引擎 fixHint 明写的正规出口，不是绕过。
 3. **只有编译包（path_c，有 `spec.toml`）走原生字幕**：`load_style_pack` 现返回 `pack["compiled"]`；`emit_composition` 仅在 `pack["compiled"] and scene_cues is not None` 时挂字幕轨。31 套 path_b 存量手发包不传 `scene_cues` ⇒ 字幕子合成一个不生成、片字节形状不变。
 4. **ASS 烧录对编译包降为"仅角标"**：`mux_and_burn` 收 `ass_cues = [] if pack["compiled"] else cues`（`subs.vtt` 仍写全量供审计）；守卫改成 `if not cues and not burn_badge`，空字幕 cue 但 full 档要角标时仍走滤镜，合规标识不被静默丢掉。
 5. **自检豁免两条、其余照查**：`layout_selfcheck` 认 `subtitle-` 前缀为字幕文件，只对 #6（动量预算）/#7（底部禁入区）两条不变量豁免（字幕层本就常驻底部、无 driftDur 预算），其余 15 条（含 `CONTRACT_ID_MISMATCH`、空目标补间、CJK `@font-face`、px 排版）全数生效 —— 反证测试改坏根 id 必须仍报红。
@@ -288,7 +290,7 @@ contrast: inherits|self-proofs|requires-chip|none · seek_safe: by-construction 
 2. **P1 旗舰包 = 决策门**：12 个 P0 原语 + 编译器最小版 + **杂志族·暖纸**一套 → 出片 → **与老包同稿并排，用户看帧判定**。不认可即停在此处，损失只有 P1
    - **已过（2026-10-10）**：六项机判全绿 + 判据 1 人工门认可（批准语"你继续铺吧"）。三条实测审美差距**不阻塞但记账**，P5 铺同族变体时一并解决：D2 字号档比基线小一档、D3 story/closer 中段约 30% 空转、D4 序数存在感弱（Playfair 16cqw 细衬线 vs 基线近满宽重量级数字）。并排帧与两支成片在 `.harness-news-runtime/tmp/p13e/`，数字在证据 §J6
 3. **P2** 字幕轨（WordBoundary + `cues.json` 落盘 + 禁入区反算）
-   - **P2-3/P2-4 已过（2026-10-10，`path_b_selftest` 140/140）**：字幕每镜编译为 2 轨子合成、ASS 对编译包降为仅角标、自检两条豁免其余照查。禁入区**维持 20cqh**、AIGC 角标不动，17cqh 收口推迟到 P4/P5（几何证据见 §6.4 第 2 条）。待办：真机出片复验四道闸 + 判据 4a 确定性（字幕进视频流后）。
+   - **P2-3/P2-4 已过（2026-10-10，`path_b_selftest` 141/141 + Node≥22 真渲染闸）**：字幕每镜编译为 2 轨子合成、ASS 对编译包降为仅角标、自检两条豁免其余照查；`check --strict` 通过（字幕填充随地面翻色 + `data-layout-allow-caption-zone` 消掉对比与禁入区两闸）；判据 4a 双渲染视频流逐字节相同（含字幕进流）。禁入区**维持 20cqh**、AIGC 角标不动，17cqh 收口推迟到 P4/P5（几何证据见 §6.4 第 2 条）。
 4. **P3** 图片门禁（四通道 + grade + 纹理化 + 示意标注）
 5. **P4** 审计上移（编译前预校验 + 5 道新检查 + 确定性哈希门）
 6. **P5** 铺 31 套，族顺序：**杂志 → 号外 → 数据 → 瑞士 → 竞技 → 图解 → 霓虹 → 胶片 → 街采**。每族先出 1 个变体验收，再铺同族其余变体

@@ -486,11 +486,15 @@ SUBTITLE_MAX_WIDTH_CQW = round(100.0 - 2 * SUBTITLE_SIDE_CQW, 4)      # 盒宽 =
 #: 用 text-shadow 的八向偏移画一圈黑：软件光栅下逐像素确定，且比 -webkit-text-stroke 更贴
 #: ASS 的"字芯 + 外描边"形状（描边长在字外面，不啃字）。
 SUBTITLE_OUTLINE_EM = round(ASS_FONT_H_FRAC / ASS_OUTLINE_H_FRAC, 4)   # (h/32)/(h/640)=20 → 1/20=0.05em
-#: 强调是"词的着色"（裁决：统一白字 + 黑描边，强调词换成固定高亮色且同样描边）。
-#: 高亮色取杂志族强调 #B45309：与黑描边在一起在任何地面上都够跳（描边把字与地面隔开）。
-SUBTITLE_TEXT_COLOR = "#ffffff"
+#: 强调是"词的着色"。**填充随地面翻色**（裁决 2026-10-10 改，推翻原"统一白字"）：
+#: `check --strict` 实测白字 #fff 在旗舰暖纸浅地面 rgb(234,229,217) 上只有 1.26:1，
+#: 不过 WCAG AA 3:1（深地面则过）。浅地面改墨字 + 白描边、深地面保持白字 + 黑描边。
+#: 强调色 #B45309 在旗舰所有地面上都 ≥3（浅纸 3.8–4.4、墨面 3.4，见证据 K16），两 tone 通用。
+SUBTITLE_LIGHT_COLOR = "#ffffff"    # 深地面用的白字
+SUBTITLE_INK_COLOR = "#1f1b16"      # 浅地面用的墨字（同 spec color.surfaces.ink）
 SUBTITLE_ACCENT_COLOR = "#B45309"
-SUBTITLE_STROKE_COLOR = "#000000"
+SUBTITLE_STROKE_COLOR = "#000000"   # 深地面配白字的黑描边
+SUBTITLE_OUTLINE_COLOR = "#ffffff"  # 浅地面配墨字的白描边
 #: 字幕不呼吸、不做连续位移（帧自检的 drift/budget 两条对字幕文件豁免），但入场用
 #: 词级 fromTo、退场用整条 cue 淡出。单词淡入下限与退场时长是有理由的具名常数：
 SUBTITLE_ENTRANCE_MIN = 0.1          # 单字淡入不短于此（太短读成跳变，非"亮起来"）
@@ -541,7 +545,7 @@ SUBTITLE_COMP_TPL = '''<!doctype html>
 .sc-acc {{ color: {accent}; }}
       </style>
       <div id="root" data-composition-id="{comp_id}" data-width="{w}" data-height="{h}">
-        <div id="sc-wrap">{body}</div>
+        <div id="sc-wrap" data-layout-allow-caption-zone>{body}</div>
       </div>
       <script>
         const tl = gsap.timeline({{ paused: true }});
@@ -553,8 +557,18 @@ SUBTITLE_COMP_TPL = '''<!doctype html>
 </html>
 '''
 
-SUBTITLE_COMP_TPL = SUBTITLE_COMP_TPL.replace("{text}", SUBTITLE_TEXT_COLOR) \
-    .replace("{stroke}", SUBTITLE_STROKE_COLOR).replace("{accent}", SUBTITLE_ACCENT_COLOR)
+
+def _subtitle_palette(tone: str) -> tuple[str, str]:
+    """按本镜真实地面 tone 取字幕填充色与描边色（浅面墨字白边 / 深面白字黑边）。
+
+    对比度是实测口径不是猜的：墨字 #1f1b16 在旗舰三个浅地面上 12.9–15.1:1、白字在黑
+    描边上过深地面 AA，两条反向描边把字与地面隔开。强调色不随 tone 变（`SUBTITLE_ACCENT_COLOR`）。
+    """
+    if tone not in (TONE_LIGHT, TONE_DARK):
+        raise EmitterError(f"字幕翻面要一个已知 tone，收到 {tone!r}")
+    if tone == TONE_LIGHT:
+        return SUBTITLE_INK_COLOR, SUBTITLE_OUTLINE_COLOR
+    return SUBTITLE_LIGHT_COLOR, SUBTITLE_STROKE_COLOR
 
 
 class EmitterError(RuntimeError):
@@ -2266,13 +2280,13 @@ def _subtitle_lines_wrap(segs, line_chars, accent_by_id) -> list[list[dict]]:
 
 
 def emit_subtitle_composition(composition_id: str, cues: list[dict],
-                              slot: float, w: int, h: int) -> str:
+                              slot: float, w: int, h: int, tone: str) -> str:
     """把一镜的字幕编译成一份**子合成 HTML**（引擎克隆 `<template>`、按 `data-composition-id` 挂载）。
 
     发射器在这里**把绝对时间烤进** timeline（每个词的 `at=` 用 `word.s`、每条 cue 的退场用
     `exit_at`），运行时不读 `Date.now()`/随机 ⇒ 判据 4a 逐字节可复现。入场逐词 `fromTo`
     （累积、不逐词消失），退场按整条 cue 容器 `to opacity 0`（裁决 17）。
-    文字色统一白、黑描边；强调词换成固定高亮色**同样描边**（只换字色，不动几何）。
+    填充/描边**随本镜地面 tone 翻面**（`_subtitle_palette`），强调词换成固定高亮色**同样描边**。
     """
     # 每条 cue 一个容器，每个词一个 span：入场打 span、退场打容器（一次淡出整条）。
     body_lines, tween_lines = [], []
@@ -2303,6 +2317,7 @@ def emit_subtitle_composition(composition_id: str, cues: list[dict],
         body_lines = ['<div id="sc-c0" class="sc-cue"></div>']
         tween_lines = [f'        tl.set("#sc-c0", {{opacity: 0}}, 0);']
     # 版式自检要求每个 `#id` 补间都能在本文件解析到元素 —— 空 cue 兜底也要有那个 div。
+    text_color, stroke_color = _subtitle_palette(tone)
     return SUBTITLE_COMP_TPL.format(
         comp_id=composition_id,
         slot=round(slot, 3),
@@ -2313,6 +2328,9 @@ def emit_subtitle_composition(composition_id: str, cues: list[dict],
         side=SUBTITLE_SIDE_CQW,
         maxw=SUBTITLE_MAX_WIDTH_CQW,
         outline=SUBTITLE_OUTLINE_EM,
+        text=text_color,
+        stroke=stroke_color,
+        accent=SUBTITLE_ACCENT_COLOR,
         body="".join(body_lines),
         tweens="\n".join(tween_lines),
     )
@@ -2364,20 +2382,20 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
         layout = pack["layouts"][layout_name]
         values = fill_variables(layout, scene, ctx)
         mounts.append(emit_mount(i, layout, values, start, dur, w, h))
+        # 本镜实际呈现的地面: 固定地面的版式用装包时算好的, 可换面的版式(story)
+        # 用它自己填出来的 tone —— 字幕翻面与下一镜的"翻不翻面"都必须看真实地面, 不能看默认值。
+        declared = values.get(TONE_VAR_ID)
+        prev_ground_tone = declared if declared in GROUND_TONES else layout["ground_tone"]
         if native_sub:
             cues = subtitle_scene_cues(scene_cues[i - 1], scene, dur,
                                        caption_line_chars(w, h))
             comp_id = f"{SUBTITLE_FILE_PREFIX}-{i}"
             subtitle_files.append((
                 f"{comp_id}.html",
-                emit_subtitle_composition(comp_id, cues, dur, w, h)))
+                emit_subtitle_composition(comp_id, cues, dur, w, h, prev_ground_tone)))
             mounts.append(emit_subtitle_mount(i, start, dur, w, h))
         if i <= len(audio_files):
             audios.append(emit_audio_mount(i, audio_files[i - 1], work_dir, start, dur))
-        # 本镜实际呈现的地面: 固定地面的版式用装包时算好的, 可换面的版式(story)
-        # 用它自己填出来的 tone —— 下一镜的"翻不翻面"必须看真实地面, 不能看默认值。
-        declared = values.get(TONE_VAR_ID)
-        prev_ground_tone = declared if declared in GROUND_TONES else layout["ground_tone"]
         shots.append({"no": i, "layout": layout_name, "start": start, "dur": dur,
                       "composition_id": layout["composition_id"],
                       "ground": prev_ground_tone, "values": values})

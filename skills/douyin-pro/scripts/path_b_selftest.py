@@ -3071,7 +3071,7 @@ def t_subtitle_composition_is_a_valid_subcomposition_and_selfchecks_clean():
     cues = pb.subtitle_scene_cues(_probe_scene(), {"onscreenAccent": "全国执行"},
                                   PROBE_SECONDS, 15)
     comp_id = f"{pb.SUBTITLE_FILE_PREFIX}-1"
-    text = pb.emit_subtitle_composition(comp_id, cues, PROBE_SECONDS, 1080, 1920)
+    text = pb.emit_subtitle_composition(comp_id, cues, PROBE_SECONDS, 1080, 1920, "dark")
     # 子合成契约三件套
     assert "<template>" in text and "</template>" in text
     assert f'data-composition-id="{comp_id}"' in text
@@ -3093,11 +3093,38 @@ def t_subtitle_composition_is_deterministic():
     """同一份 cue 编译两次逐字节相同 —— 判据 4a：字幕烤进视频流后，流哈希不许因重跑而抖。"""
     cues = pb.subtitle_scene_cues(_probe_scene(), {}, PROBE_SECONDS, 15)
     comp_id = f"{pb.SUBTITLE_FILE_PREFIX}-1"
-    a = pb.emit_subtitle_composition(comp_id, cues, PROBE_SECONDS, 1080, 1920)
-    b = pb.emit_subtitle_composition(comp_id, cues, PROBE_SECONDS, 1080, 1920)
+    a = pb.emit_subtitle_composition(comp_id, cues, PROBE_SECONDS, 1080, 1920, "dark")
+    b = pb.emit_subtitle_composition(comp_id, cues, PROBE_SECONDS, 1080, 1920, "dark")
     assert a == b, "字幕子合成不可复现：里面混进了墙钟/随机"
     # 时间全部烤成绝对秒，运行时不读 Date.now / Math.random
     assert "Date.now" not in a and "Math.random" not in a
+
+
+def t_subtitle_fill_flips_with_ground_tone_to_pass_contrast():
+    """字幕填充色随地面翻面：浅地面用墨字白描边、深地面用白字黑描边（裁决：随地面翻色）。
+
+    起因是 `check --strict` 实测：白字(#fff)在旗舰暖纸浅地面 rgb(234,229,217) 上对比
+    1.26:1，不过 WCAG AA 3:1（深地面则过）。所以"统一白字"被推翻，改成按本镜真实地面
+    tone 取色。两条都断言（缺一条就是假绿）：
+      ① light → 墨字 #1f1b16 + 白描边；dark → 白字 #fff + 黑描边；
+      ② 强调色两 tone 都固定 #B45309（在旗舰所有地面上都 ≥3，实测见证据 K16）。
+    """
+    cues = pb.subtitle_scene_cues(_probe_scene(), {}, PROBE_SECONDS, 15)
+    comp_id = f"{pb.SUBTITLE_FILE_PREFIX}-1"
+    light = pb.emit_subtitle_composition(comp_id, cues, PROBE_SECONDS, 1080, 1920, "light")
+    dark = pb.emit_subtitle_composition(comp_id, cues, PROBE_SECONDS, 1080, 1920, "dark")
+    # ① 浅地面：填充=墨、描边=白；深地面：填充=白、描边=黑
+    assert f"color: {pb.SUBTITLE_INK_COLOR};" in light, light
+    assert f"color: {pb.SUBTITLE_LIGHT_COLOR};" in dark, dark
+    assert f"em 0 {pb.SUBTITLE_OUTLINE_COLOR}," in light, "浅地面描边没翻成白"
+    assert f"em 0 {pb.SUBTITLE_STROKE_COLOR}," in dark, "深地面描边没保持黑"
+    # ② 强调两 tone 同色
+    assert f"color: {pb.SUBTITLE_ACCENT_COLOR};" in light
+    assert f"color: {pb.SUBTITLE_ACCENT_COLOR};" in dark
+    # 翻面后浅地面不再是白字（防回退到被推翻的"统一白字"）
+    assert "color: #ffffff;" not in light, "浅地面还在用白字，对比度闸会重新报红"
+    # 字幕是故意落在 lower-third 禁入区的，必须自带豁免标记，否则 check 报 caption_zone_collision
+    assert "data-layout-allow-caption-zone" in light and "data-layout-allow-caption-zone" in dark
 
 
 def t_subtitle_mount_uses_track_two_and_points_at_generated_file():
@@ -3117,7 +3144,7 @@ def t_selfcheck_exempts_subtitle_only_for_the_two_invariants():
     """
     cues = pb.subtitle_scene_cues(_probe_scene(), {}, PROBE_SECONDS, 15)
     good = pb.emit_subtitle_composition(f"{pb.SUBTITLE_FILE_PREFIX}-1", cues,
-                                        PROBE_SECONDS, 1080, 1920)
+                                        PROBE_SECONDS, 1080, 1920, "dark")
     with tempfile.TemporaryDirectory() as d:
         os.makedirs(os.path.join(d, "compositions"))
         p = Path(d) / "compositions" / f"{pb.SUBTITLE_FILE_PREFIX}-1.html"
