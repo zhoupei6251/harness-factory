@@ -1,0 +1,116 @@
+{
+  "capability_ok": true,
+  "min_short_edge": 720,
+  "min_neighbors": 3,
+  "min_size_px": 24,
+  "allowed_cascades": [
+    "frontalface_alt2",
+    "profileface"
+  ],
+  "denied_cascades": [
+    "frontalface_default",
+    "upperbody"
+  ],
+  "primary": [
+    {
+      "file": "face-01.jpg",
+      "sha256_short": "2f0a8f079a3e60b7",
+      "detector_available": true,
+      "floor": "G0",
+      "hits": 3,
+      "boxes": [
+        [
+          168,
+          536,
+          179,
+          179
+        ],
+        [
+          456,
+          366,
+          606,
+          606
+        ],
+        [
+          464,
+          366,
+          597,
+          597
+        ]
+      ],
+      "cascades": [
+        "frontalface_alt2",
+        "profileface"
+      ]
+    },
+    {
+      "file": "gear-01.jpg",
+      "sha256_short": "7edcebedaa67e6d5",
+      "detector_available": true,
+      "floor": null,
+      "hits": 0,
+      "boxes": [],
+      "cascades": [
+        "frontalface_alt2",
+        "profileface"
+      ]
+    }
+  ],
+  "blacklist_control": [
+    {
+      "file": "gear-01.jpg",
+      "sha256_short": "7edcebedaa67e6d5",
+      "detector_available": true,
+      "floor": "G0",
+      "hits": 7,
+      "boxes": [
+        [
+          153,
+          622,
+          60,
+          49
+        ],
+        [
+          497,
+          384,
+          80,
+          65
+        ],
+        [
+          501,
+          406,
+          77,
+          77
+        ],
+        [
+          622,
+          333,
+          110,
+          110
+        ],
+        [
+          625,
+          333,
+          110,
+          110
+        ],
+        [
+          741,
+          444,
+          74,
+          74
+        ],
+        [
+          1196,
+          624,
+          36,
+          36
+        ]
+      ],
+      "cascades": [
+        "frontalface_default",
+        "upperbody"
+      ]
+    }
+  ]
+}

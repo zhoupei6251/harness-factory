@@ -35,6 +35,7 @@ import path_b_build as pb  # noqa: E402  (sys.path 必须先落地)
 import hf_compile as hc  # noqa: E402  (P1-3c 编译器：spec → 宿主 + 7 版式 + frame.md)
 import hf_primitives as hp  # noqa: E402  (v2 原语库：spec → 片段文本，法则 7/8/10 的可执行面)
 import hf_style_spec as hs  # noqa: E402  (v2 风格 spec：结构校验 + 编译前判据 3/5)
+import image_gate as ig  # noqa: E402  (P3 图片门禁：本地零网络人脸检测器)
 
 FAILURES: list[tuple[str, str]] = []
 
@@ -3204,6 +3205,80 @@ def t_mux_retires_ass_subtitles_for_compiled_pack_only():
     assert badge_only.count("Dialogue:") == 1, badge_only
     assert ",AIGC,," in badge_only, "空 cue 时角标事件必须还在"
     assert ",Default,," not in badge_only
+
+
+# ---- P3 图片门禁（image_gate）判据 P3-1/2/3 ---------------------------------
+# 一张有脸 + 一张纯机械的测试图入库到
+# `routes/news/evidence/2026-10-10-p3-probe/`；这里跑同一份实现，
+# 保证"探针绿 == 产线绿"，不留第二条检测路径。
+
+_P3_FIXTURE_DIR = (Path(__file__).resolve().parents[3]
+                   / "routes" / "news" / "evidence" / "2026-10-10-p3-probe")
+
+
+def t_p3_detector_capability_ok():
+    """cv2 + 白名单两张 cascade 都可加载 —— 门能开的前提。"""
+    assert ig.capability_ok(), (
+        "image_gate 能力未就绪：cv2 或 haarcascade_frontalface_alt2/profileface 缺失。"
+        "产线会维持'photo-* 一律拒编'的默认状态，但探针必须显式失败，不能静默。")
+
+
+def t_p3_face_fixture_hits_four_channel_union():
+    """P3-1：入库人脸图在四通道并集下至少一路命中 → floor=G0。"""
+    face = _P3_FIXTURE_DIR / "face-01.jpg"
+    assert face.is_file(), f"缺 face 测试图 {face}"
+    result = ig.detect_faces(face)
+    assert result.detector_available
+    assert result.floor == "G0", f"入库人脸应判 G0，实际 floor={result.floor} hits={len(result.faces)}"
+    assert len(result.faces) >= 1, "四通道并集一次也没命中，检测器或参数漂了"
+
+
+def t_p3_gear_fixture_hits_nothing_on_whitelist():
+    """P3-1（另一半）：齿轮图四通道并集全零 → floor=None。分离度是门禁可信的根。"""
+    gear = _P3_FIXTURE_DIR / "gear-01.jpg"
+    assert gear.is_file(), f"缺 gear 测试图 {gear}"
+    result = ig.detect_faces(gear)
+    assert result.detector_available
+    assert not result.hit, f"齿轮上白名单不该有命中，实际 hits={len(result.faces)} boxes={result.faces}"
+    assert result.floor is None
+
+
+def t_p3_blacklist_denials_are_not_decorative():
+    """P3-2 反-反例：齿轮图跑黑名单必报假阳 —— 证明显式拒绝不是"没被选中"的另一种说法。
+
+    设计 §2 硬法则 2：`frontalface_default`（锈螺栓圈误报）、`upperbody`（人物躯干过检）。
+    这条断言反过来用：如果这两张在齿轮上都不误报，那"显式拒绝"就是空规则 —— 必须失败。
+    """
+    gear = _P3_FIXTURE_DIR / "gear-01.jpg"
+    result = ig.detect_faces(gear, cascade_names=ig._DENIED_CASCADES)
+    assert result.detector_available
+    assert result.hit, (
+        "黑名单在齿轮上零命中 —— 显式拒绝这条规则没有实测反例支撑，"
+        "要么换一张更锈的测试图，要么把 §2 里那条『齿轮误报』从 prose 降级为未证。")
+
+
+def t_p3_probe_artifact_is_committed():
+    """P3-3：探针产物（两张测试图 + probe-result.json）都在 evidence 目录里 —— 不只是 prose。"""
+    for name in ("face-01.jpg", "gear-01.jpg", "probe-result.json"):
+        p = _P3_FIXTURE_DIR / name
+        assert p.is_file() and p.stat().st_size > 0, f"探针入库缺 {name}"
+    payload = json.loads((_P3_FIXTURE_DIR / "probe-result.json").read_text(encoding="utf-8"))
+    assert payload.get("capability_ok") is True
+    primary = {row["file"]: row for row in payload.get("primary", [])}
+    assert primary["face-01.jpg"]["floor"] == "G0"
+    assert primary["gear-01.jpg"]["floor"] is None
+    assert payload["blacklist_control"][0]["hits"] > 0, (
+        "落盘的反-反例 hits 为 0 —— 与本地重跑不一致，检测器参数或图变了；"
+        "重跑 `python skills/douyin-pro/scripts/p3_probe.py` 刷新 evidence。")
+
+
+def t_p3_detector_is_deterministic_on_same_bytes():
+    """检测器必须是图字节的纯函数 —— 判据 4a 的静态锚：同图两次跑 grade 一致。"""
+    gear = _P3_FIXTURE_DIR / "gear-01.jpg"
+    a = ig.detect_faces(gear)
+    b = ig.detect_faces(gear)
+    assert [x.to_tuple() for x in a.faces] == [x.to_tuple() for x in b.faces], (
+        "同图两次 detect_faces 结果不一致 —— 检测器引入了状态或时间，判据 4a 会破。")
 
 
 if __name__ == "__main__":

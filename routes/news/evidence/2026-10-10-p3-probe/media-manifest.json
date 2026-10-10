@@ -1,0 +1,30 @@
+{
+ "face-01.jpg": {
+  "query": "Barack Obama official portrait",
+  "title": "File:Official portrait of Barack Obama.jpg",
+  "artist": "Pete Souza",
+  "license": "CC BY 3.0",
+  "terms": "Creative Commons Attribution 3.0",
+  "width": 1916,
+  "height": 2608,
+  "source_url": "https://commons.wikimedia.org/wiki/File:Official_portrait_of_Barack_Obama.jpg",
+  "thumb_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e9/Official_portrait_of_Barack_Obama.jpg/1280px-Official_portrait_of_Barack_Obama.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "license_reason": "词面与查询相符",
+  "relevance": 4,
+  "bytes": 308549
+ },
+ "gear-01.jpg": {
+  "query": "gear",
+  "title": "File:A gear wheel that washed up on the beach (9273493350).jpg",
+  "artist": "David Whelan",
+  "license": "CC BY 2.0",
+  "terms": "Creative Commons Attribution 2.0",
+  "width": 4288,
+  "height": 3216,
+  "source_url": "https://commons.wikimedia.org/wiki/File:A_gear_wheel_that_washed_up_on_the_beach_(9273493350).jpg",
+  "thumb_url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a4/A_gear_wheel_that_washed_up_on_the_beach_%289273493350%29.jpg/1280px-A_gear_wheel_that_washed_up_on_the_beach_%289273493350%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+  "license_reason": "词面与查询相符",
+  "relevance": 1,
+  "bytes": 477593
+ }
+}
