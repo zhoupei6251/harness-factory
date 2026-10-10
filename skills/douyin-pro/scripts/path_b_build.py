@@ -1148,6 +1148,75 @@ def cue_cache_key(text: str, voice: str) -> str:
     return digest[:16]
 
 
+# ------------------------- 跨 work_dir 的配音持久缓存（口径 A 补口）-------------------------
+#: 为什么需要这一层（2026-10-10 真网双渲染实测，见 evidence K32）：
+#:   `cue_cache_key` 只活在 work_dir 内的 `cues.json` 里，而 work_dir 每次是全新的
+#:   `pathb_{pid}` ⇒ 换一次构建就重新配音。edge-tts **逐字节不可复现**（同 text+voice 两次
+#:   stream 拿到的 mp3 PCM 都不同，实测 size 同、解码 pcm 哈希不同），配音轨又被 mux 进
+#:   `silent.mp4`，而 `ProduceID = sha256(silent.mp4)` 哈希**整支容器** —— 于是画面逐帧相同
+#:   （判据 4a 已证）却仍拿到不同 ProduceID。图片侧的同类破口已由 commons 持久缓存封死
+#:   （K31），音频侧必须补同一刀，否则"同稿同片"只对了半条链。
+#: 失效口径与图片缓存同构：
+#:   · 正文/音色变 → `cue_cache_key` 变 → 自动 miss 重配（产线既有行为，这里只是跨 run 生效）；
+#:   · **解读逻辑变**（`words_from_events` 的 100ns→秒换算、`scene_cues_from_words` 归组、
+#:     `caption_norm` 归一化）→ 把下面的版本号 +1 ⇒ 旧缓存整批作废。缓存存的是这些函数的
+#:     **输出**，函数语义改了再复用旧输出=用错的处理喂新逻辑，必须显式作废。
+TTS_CACHE_SCHEMA_VERSION = 1
+TTS_CACHE_DIRNAME = "tts-cache"
+TTS_CACHE_MP3_NAME = "scene.mp3"
+TTS_CACHE_META_NAME = "meta.json"
+#: 默认根 `DEFAULT_TTS_CACHE_ROOT` 定义在 DEFAULT_WORK_ROOT 旁边（文件下方），
+#: 这里不提前引用那个模块级常量。
+
+
+def tts_cache_key(text: str, voice: str) -> str:
+    """配音持久缓存寻址键 = SCHEMA_VERSION + cue_cache_key(正文, 音色) 的完整 sha256。
+
+    复用 `cue_cache_key` 做正文/音色那半截（失效口径与 work_dir 内复用完全一致），
+    再叠一层版本号 —— 与 commons 的 cache_key 同构：规则改了改版本即整动作废。
+    """
+    basis = f"{TTS_CACHE_SCHEMA_VERSION}\n{cue_cache_key(text, voice)}"
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()
+
+
+def tts_cache_lookup(cache_dir, text: str, voice: str):
+    """持久配音缓存命中：目录里 mp3 + meta 都在、且 meta 字段齐才算命中；否则 None。
+
+    meta 必须带齐产线复用要的四样（mode/seconds/words，且 words 非空），缺任一样按未命中
+    重新配音 —— 宁可重跑一次网络，也不拿半截时序去配新 work_dir 的画面。
+    """
+    if not cache_dir:
+        return None
+    folder = Path(cache_dir) / tts_cache_key(text, voice)
+    mp3 = folder / TTS_CACHE_MP3_NAME
+    meta_path = folder / TTS_CACHE_META_NAME
+    if not (mp3.exists() and mp3.stat().st_size > 0 and meta_path.exists()):
+        return None
+    meta = read_json(str(meta_path))
+    if not isinstance(meta, dict):
+        return None
+    words = meta.get("words")
+    if not (isinstance(words, list) and words and meta.get("seconds")):
+        return None
+    return {"mp3": str(mp3), "mode": str(meta.get("mode", "word")),
+            "seconds": float(meta["seconds"]), "words": words}
+
+
+def tts_cache_store(cache_dir, text: str, voice: str, mp3_path: str,
+                    mode: str, seconds: float, words) -> None:
+    """把一支配好的 mp3 + 它对应的词级时序原子落进持久缓存（.part→replace，防半截）。"""
+    if not cache_dir:
+        return
+    folder = Path(cache_dir) / tts_cache_key(text, voice)
+    folder.mkdir(parents=True, exist_ok=True)
+    dst_mp3 = folder / TTS_CACHE_MP3_NAME
+    tmp = dst_mp3.with_suffix(".mp3.part")
+    shutil.copyfile(mp3_path, tmp)
+    tmp.replace(dst_mp3)
+    write_json(str(folder / TTS_CACHE_META_NAME),
+               {"schema": "hf-tts-cache/1", "mode": mode, "seconds": seconds, "words": words})
+
+
 CUES_NAME = "cues.json"
 CUES_SCHEMA = "hf-cues/1"
 
@@ -2920,7 +2989,7 @@ def scene_cues_from_words(text: str, words, seconds: float, index: int) -> list:
         return cues_from_words(text, words_from_text(text, seconds), seconds)
 
 
-def synthesize_audio(scenes, voice_default, work_dir):
+def synthesize_audio(scenes, voice_default, work_dir, tts_cache_dir=None):
     """逐镜配音并交出词级 cues；命中 `cues.json` 的那一镜**不碰服务**。
 
     返回 `(mp3 列表, 逐镜 cue 列表, 时长列表)`。第二项从前的"逐镜 .vtt 路径"换成了
@@ -2934,6 +3003,12 @@ def synthesize_audio(scenes, voice_default, work_dir):
         抖动时把一份已经合格的稿子变成失败。
     缓存键是 (归一化正文, 音色) 的哈希：改一个字、换一个音色都必须重配 —— 拿旧 cues
     配新稿会让字幕和配音对不上，而 mp3 和 cues.json **两边都还是绿的**。
+
+    口径 A 补口（K32）：work_dir 内的 `cues.json` 只活单次 run，全新 work_dir 会重新配音，
+    而 edge-tts 逐字节不可复现 → 同稿不同音频 → 不同 `silent.mp4` → 不同 ProduceID。传入
+    `tts_cache_dir` 时在"命中 work_dir"和"打网络"之间加一层**跨 work_dir 持久配音缓存**：
+    命中直接复用缓存的 mp3 字节 + 词级时序（零网络），未命中才配音并落盘。失效口径见
+    `TTS_CACHE_SCHEMA_VERSION`。不传（默认 None）时行为与旧版逐字一致。
     """
     doc = read_json(os.path.join(work_dir, CUES_NAME))
     cached = doc["scenes"] if isinstance(doc, dict) and doc.get("schema") == CUES_SCHEMA \
@@ -2957,6 +3032,13 @@ def synthesize_audio(scenes, voice_default, work_dir):
             mode, seconds = str(hit.get("mode", "word")), float(hit["seconds"])
             words = [{"w": w["w"], "s": w["s"], "e": w["e"]} for w in hit["words"]]
             log(f"→ 配音 分镜{i} 复用 cues.json (voice={voice}, {mode} 支 {len(words)} 词)")
+        elif (persisted := tts_cache_lookup(tts_cache_dir, speak_text, voice)) is not None:
+            # 跨 work_dir 持久缓存命中：字节级复用同一份配音，词级时序原样取回 → 零网络。
+            shutil.copyfile(persisted["mp3"], mp3)
+            mode = persisted["mode"]
+            seconds = persisted["seconds"]
+            words = [{"w": w["w"], "s": w["s"], "e": w["e"]} for w in persisted["words"]]
+            log(f"→ 配音 分镜{i} 复用持久配音缓存 (voice={voice}, 跨 work_dir 同稿同片)")
         else:
             log(f"→ 配音 分镜{i} (voice={voice})")
             try:
@@ -2979,6 +3061,8 @@ def synthesize_audio(scenes, voice_default, work_dir):
                 log(f"  ⚠️ 分镜{i} 服务没给词级时序 —— 本镜时序退到字符支")
             else:
                 log(f"  词级 {len(words)} 个")
+            # 刚配好的这份 mp3 + 词级时序落进跨 work_dir 缓存，下次同 text+voice 直接复用。
+            tts_cache_store(tts_cache_dir, speak_text, voice, mp3, mode, seconds, words)
         if seconds < MIN_SLOT_SECONDS:
             raise EmitterError(
                 f"分镜{i} 配音只有 {seconds:.2f}s, 低于版式契约下限 {MIN_SLOT_SECONDS}s —— "
@@ -3234,6 +3318,11 @@ DEFAULT_WORK_ROOT = Path(__file__).resolve().parents[3] / ".harness-news-runtime
 #: 这一层才是跨 run 复用的原因（详见 commons_media.resolve_shot_image 的 docstring）。
 DEFAULT_IMAGE_CACHE_ROOT = DEFAULT_WORK_ROOT.parent / "commons-cache"
 
+#: 跨 work_dir 的**配音**持久缓存根（口径 A 补口，K32）。edge-tts 逐字节不可复现，
+#: 配音轨又被 mux 进 silent.mp4（ProduceID 哈希整支容器）⇒ 不锁配音，同稿仍出不同 ProduceID。
+#: 与 commons-cache 同域、同失效口径（详见文件上方 TTS_CACHE_SCHEMA_VERSION 注释）。
+DEFAULT_TTS_CACHE_ROOT = DEFAULT_WORK_ROOT.parent / TTS_CACHE_DIRNAME
+
 
 def default_work_dir() -> str:
     """本次渲染的工作目录，**默认落在项目内而不是系统 temp**。
@@ -3310,6 +3399,13 @@ def main():
     ap.add_argument("--no-image-cache", action="store_true",
                     help="禁用持久取图缓存, 每次联网重取(现状行为)。smoke 探针要测联网选图时用它; "
                          "代价: 关掉后同稿不保证同片。")
+    ap.add_argument("--tts-cache-dir", default=None, metavar="DIR",
+                    help="跨 work_dir 的配音持久缓存目录 "
+                         "(默认 .harness-news-runtime/tts-cache/)。口径 A 补口: edge-tts 逐字节"
+                         "不可复现, 不锁配音则同稿仍出不同 ProduceID; 同 (正文,音色) 第二次构建"
+                         "直接复用缓存的 mp3 字节 + 词级时序。")
+    ap.add_argument("--no-tts-cache", action="store_true",
+                    help="禁用持久配音缓存, 每次联网重配音(现状行为)。代价: 同稿不保证同片。")
     ap.add_argument("--hyperframes-bin",
                     help="显式指定 hyperframes 可执行(跳过自动探测); 排查与新机器用")
     ap.add_argument("--check-only", action="store_true", help="只发射+版式自检+check 门禁, 不渲染")
@@ -3388,6 +3484,10 @@ def main():
             )
 
         with timed("dub"):
+            # 持久配音缓存(口径 A 补口): 默认开; --no-tts-cache 退回每次联网重配。
+            # --skip-render 走估算支, 不配音, 也就不碰这层。
+            tts_cache = None if args.no_tts_cache else Path(
+                args.tts_cache_dir or DEFAULT_TTS_CACHE_ROOT)
             if args.skip_render:
                 # 没有配音就没有真实时长, 用文本估算保证发射链路照样能验
                 audio_files = []
@@ -3395,8 +3495,11 @@ def main():
                 scene_cues = [fallback_scene_cues(sc["body"], dur, i)
                               for i, (sc, dur) in enumerate(zip(scenes, durations), 1)]
             else:
+                if tts_cache is not None:
+                    tts_cache.mkdir(parents=True, exist_ok=True)
+                    log(f"配音: 持久缓存 {tts_cache}（同正文+音色复用同一份 mp3）")
                 audio_files, scene_cues, durations = synthesize_audio(
-                    scenes, args.voice, work)
+                    scenes, args.voice, work, tts_cache_dir=tts_cache)
 
         ctx_base = {
             "kicker": args.kicker,

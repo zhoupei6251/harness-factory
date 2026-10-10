@@ -2779,6 +2779,117 @@ def t_synthesize_audio_reuses_cues_json_without_the_service():
         assert called.get("text") == "换了稿子", "哈希不匹配却没重配 = 字幕配错音"
 
 
+def t_tts_cache_key_binds_schema_version_and_content():
+    """口径 A 补口的音频寻址键 = 版本号 + cue_cache_key(正文, 音色)，两者皆纯函数入参。
+
+    复用 cue_cache_key 保证"改字/换音色即失效"与 work_dir 内那层完全同口径；叠版本号是
+    唯一能作废'解读逻辑变了'的通道（words_from_events/caption_norm 改了，旧 words 不能再复用）。
+    """
+    k = pb.tts_cache_key(PROBE_TEXT, "zh-CN-XiaoxiaoNeural")
+    assert k == pb.tts_cache_key(PROBE_TEXT, "zh-CN-XiaoxiaoNeural"), "同版本同内容必须同键"
+    assert pb.tts_cache_key(PROBE_TEXT + "改", "zh-CN-XiaoxiaoNeural") != k, "改正文必须换键"
+    assert pb.tts_cache_key(PROBE_TEXT, "zh-CN-YunxiNeural") != k, "换音色必须换键"
+    original = pb.TTS_CACHE_SCHEMA_VERSION
+    try:
+        pb.TTS_CACHE_SCHEMA_VERSION = original + 1
+        assert pb.tts_cache_key(PROBE_TEXT, "zh-CN-XiaoxiaoNeural") != k, \
+            "版本号一改, 同内容键也变 ⇒ 旧配音缓存整批作废"
+    finally:
+        pb.TTS_CACHE_SCHEMA_VERSION = original
+
+
+def t_tts_cache_store_then_lookup_reuses_mp3_bytes_offline():
+    """存一份再取：mp3 字节逐字相同、词级时序齐、全程零网络（可离线复现）。"""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        cache = Path(td) / "tts-cache"
+        src = Path(td) / "scene_1.mp3"
+        src.write_bytes(b"\xff\xfb\x90\x00" + b"AUDIO-BYTES" * 40)
+        words = [{"w": w["w"], "s": w["s"], "e": w["e"]}
+                 for w in pb.words_from_events(_probe_events(), PROBE_SECONDS)]
+        pb.tts_cache_store(cache, PROBE_TEXT, "zh-CN-XiaoxiaoNeural",
+                           str(src), "word", PROBE_SECONDS, words)
+        hit = pb.tts_cache_lookup(cache, PROBE_TEXT, "zh-CN-XiaoxiaoNeural")
+        assert hit is not None, "存过的 (正文,音色) 必须取回"
+        assert Path(hit["mp3"]).read_bytes() == src.read_bytes(), "复用同一份 mp3 字节(同片硬保证)"
+        assert hit["seconds"] == PROBE_SECONDS and hit["mode"] == "word"
+        assert hit["words"] == words, "词级时序必须原样取回(否则字幕与配音错位)"
+        # 换词/换音色/无 cache_dir 都必须 miss
+        assert pb.tts_cache_lookup(cache, PROBE_TEXT + "改", "zh-CN-XiaoxiaoNeural") is None
+        assert pb.tts_cache_lookup(cache, PROBE_TEXT, "zh-CN-YunxiNeural") is None
+        assert pb.tts_cache_lookup(None, PROBE_TEXT, "zh-CN-XiaoxiaoNeural") is None
+
+
+def t_synthesize_audio_reuses_persistent_tts_cache_across_work_dirs():
+    """两个全新 work_dir、同一 (正文,音色) ⇒ 第二次**不打 edge-tts**、复用同一份 mp3。
+
+    这就是 K32 里 ProduceID 仍漂移的真根因: edge-tts 逐字节不可复现, 旧代码每次全新 work_dir
+    重配 → narration.mp3 变 → silent.mp4(含音频轨)变 → ProduceID 变(画面其实逐帧相同)。
+    打桩让首次服务写一份确定字节, 并断言第二次 tts_word_events **一次都没被调**。
+    """
+    import tempfile
+    real_events = pb.tts_word_events
+    real_probe = pb.ffprobe_duration
+    calls = {"n": 0}
+
+    def fake_events(text, voice, mp3_path):
+        calls["n"] += 1
+        open(mp3_path, "wb").write(b"\xff\xfb\x90\x00" + b"DETERMINISTIC" * 100)
+        return _probe_events(), 1200
+
+    with tempfile.TemporaryDirectory() as td:
+        cache = Path(td) / "tts-cache"
+        cache.mkdir()
+        pb.tts_word_events = fake_events
+        pb.ffprobe_duration = lambda p: PROBE_SECONDS
+        try:
+            scenes = [{"body": PROBE_TEXT}]
+            w1 = Path(td) / "pathb_1"
+            w1.mkdir()
+            m1, c1, d1 = pb.synthesize_audio(scenes, "zh-CN-XiaoxiaoNeural", str(w1),
+                                             tts_cache_dir=cache)
+            assert calls["n"] == 1, "首配应打一次服务"
+            bytes1 = Path(m1[0]).read_bytes()
+            w2 = Path(td) / "pathb_2"
+            w2.mkdir()
+            m2, c2, d2 = pb.synthesize_audio(scenes, "zh-CN-XiaoxiaoNeural", str(w2),
+                                             tts_cache_dir=cache)
+            assert calls["n"] == 1, f"第二次必须命中持久缓存、零服务: n={calls['n']}"
+            assert Path(m2[0]).read_bytes() == bytes1, "两跑 mp3 字节必须逐字相同"
+            assert d1 == d2 == [PROBE_SECONDS], "时长一致 ⇒ 发射入参确定"
+        finally:
+            pb.tts_word_events = real_events
+            pb.ffprobe_duration = real_probe
+
+
+def t_synthesize_audio_persistent_tts_cache_off_by_default():
+    """不传 tts_cache_dir 时每次全新 work_dir 都要重配(现状行为, 向后兼容)。"""
+    import tempfile
+    real_events = pb.tts_word_events
+    real_probe = pb.ffprobe_duration
+    calls = {"n": 0}
+
+    def fake_events(text, voice, mp3_path):
+        calls["n"] += 1
+        open(mp3_path, "wb").write(b"\xff\xfb" * 60)
+        return _probe_events(), 120
+
+    with tempfile.TemporaryDirectory() as td:
+        pb.tts_word_events = fake_events
+        pb.ffprobe_duration = lambda p: PROBE_SECONDS
+        try:
+            w1 = Path(td) / "m1"
+            w1.mkdir()
+            pb.synthesize_audio([{"body": PROBE_TEXT}], "zh-CN-XiaoxiaoNeural", str(w1))
+            w2 = Path(td) / "m2"
+            w2.mkdir()
+            pb.synthesize_audio([{"body": PROBE_TEXT}], "zh-CN-XiaoxiaoNeural", str(w2))
+            assert calls["n"] == 2, "没开持久缓存, 第二个 work_dir 仍应重配(保持旧行为)"
+        finally:
+            pb.tts_word_events = real_events
+            pb.ffprobe_duration = real_probe
+
+
 def t_collect_cues_shifts_scenes_without_reparsing_files():
     """`collect_cues` 的入参从"逐镜字幕文件"换成取数面交出的 cue —— 一处真源。
 

@@ -8,6 +8,7 @@
 > · P3-9（落位禁令：G0 不进首镜/closer/人物镜/含专名镜；普通镜复检仍命中才弃）
 > · P3-10（含图旗舰同稿双渲染 · 判据 4a 视频流哈希一致 —— 见 K30）
 > · P4-A（口径 A：跨 work_dir 持久取图缓存，锁死同稿同片 → 同 ProduceID —— 见 K31）
+> · P4-A-a（口径 A 补口：跨 work_dir 持久配音缓存，钉死 edge-tts 非复现字节 —— 见 K32）
 > 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成 + 原语映射表）
 > 探针：`skills/douyin-pro/scripts/p3_probe.py`（跑同一份实现，把结论落 JSON）
 > 接线：`path_b_build._resolve_shot_image`（构建期单点定档，写进 image_record）
@@ -16,7 +17,8 @@
 > 落位禁令：`path_b_build.image_deprecated`（纯判决）+ `emit_composition`（置空 local_path → §4 塌槽 + `image_gate.crop_and_recheck` 复检）
 > 预检：`routes/news/scripts/check_scene_contract.py`（写稿期抓坏合同）
 > 自检：`path_b_selftest.py` 的 28 条 `t_p3_*` + 7 条 `t_persistent_cache/t_resolve_shot_image`（口径 A）
-> + 重写的 `t_hf_primitives_gate_*`（共 177 项，全绿）
+> + 4 条 `t_tts_cache/t_synthesize_audio_…persistent`（口径 A 补口 · 配音缓存）
+> + 重写的 `t_hf_primitives_gate_*`（共 181 项，全绿）
 
 ## K17 检测器分离度 —— 一张真脸 + 一张真齿轮，四条通道并集分开
 
@@ -407,6 +409,49 @@ path_b CLI 默认**开**持久缓存，`--image-cache-dir DIR` 覆盖、`--no-im
 `index.html + 全部 compositions + media/shot_01.jpg` **整棵产物树 sha256 全等** ⇒ 固定发射（本轮证）
 × 判据 4a 固定渲染（K30 证，含真渲染 `silent` sha256[:32]=`4342bd6896959485174f2ec6aff0874d` 两跑相同）
 ⇒ **同稿 → 同缓存 → 同发射 → 同片 → 同 ProduceID** 链条闭合。
+
+## K32 第二个非复现输入：edge-tts 配音 + 口径 A 补口的持久配音缓存（P4，owner 选 A-a）
+
+**推翻 K31 的"链条已闭合"**：K31 只锁住了**取图**这一侧，并跑证明的是"固定发射"的确定性 —— 但那条链的
+第一环"同稿 → 同缓存 → 同发射"里，**配音 mp3 同样是发射入参，而它没进任何跨 run 缓存**。owner 让"去跑一遍真网渲染验证"，
+真网双渲染（`.harness-news-runtime/tmp/p4-live/`）当场把这条缺口打出来：两跑画面逐字节相同，**ProduceID 仍不同**
+（`3a36311f… ≠ bedd37f5…`）。逐项定位：HTML 无差异、`shot_01.jpg` sha256 两跑相同（`7edcebe…`，口径 A 生效）、
+解码视频流 + yuv 两跑相同（判据 4a 生效），**唯一分歧在 `narration.mp3`** —— 同 (正文, 音色) 两次 edge-tts 请求
+返回**逐字节不同的 PCM**（尺寸同为 39980B，解码样本却不等）。因 `silent.mp4` 是 `hyperframes render` 出的**带音轨成片**
+（编译 metadata `audioCount:1`，`ProduceID = sha256(silent.mp4)[:32]` 哈希的是整个容器 = 画面 + 配音），配音漂 →
+`silent.mp4` 差 524B → ProduceID 漂。**结论：取图缓存是必要不充分，配音是第二根必须钉死的非复现输入。**
+
+**A-a（owner 选的补口）落法**：镜像 K31 的取图缓存，给配音加一层**跨 work_dir 持久缓存**，寻址键
+`tts_cache_key(text, voice) = sha256(f"{TTS_CACHE_SCHEMA_VERSION}\n{cue_cache_key(text, voice)}")`（复用 `cue_cache_key`
+做正文/音色那半截，失效口径与 work_dir 内 `cues.json` 完全同源；再叠版本号作废"解读逻辑变了"，与 commons `cache_key` 同构）。
+`synthesize_audio`（path_b_build:2992）的取音次序变成三级：① work_dir 内 `cues.json` 命中（单次 run，不变）→
+② **新增**持久配音缓存命中 `copyfile` 缓存 mp3 到本 work_dir、原样取回 `mode/seconds/words`（**零网络**，字节逐字相同）→
+③ 全不中才联网配音，成功后 `tts_cache_store` 原子落盘（`.mp3.part`→replace，防半截）。默认根
+`DEFAULT_TTS_CACHE_ROOT = .harness-news-runtime/tts-cache/`（与 work/image 同域，`.gitignore` 覆盖、跨 run 存活）。
+**同样不碰 ProduceID 公式** —— 配音字节钉死 ⇒ `silent.mp4` 钉死 ⇒ ProduceID 自动稳定。
+
+**失效口径**：
+- **正文/音色变** → `cue_cache_key` 变 → 自动 miss 重配（改一个字、换一个音色都必须重配：拿旧 mp3 配新稿会让字幕与配音错位而 mp3/cues **两边都还是绿的**）。
+- **解读逻辑变**（`words_from_events` 的 100ns→秒换算、`caption_norm` 归一化、`scene_cues_from_words` 归组）→ `TTS_CACHE_SCHEMA_VERSION` +1
+  ⇒ 旧配音缓存整批作废。缓存存的是这些函数的**输出**，语义改了再复用旧输出 = 用错的处理喂新逻辑，必须显式作废。
+- **想强刷某支配歪的音**：删那个 hash 文件夹（或整 `tts-cache/`）。缓存对"edge-tts 逐次漂字节"故意钉死 —— 可复现优先于"每次最新韵律"。
+
+**边界**：新参数 `tts_cache_dir` 默认 `None` ⇒ 旧调用逐字节不变（smoke 探针、`--no-tts-cache` 走这条，测的是每次联网重配现状）。
+path_b CLI 默认**开**持久配音缓存，`--tts-cache-dir DIR` 覆盖、`--no-tts-cache` 关闭。`--skip-render` 走估算支不配音、不碰这层。
+31 套 path_b 手发包仍字节冻结（配音缓存只换"取到哪份 mp3"的确定性，不改任何无音/估算路径的字节）。
+
+**机器证明（新增 4 条 selftest，177 → 181/181 全绿）**：
+- `t_tts_cache_key_binds_schema_version_and_content`：键是 (版本, cue_cache_key) 纯函数；改字、换音色、版本号 +1 三种都换键（旧缓存整动作废）。
+- `t_tts_cache_store_then_lookup_reuses_mp3_bytes_offline`：存后取回 mp3 字节逐字相同、`mode/seconds/words` 原样回来、全程零网络；换词/换音色/`cache_dir=None` 一律 miss。
+- `t_synthesize_audio_reuses_persistent_tts_cache_across_work_dirs`：**两个全新 work_dir、同 (正文,音色) ⇒ 第二次 `tts_word_events` 一次都没被调**（打桩计数 `n` 停在 1）、两跑 mp3 字节相同、时长一致 —— 这就是 K32 真根因的反证补口。
+- `t_synthesize_audio_persistent_tts_cache_off_by_default`：不传 `tts_cache_dir` 时第二个 work_dir 仍重配（`n==2`，保持旧行为、向后兼容）。
+
+**端到端真网双渲染（跑完即弃，不入产线，`.harness-news-runtime/tmp/p4-audio/`）**：共享一对空 `tts-cache`/`img-cache`，
+两个全新 work_dir 各渲染一遍。**run A**：`→ 配音 分镜1`（联网）+ `取图 …gear…`（联网），dub=2.6s images=4.4s，`ProduceID=090b768c…`；
+**run B**：`→ 配音 分镜1 复用持久配音缓存` + `复用持久缓存 shot_01.jpg`，**dub=0.0s images=0.4s（配音零网络）**，`ProduceID=090b768c…` —— **两跑同号**。
+逐字节核：`scene_1.mp3` A=`B`（`48b78540…`）、`silent.mp4` 完整 sha A=`B`（`090b768c…e7179b70edec`，取图缓存 K31 + 配音缓存 A-a 合锁后连容器都逐字节相同）、
+交付 `outA.mp4`=`outB.mp4`（`95c36f2d…`，尺寸 3769492 相等）。⇒ **取图缓存（K31）+ 配音缓存（A-a）共同把"同稿必须同片"补到全文件字节级闭合**，
+ProduceID 公式一字未改。
 
 ---
 
