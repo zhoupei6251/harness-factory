@@ -3466,6 +3466,61 @@ def hf_compile_image_gate_ready() -> bool:
     return bool(_hc._IMAGE_GATE_READY)
 
 
+# ---- P3 grade⟷原语映射（设计 §5）判据 P3-7 ---------------------------------
+
+def t_p3_grade_primitive_matrix_matches_design():
+    """§5 表：G2 可用三原语 · G1 只能 photo-local-crop · G0 三个都不行。"""
+    assert ig.GRADE_ALLOWED_PRIMITIVES["photo-duotone"] == frozenset({"G2"}), \
+        "photo-duotone 只能 G2 —— 满屏 duotone 会把 G1 场景变成可指认的图"
+    assert ig.GRADE_ALLOWED_PRIMITIVES["ken-burns-in"] == frozenset({"G2"}), \
+        "ken-burns-in 是满屏推镜，同 duotone 一档"
+    assert ig.GRADE_ALLOWED_PRIMITIVES["photo-local-crop"] == frozenset({"G1", "G2"}), \
+        "photo-local-crop 是唯一 G1 允许（25-35% 局部裁掉指认性）"
+
+
+def t_p3_check_layout_grade_catches_g1_with_full_bleed():
+    """P3-7 核心：作者声明 scene(G1) 却用了 photo-duotone → 返回冲突不空。
+
+    设计 §5 的"新增一致校验"就是这一条。这里直接测纯函数：反证若把 photo-duotone
+    的允许档从 {G2} 放宽到 {G1,G2}，本条必红 —— 语义"G1 只能走 local-crop"是硬约束。
+    """
+    problems = ig.check_layout_grade(
+        primitives=["hairline", "photo-duotone", "cue-fade"], final_grade="G1")
+    assert any("photo-duotone" in p for p in problems), \
+        f"G1 + photo-duotone 应报冲突，实际: {problems}"
+    # G1 + local-crop 允许
+    assert ig.check_layout_grade(["photo-local-crop"], "G1") == []
+    # G2 + 三原语都允许
+    assert ig.check_layout_grade(
+        ["photo-duotone", "photo-local-crop", "ken-burns-in"], "G2") == []
+    # G0 + 任一取图原语都拒（G0 走 §7 落位弃图，不进 photo-*）
+    for prim in ig.GRADE_ALLOWED_PRIMITIVES:
+        problems = ig.check_layout_grade([prim], "G0")
+        assert any(prim in p for p in problems), f"G0 遇 {prim} 应拒，实际放行"
+
+
+def t_p3_check_layout_grade_ignores_non_photo_primitives():
+    """与 grade 无关的原语（hairline / char-rise / block-chip / giant-numeral …）不误报。
+
+    反证：把这张判据放宽就等于把"grade 只管取图三兄弟"的合同抹掉，将来 grade 会
+    去拦不该拦的东西。
+    """
+    assert ig.check_layout_grade(
+        ["hairline", "block-chip", "char-rise", "keyword-tint",
+         "rule-pull", "cue-fade", "giant-numeral", "clip-wipe-up",
+         "drift-y"], "G1") == []
+
+
+def t_p3_check_layout_grade_rejects_unknown_grade():
+    """grade 只能是三档字符串；拼错/None/数字都抛 ValueError 而不是静默放行。"""
+    for bad in (None, "", "G3", "g1", 1, "G0 "):
+        try:
+            ig.check_layout_grade(["photo-duotone"], bad)
+        except ValueError:
+            continue
+        raise AssertionError(f"grade={bad!r} 应抛 ValueError，实际静默通过")
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

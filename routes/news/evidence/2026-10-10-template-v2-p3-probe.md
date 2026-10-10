@@ -3,12 +3,13 @@
 > 上游：`docs/superpowers/specs/2026-10-10-news-p3-image-gate-design.md` §2/§3/§8
 > 覆盖判据：P3-1（分离度）· P3-2（黑名单非摆设）· P3-3（探针入库）
 > · P3-4（grade 合成四组合）· P3-5（检测器失效→G0）· P3-6（开闸迁移，asset→CALLSITE）
-> 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成）
+> · P3-7（grade⟷原语映射，G1 只走 local-crop / G0 全禁 photo-*）
+> 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成 + 原语映射表）
 > 探针：`skills/douyin-pro/scripts/p3_probe.py`（跑同一份实现，把结论落 JSON）
 > 接线：`path_b_build._resolve_shot_image`（构建期单点定档，写进 image_record）
 > 开闸：`hf_compile._IMAGE_GATE_READY = capability_ok()`；`hf_primitives.CALLSITE_REQUIRES["asset"]`
 > 预检：`routes/news/scripts/check_scene_contract.py`（写稿期抓坏合同）
-> 自检：`path_b_selftest.py` 的 15 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 156 项，全绿）
+> 自检：`path_b_selftest.py` 的 19 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 160 项，全绿）
 
 ## K17 检测器分离度 —— 一张真脸 + 一张真齿轮，四条通道并集分开
 
@@ -179,6 +180,49 @@ record["namedSubject"] = bool(scene.get("namedSubject", False))
 
 自检计数：154 → 156（切片 3 加两条 P3-6 断言，老 P3-前置测试重写不加不减）。
 **156/156 全绿。**
+
+## K27 grade⟷原语映射：G1 scene 只能 photo-local-crop，G0 全禁 photo-*
+
+设计 §5 表把"纹理强度按 grade"落到架构上不是"调一个原语的参数"而是
+"**grade 决定选哪个取图原语**"。这一条有明确的**可机判形状**，不是 prose：
+
+```
+GRADE_ALLOWED_PRIMITIVES = {
+    "photo-duotone":     {"G2"},          # 满屏 duotone 会把 G1 场景变成可指认图
+    "photo-local-crop":  {"G1", "G2"},    # 25-35% 局部裁掉指认性 → G1 唯一允许
+    "ken-burns-in":      {"G2"},          # 满屏推镜，同 duotone 一档
+}
+```
+
+`check_layout_grade(primitives, final_grade)` 是**纯函数**：吃"这一镜版式用到的原语名列表"
++ "构建期合成完的终档"，返回冲突列表（空 = 一致）。与 grade 无关的原语（hairline /
+block-chip / char-rise / keyword-tint / rule-pull / cue-fade / giant-numeral /
+clip-wipe-up / drift-y）不参与判定；判据 P3-7 只落在取图三兄弟身上。
+
+判据 4 条测试：
+- `t_p3_grade_primitive_matrix_matches_design` —— 表本身钉住 §5；改一条就要改 spec。
+- `t_p3_check_layout_grade_catches_g1_with_full_bleed` —— 核心断言：G1+photo-duotone
+  必报冲突；G1+photo-local-crop 放行；G2 三兄弟全放行；G0 遇任一 photo-* 都拒。
+- `t_p3_check_layout_grade_ignores_non_photo_primitives` —— 反证：判据不许扩到九条
+  非取图原语，否则将来 grade 会去拦不该拦的东西。
+- `t_p3_check_layout_grade_rejects_unknown_grade` —— 传 None/""/"G3"/"g1"/1/"G0 " 全抛
+  ValueError，防拼错档静默放行。
+
+**接线时机**：现在 flagship（`news-editorial-warm`）的版式里没有任何 photo-* 配方，
+所以这条纯函数在 emit 里目前**没有实际触发点**。真正的接线在切片 5/6/7：
+- 切片 5 加 `schematic-tag` 新原语（有图非 real 强制注入）。
+- 切片 6 加落位禁令（G0 → imagePath=''）。
+- 切片 7 让 flagship 至少有一镜用 `photo-local-crop` 或 `photo-duotone` —— 那时
+  `check_layout_grade` 就成了发射前的硬闸：scene 声明 G1 但配方取 `photo-duotone`
+  就 EmitterError。
+
+设计 §5 的措辞是"编译期一致校验，拒编" —— 但编译期 hf_compile 拿不到 per-shot 的
+`imageGrade`（那是 scene 级），因此**实际触发点在构建期 `_resolve_shot_image` 定完
+grade 之后**。这是设计措辞与实现的**唯一分歧点**：语义等价（"grade×primitive 不一致
+→停机不落盘"），只是停机时机在 emit 前而不是 pack 编译时。切片 7 落 `emit_composition`
+调用时，这条会显式加进构建日志一行"grade=G1, primitive=photo-duotone → 拒"。
+
+自检计数：156 → **160/160** 全绿（切片 4 加 4 条判据 P3-7 相关断言）。
 
 ---
 

@@ -270,3 +270,43 @@ def synth_grade(author_grade: str | None, detector: GradeResult) -> str:
         return author_code
     return max((author_code, floor_code), key=GRADE_ORDER.index)
 
+
+# ---------------------------------------------------------------- 档⟷原语一致（设计 §5）
+
+#: 每个取图原语允许的**终档**集合。设计 §5 表：
+#:   G2 material → photo-duotone（满屏可）/ ken-burns-in / photo-local-crop
+#:   G1 scene    → **仅** photo-local-crop（25-35% 局部，失去场景指认性）
+#:   G0          → 无（弃图走 §7 落位禁令；本表就是拒绝进入 photo-*）
+#: 键不在表里的原语 = "与 grade 无关"，`check_layout_grade` 会跳过。
+GRADE_ALLOWED_PRIMITIVES: dict[str, frozenset[str]] = {
+    "photo-duotone":     frozenset({"G2"}),
+    "photo-local-crop":  frozenset({"G1", "G2"}),
+    "ken-burns-in":      frozenset({"G2"}),
+}
+
+
+def check_layout_grade(primitives: list[str], final_grade: str) -> list[str]:
+    """返回"这一镜的终档 × 版式用到的原语"之间的冲突列表（空 = 一致）。
+
+    ``primitives`` 是版式配方里出现过的**原语名序列**（可含非取图原语，本函数
+    只挑在 ``GRADE_ALLOWED_PRIMITIVES`` 里的三条来判）。``final_grade`` 必须是
+    ``synth_grade`` 出来的字符串（"G0"/"G1"/"G2"），别的值抛 ValueError。
+
+    这条不是编译期闸门 —— hf_compile 拿不到 scene 级 ``imageGrade``；它是**构建期**
+    在 `_resolve_shot_image` 定完档之后跑的**发射前**检查，命中即 EmitterError 停机，
+    与 §7 落位禁令并列（"这一镜能不能要图" vs "这一镜要了图能不能用这个原语"）。
+    """
+    if final_grade not in GRADE_ORDER:
+        raise ValueError(f"grade 只能是 {GRADE_ORDER}，收到 {final_grade!r}")
+    problems: list[str] = []
+    for prim in primitives:
+        allowed = GRADE_ALLOWED_PRIMITIVES.get(prim)
+        if allowed is None:
+            continue                     # 与 grade 无关的原语（hairline / block-chip 等）
+        if final_grade not in allowed:
+            problems.append(
+                f"{prim} 允许的档是 {sorted(allowed)}，本镜终档 {final_grade} —— "
+                "G1 scene 只能走 photo-local-crop 保指认性剥离，G0 一律弃图")
+    return problems
+
+
