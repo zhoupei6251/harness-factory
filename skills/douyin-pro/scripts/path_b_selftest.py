@@ -3521,6 +3521,115 @@ def t_p3_check_layout_grade_rejects_unknown_grade():
         raise AssertionError(f"grade={bad!r} 应抛 ValueError，实际静默通过")
 
 
+# ---- P3 示意标注（schematic-tag）判据 P3-8 ----------------------------------
+
+def _p3_fake_image_record(grade, *, local_path="media/shot_01.jpg"):
+    """造一条**像产线出品**的 image_record：有 local_path、给定终档、带署名所需字段。
+
+    `attribution_text` 只读 `license`/`artist`，故这两条必须有；`grade` 由调用方钉死
+    （产线里它是 `synth_grade` 出来的，本测只测标注触发，不重复测合成）。
+    """
+    return {"local_path": local_path, "grade": grade, "detector_available": True,
+            "faces": [], "person": False, "namedSubject": False,
+            "title": "示意测试图", "artist": "Jane Doe", "license": "CC BY 4.0",
+            "source_url": "https://commons.example/f"}
+
+
+def t_p3_schematic_needed_predicate_three_branches():
+    """P3-8 判据本体：三态必测，缺一即假绿 —— 无图/真图不挂，纹理图必挂。"""
+    # ① 无图（record 为 None，含 image:false / 取图失败）→ 不注入
+    assert pb.schematic_needed(None) is False
+    # ② 有 record 但图被 §7 弃用（local_path 空）→ 屏上无图，不注入
+    assert pb.schematic_needed({"local_path": "", "grade": "G1"}) is False
+    # ③ 本尊照（grade=real）→ 不是纹理示意，不注入
+    assert pb.schematic_needed(_p3_fake_image_record(ig.REAL_GRADE)) is False
+    # ④ 纹理图（G1/G2）在屏 → 必注入（无开关无例外）
+    assert pb.schematic_needed(_p3_fake_image_record("G1")) is True
+    assert pb.schematic_needed(_p3_fake_image_record("G2")) is True
+
+
+def t_p3_schematic_composition_is_valid_and_selfchecks_clean():
+    """标注子合成必须是合法子合成 + 过真自检（豁免只放底部叠加层两条，其余照查）。"""
+    rec = _p3_fake_image_record("G2")
+    comp_id = f"{pb.SCHEMATIC_FILE_PREFIX}-1"
+    text = pb.emit_schematic_composition(comp_id, rec, PROBE_SECONDS, 1080, 1920, "light")
+    # 子合成契约三件套
+    assert "<template>" in text and "</template>" in text
+    assert f'data-composition-id="{comp_id}"' in text
+    assert f'window.__timelines["{comp_id}"]' in text
+    assert "background: transparent" in text, "#root 必须透明，否则 3 轨会把字幕/版式糊住"
+    # 文案两级都在（主句 + 附属署名，署名从 Commons 字段拼出）
+    assert pb.SCHEMATIC_LEAD_TEXT in text, "免责主句没进 HTML"
+    assert "Jane Doe" in text and "CC BY 4.0" in text, "附属署名没拼出作者+许可证"
+    # 每个 #id 补间目标都能在文件里解析到元素
+    for target in re.findall(r'tl\.\w+\("#([a-zA-Z0-9_-]+)"', text):
+        assert f'id="{target}"' in text, f"补间目标 #{target} 没有对应元素"
+    # 浅地面墨字 / 深地面白字：复用 _subtitle_palette 翻色口径（不新造对比）。
+    # 核的是 `color:` 这一条（填充），不是子串存在 —— 白字色 #ffffff 在浅档会作为**描边**出现，
+    # 用"contains 白"判会假阳，必须钉到填充属性上。
+    light = pb.emit_schematic_composition(comp_id, rec, PROBE_SECONDS, 1080, 1920, "light")
+    dark = pb.emit_schematic_composition(comp_id, rec, PROBE_SECONDS, 1080, 1920, "dark")
+    assert f"color: {pb.SUBTITLE_INK_COLOR};" in light, "浅地面填充应是墨字"
+    assert f"color: {pb.SUBTITLE_LIGHT_COLOR};" in dark, "深地面填充应是白字"
+    # 过真自检：文件名前缀命中底部叠加层豁免（动量/禁入区两条），其余不变量仍核
+    with tempfile.TemporaryDirectory() as d:
+        os.makedirs(os.path.join(d, "compositions"))
+        p = Path(d) / "compositions" / f"{comp_id}.html"
+        p.write_text(text, encoding="utf-8")
+        violations = ls.check_layout(p)
+        assert not violations, [str(v) for v in violations]
+
+
+def t_p3_schematic_composition_is_deterministic():
+    """同一份 record 编译两次逐字节相同 —— 判据 4a：标注烤进视频流后不许因重跑而抖。"""
+    rec = _p3_fake_image_record("G2")
+    comp_id = f"{pb.SCHEMATIC_FILE_PREFIX}-1"
+    a = pb.emit_schematic_composition(comp_id, rec, PROBE_SECONDS, 1080, 1920, "dark")
+    b = pb.emit_schematic_composition(comp_id, rec, PROBE_SECONDS, 1080, 1920, "dark")
+    assert a == b, "标注子合成不可复现：里面混进了墙钟/随机"
+    assert "Date.now" not in a and "Math.random" not in a
+
+
+def t_p3_schematic_tag_emitted_at_highest_track_when_texture_image():
+    """端到端 P3-8：编译包里有一镜带纹理图 → 成片宿主必挂 schematic-tag 且 track 序最高(3)；
+    无图那镜不挂。存量手发包（compiled=False）一镜都不挂。
+    """
+    pack = pb.load_style_pack("news-editorial-warm")
+    assert pack["compiled"] is True
+    scene_txt = {"title": "门诊新规", "body": PROBE_TEXT,
+                 "onscreen": "没人告诉他，他一直没问", "onscreenAccent": None}
+    scene_img = dict(scene_txt, image="示意测试图")
+    rec_img = _p3_fake_image_record("G2")
+    with tempfile.TemporaryDirectory() as d:
+        shots = pb.emit_composition(pack, [scene_txt, scene_img],
+                                    [PROBE_SECONDS, PROBE_SECONDS], d,
+                                    {"overrides": {}}, 1080, 1920,
+                                    [], [None, rec_img],
+                                    scene_cues=[_probe_scene(), _probe_scene()])
+        assert len(shots) == 2
+        # 有图那镜（i=2）落 schematic-2.html，无图那镜不落
+        comp2 = Path(d) / "compositions" / f"{pb.SCHEMATIC_FILE_PREFIX}-2.html"
+        comp1 = Path(d) / "compositions" / f"{pb.SCHEMATIC_FILE_PREFIX}-1.html"
+        assert comp2.is_file(), "带纹理图的镜没生成 schematic-tag 子合成"
+        assert not comp1.is_file(), "无图的镜不该生成 schematic-tag"
+        index = Path(d, "index.html").read_text(encoding="utf-8")
+        assert index.count('data-track-index="3"') == 1, "标注轨(3)没挂上或挂多了"
+        assert index.count(f'compositions/{pb.SCHEMATIC_FILE_PREFIX}-2.html') == 1
+        # track 序最高：字幕(2)也在，标注(3)压在其上
+        assert index.count('data-track-index="2"') == 2, "两镜都该有字幕轨"
+        assert index.count('data-track-index="1"') == 2, "两镜都该有版式轨"
+        # 宿主挂载计数自洽：2 版式 + 2 字幕 + 1 标注 = 5 个 composition-src
+        assert index.count('data-composition-src="compositions/') == 5
+    # 存量手发包（compiled=False）：带图也不生成标注
+    legacy = pb.load_style_pack(pb.DEFAULT_STYLE)
+    assert legacy["compiled"] is False
+    with tempfile.TemporaryDirectory() as d:
+        pb.emit_composition(legacy, [scene_img], [PROBE_SECONDS], d,
+                            {"overrides": {}}, 1080, 1920, [], [rec_img])
+        comp = Path(d) / "compositions" / f"{pb.SCHEMATIC_FILE_PREFIX}-1.html"
+        assert not comp.is_file(), "存量手发包被误加了 schematic-tag"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

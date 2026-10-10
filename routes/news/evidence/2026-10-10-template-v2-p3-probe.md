@@ -4,12 +4,14 @@
 > 覆盖判据：P3-1（分离度）· P3-2（黑名单非摆设）· P3-3（探针入库）
 > · P3-4（grade 合成四组合）· P3-5（检测器失效→G0）· P3-6（开闸迁移，asset→CALLSITE）
 > · P3-7（grade⟷原语映射，G1 只走 local-crop / G0 全禁 photo-*）
+> · P3-8（示意标注 schematic-tag 强制注入，track 序最高=3）
 > 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成 + 原语映射表）
 > 探针：`skills/douyin-pro/scripts/p3_probe.py`（跑同一份实现，把结论落 JSON）
 > 接线：`path_b_build._resolve_shot_image`（构建期单点定档，写进 image_record）
 > 开闸：`hf_compile._IMAGE_GATE_READY = capability_ok()`；`hf_primitives.CALLSITE_REQUIRES["asset"]`
+> 标注：`path_b_build.schematic_needed / emit_schematic_composition / emit_schematic_mount`（3 轨叠加）
 > 预检：`routes/news/scripts/check_scene_contract.py`（写稿期抓坏合同）
-> 自检：`path_b_selftest.py` 的 19 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 160 项，全绿）
+> 自检：`path_b_selftest.py` 的 23 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 164 项，全绿）
 
 ## K17 检测器分离度 —— 一张真脸 + 一张真齿轮，四条通道并集分开
 
@@ -226,13 +228,52 @@ grade 之后**。这是设计措辞与实现的**唯一分歧点**：语义等�
 
 ---
 
+## K28 示意标注：schematic-tag 是**构建期 3 轨叠加层**，不是编译期版式原语
+
+切片 5 交付 P3-8「有图且 grade!=real 强制注入示意标注」。落地形态选**字幕同款子合成叠加**，
+不是往 `hf_primitives` 里再加一条版式原语 —— 理由（设计 §6 写"新原语"，但要的是效果不是载体）：
+
+1. **它是整片级免责文字，压在所有元素之上**。版式原语活在 1 轨的版式文件内部，会被同版式的
+   入场元素/容器叠压，做不到"谁都盖不住"。字幕已经证明了"独立子合成 + 专属高 track"才是
+   这条需求的正确载体，标注沿用同一机制，挂在 **track 3**（比字幕 2 轨更高）。
+2. **它按 `image_record.grade` 逐镜决定注入**，而 grade 是构建期事实（切片 2 才落到 record）。
+   编译期 pack 里没有这个信息，做成编译期原语就没有触发点。
+3. **存量手发包字节不变**：注入用 `compiled_pack and schematic_needed(record)` 双条件门，
+   `compiled=False` 一镜都不挂（与字幕轨同口径）。
+
+三个新符号（全在 `path_b_build.py`）：
+- `schematic_needed(record)`：三态纯判据 —— None/`local_path` 空（§7 弃图后）/`grade==real`
+  都不挂，G1/G2 有真图才挂。用 `local_path` 兜最终裁决：图被弃 ⇒ 屏上无图 ⇒ 不免责（避免
+  挂一条对着空气的"示意画面"）。
+- `emit_schematic_composition(comp_id, record, slot, w, h, tone)`：两行文案（主句
+  `示意画面 · 与报道对象无直接关联` + 附属署名 `attribution_text(record)`），填充/描边走
+  `_subtitle_palette(tone)` 翻色（≥3:1 大字档，复用 P2 口径不新造），等宽 2.0cqw、字距 .08em、
+  左下贴在禁入区上沿（bottom=CAPTION_RESERVE+1）。
+- `emit_schematic_mount` + 循环内注入：`schematic-<i>.html` 落 `compositions/`，宿主多一条
+  track-3 clip。`emit_host` 的挂载计数断言随之自洽（2 版式 + 2 字幕 + 1 标注 = 5）。
+
+`image_gate.REAL_GRADE = "real"` 是**保留档**：Commons 取图链路永不产出（图只是纹理，裁决 3），
+它存在的唯一意义是给 `schematic_needed` 的"grade==real 不注入"一支一个可机判的哨兵 —— 否则
+"P3-8 的 real 分支"只能靠 prose 说，测不到（本仓「断言优先于 prose」）。别把它当作者可写的
+`imageGrade`，那是 `AUTHOR_GRADE_TO_CODE` 的 scene/material 两档。
+
+**自检计数**：160 → **164/164** 全绿（切片 5 加 4 条 P3-8 断言：三态判据 / 合法子合成+过真自检 /
+逐字节确定 / 端到端 3 轨注入+存量包不挂）。`hf_compile --check news-editorial-warm` 仍 ✓（标注是
+构建期叠加，不碰编译产物，旗舰字节零回归）。`layout_selfcheck` 把 schematic- 与 subtitle- 一并
+认作"底部静态叠加层"，豁免动量预算/底部禁入区两条（其余不变量照核，含子合成契约与 WCAG 字体）。
+
+**遗留到后续切片**：`crop_and_recheck` 的弃图复检、落位禁令（G0→index0/closer/person/namedSubject）
+是切片 6；含 photo-* 版式的旗舰真渲染 + 判据 4a 双跑哈希是切片 7（需 `nvm use 22.20.0` 与渲染同一次调用）。
+
+---
+
 ## 附录 · 一图档 · 复算命令
 
 ```bash
 # 从零刷新证据
 python skills/douyin-pro/scripts/p3_probe.py
-# 只跑 6 条 P3 自检（本地过滤）
-python skills/douyin-pro/scripts/path_b_selftest.py 2>&1 | grep -E "t_p3_|147"
+# 只跑 P3 自检（本地过滤）
+python skills/douyin-pro/scripts/path_b_selftest.py 2>&1 | grep -E "t_p3_|164"
 ```
 
 `probe-result.json` 与本地 selftest 断言必须同步；任何一方改检测参数、图字节或阈值，`t_p3_probe_artifact_is_committed` 会拿 JSON 里的 floor / hits 与 fresh 运行结果做对比，任一分歧即红。

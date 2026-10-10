@@ -52,6 +52,12 @@ SLOT_VARIABLE = "slotSeconds"
 #: ② 底部字幕禁入区（字幕**就住在**那条带里，那 20cqh 本就是给它留的）。其余不变量全核。
 SUBTITLE_FILE_STEM = "subtitle"
 
+#: P3 §6 示意标注子合成挂在 3 轨（比字幕更高，压在所有元素上）。它与字幕同属**底部静态文字叠加层**：
+#: 不做整段位移呼吸、住在画面下缘，因此同样豁免①动量预算、②底部禁入区两条不变量（它按
+#: ``CAPTION_RESERVE+1cqh`` 落位，本就贴在禁入区上沿，不该被当成侵入）。发射器
+#: `path_b_build.SCHEMATIC_FILE_PREFIX` 用同一个串拼文件名 —— 两处分家 = 标注文件被当普通版式误判红。
+SCHEMATIC_FILE_STEM = "schematic"
+
 #: 动量预算必须写成具名常数，不许把数字直接塞进 Math.min/Math.max
 BUDGET_CONSTANTS = ("INTRO_END", "MIN_DRIFT")
 
@@ -289,8 +295,10 @@ def check_layout(path: Path) -> list[Violation]:
     file_name = path.name
     text = path.read_text(encoding="utf-8")
     violations: list[Violation] = []
-    # 字幕子合成只豁免两条对它无意义的不变量（动量预算 / 底部禁入区），见 SUBTITLE_FILE_STEM。
-    is_subtitle = file_name.startswith(f"{SUBTITLE_FILE_STEM}-")
+    # 字幕 / P3 示意标注子合成只豁免两条对**底部静态文字叠加层**无意义的不变量（动量预算 /
+    # 底部禁入区），见 SUBTITLE_FILE_STEM / SCHEMATIC_FILE_STEM。两条各自按前缀认，别混。
+    is_bottom_overlay = file_name.startswith(
+        (f"{SUBTITLE_FILE_STEM}-", f"{SCHEMATIC_FILE_STEM}-"))
 
     def fail(code: str, detail: str) -> None:
         violations.append(Violation(file_name, code, detail))
@@ -302,6 +310,10 @@ def check_layout(path: Path) -> list[Violation]:
     template_html = template_match.group(1)
 
     head_region = text[: template_match.start()]
+    style_blocks = "".join(STYLE_BLOCK_RE.findall(template_html))
+    script_blocks = "".join(SCRIPT_BLOCK_RE.findall(template_html))
+    rules = parse_css_rules(style_blocks)
+    ids, id_classes, classes = collect_elements(template_html)
     style_blocks = "".join(STYLE_BLOCK_RE.findall(template_html))
     script_blocks = "".join(SCRIPT_BLOCK_RE.findall(template_html))
     rules = parse_css_rules(style_blocks)
@@ -361,8 +373,8 @@ def check_layout(path: Path) -> list[Violation]:
             )
 
     # 6) 动量预算：具名常数 + 至少一条用 driftDur 的持续位移
-    #    （字幕子合成豁免：文字层不做整段位移呼吸，见 SUBTITLE_FILE_STEM）
-    if not is_subtitle:
+    #    （字幕 / 示意标注子合成豁免：静态文字层不做整段位移呼吸，见 SUBTITLE/SCHEMATIC_FILE_STEM）
+    if not is_bottom_overlay:
         for constant in BUDGET_CONSTANTS:
             if not re.search(rf"\bconst\s+{constant}\s*=", script_blocks):
                 fail("MAGIC_BUDGET_VALUE", f"动量预算常数 {constant} 必须具名声明")
@@ -372,8 +384,8 @@ def check_layout(path: Path) -> list[Violation]:
         if not drift_tweens:
             fail("MISSING_CONTINUOUS_MOTION", "没有任何补间使用 driftDur —— 该镜头尾段会冻住")
 
-    # 7) 底部字幕禁入区（字幕子合成豁免：那 20cqh 本就是给它留的，见 SUBTITLE_FILE_STEM）
-    if not is_subtitle:
+    # 7) 底部字幕禁入区（字幕/示意标注子合成豁免：那 20cqh 本就是底部叠加层的家，见两 STEM 常量）
+    if not is_bottom_overlay:
         for selector, decls in rules:
             if "bottom" in decls and bottom_is_intruding(decls["bottom"]):
                 fail("CAPTION_RESERVE_INTRUDED", f"{selector} 的 bottom:{decls['bottom']} 侵入 {CAPTION_RESERVE_CQH}cqh 字幕区")

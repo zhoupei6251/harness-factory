@@ -511,6 +511,73 @@ SUBTITLE_MOUNT_TPL = (
     ' data-width="{w}" data-height="{h}"></div>'
 )
 
+# ---------------- 示意标注轨（P3 §6，新原语 schematic-tag） ----------------
+#: 标注是"压在**所有**元素之上"的免责文字，所以它的 track 序必须**高于字幕**（字幕 2 轨）
+#: ⇒ 取 3。这是 P3-8「track 序最高」的物理落点：版式 1 轨、配音 0 轨、字幕 2 轨、标注 3 轨，
+#: 逐层互不遮挡，标注永远在最上层（任何入场元素都盖不住它）。
+SCHEMATIC_TRACK_INDEX = 3
+#: 生成标注子合成的文件名词干 —— 真源同样落在 `layout_selfcheck`（它靠这个前缀把标注文件
+#: 与字幕文件一并豁免动量预算/底部禁入区两条对静态叠加层无意义的不变量）。
+SCHEMATIC_FILE_PREFIX = layout_selfcheck.SCHEMATIC_FILE_STEM
+#: 几何：左下、安全区内、等宽 `2.0cqw`、字距 `.08em`（设计 §6）。署名行降一档（1.4cqw，
+#: 与 photo-duotone 原 credit 同口径 —— credit 已降级为"附属署名"，归到这里画）。
+SCHEMATIC_FONT_CQW = 2.0
+SCHEMATIC_SUB_CQW = 1.4
+SCHEMATIC_TRACKING_EM = 0.08
+SCHEMATIC_SIDE_CQW = round(ASS_MARGIN_W_FRAC * 100, 4)          # 左沿 = 6cqw（与字幕同安全边距）
+#: 纵向底边落在**字幕禁入区之上**（20cqh 是给字幕的，标注不占它，也不与居中字幕撞字），
+#: 取 21cqh —— 左下、贴着禁入区上沿、不与居中字幕重叠（字幕居中，标注靠左）。
+SCHEMATIC_BOTTOM_CQH = layout_selfcheck.CAPTION_RESERVE_CQH + 1.0
+#: 免责主句（设计 §6 定死的文案）。
+SCHEMATIC_LEAD_TEXT = "示意画面 · 与报道对象无直接关联"
+
+#: 一镜示意标注子合成的骨架。占位符由 `emit_schematic_composition` 填：合成 id、本镜秒数、
+#: 左/底/字号/署名字号/字距、填充色与描边色（`_subtitle_palette` 随地面 tone 翻色，≥3:1 大字档）、
+#: 主句 + 附属署名。**#root 透明**、无背景 ⇒ 唯一的 opacity 入场补间合法（无面可混色）。
+SCHEMATIC_COMP_TPL = '''<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+    {{"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": {slot}, "min": 1}}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+@font-face {{
+  font-family: "HF CJK";
+  src: local("Noto Sans SC"), local("Microsoft YaHei"), local("DengXian");
+  font-weight: 100 900;
+}}
+
+#root {{ position: absolute; inset: 0; overflow: hidden; background: transparent; }}
+
+#st-tag {{ position: absolute; left: {side}cqw; bottom: {bottom}cqh; text-align: left;
+  font-family: "JetBrains Mono", "HF CJK", monospace; letter-spacing: {tracking}em;
+  line-height: 1.5; color: {text};
+  text-shadow: 0.05em 0.05em 0 {stroke}, -0.05em 0.05em 0 {stroke},
+    0.05em -0.05em 0 {stroke}, -0.05em -0.05em 0 {stroke}; }}
+#st-lead {{ font-size: {lead}cqw; font-weight: 700; display: block; }}
+#st-attr {{ font-size: {attr}cqw; font-weight: 400; display: block; }}
+      </style>
+      <div id="root" data-composition-id="{comp_id}" data-width="{w}" data-height="{h}">
+        <div id="st-tag">
+          <span id="st-lead">{lead_text}</span>
+          <span id="st-attr">{attribution}</span>
+        </div>
+      </div>
+      <script>
+        const tl = gsap.timeline({{ paused: true }});
+        tl.fromTo("#st-tag", {{ opacity: 0 }},
+          {{ opacity: 1, duration: 0.4, ease: "power2.out" }}, 0.15);
+        window.__timelines["{comp_id}"] = tl;
+      </script>
+    </template>
+  </body>
+</html>
+'''
+
+
 #: 一镜字幕子合成的骨架。**六个占位符**由 `emit_subtitle_composition` 填：合成 id、本镜秒数、
 #: 底/字号/边距/盒宽（cqh/cqw，全部从 ASS_* 常数推导）、逐 cue 容器、逐词+逐 cue 补间。
 #: `#root` 透明、`.sc-cue` 无背景 —— 版式自检的 SURFACE_OPACITY_TWEEN 只挡带背景的面淡入，
@@ -2361,6 +2428,64 @@ def emit_subtitle_mount(mount_index: int, start: float, dur: float,
     )
 
 
+def schematic_needed(image_record: dict | None) -> bool:
+    """P3 §6 触发口径：**这一镜有真实图在屏上、且它不是"报道对象本尊"** ⇒ 必须挂示意标注。
+
+    - `image_record` 为 None（无图/`image:false`/取图失败）→ 不注入（没有图可免责）。
+    - `image_record["grade"] == "real"`（本尊照）→ 不注入（不是纹理化示意，无需免责）。
+    - 其余（G1/G2，Commons 纹理图）→ 注入。G0 在 §7 被弃图后置空 local_path，落到"无图"支，
+      所以这里用 `local_path` 是否为真做最终裁决 —— 图真在屏上才要免责，图被弃了就不挂。
+    """
+    if not image_record:
+        return False
+    if not image_record.get("local_path"):
+        return False
+    return image_record.get("grade") != ig.REAL_GRADE
+
+
+def emit_schematic_composition(composition_id: str, image_record: dict,
+                               slot: float, w: int, h: int, tone: str) -> str:
+    """把一镜的示意标注编译成一份**子合成 HTML**（与字幕同一套子合成契约，走 3 轨）。
+
+    填充/描边复用 P2 `_subtitle_palette` 的地面翻色口径（不新造对比逻辑）：浅地面墨字、
+    深地面白字，两条反向描边把字与地面隔开 —— 标注压在照片/地面上也必须 ≥3:1 才看得清。
+    附属署名取自 Commons 记录（`attribution_text`：只由 API 字段拼、缺作者写「未署名」），
+    与主句同色同描边、只降字号 —— 免责文字和署名是**一条标注里的两级**，不是两套颜色。
+    """
+    text_color, stroke_color = _subtitle_palette(tone)
+    attribution = cm.attribution_text(image_record)
+    return SCHEMATIC_COMP_TPL.format(
+        comp_id=composition_id,
+        slot=round(slot, 3),
+        w=w,
+        h=h,
+        side=SCHEMATIC_SIDE_CQW,
+        bottom=SCHEMATIC_BOTTOM_CQH,
+        tracking=SCHEMATIC_TRACKING_EM,
+        lead=SCHEMATIC_FONT_CQW,
+        attr=SCHEMATIC_SUB_CQW,
+        text=text_color,
+        stroke=stroke_color,
+        lead_text=html.escape(SCHEMATIC_LEAD_TEXT),
+        attribution=html.escape(attribution),
+    )
+
+
+def emit_schematic_mount(mount_index: int, start: float, dur: float,
+                         w: int, h: int) -> str:
+    """示意标注挂在 3 轨（比字幕 2 轨更高）：压在所有版式与字幕之上，谁都盖不住它。"""
+    return SUBTITLE_MOUNT_TPL.format(
+        mount_id=f"schematic-{mount_index}",
+        composition_id=f"{SCHEMATIC_FILE_PREFIX}-{mount_index}",
+        file_name=f"{SCHEMATIC_FILE_PREFIX}-{mount_index}.html",
+        start=fmt_secs(start),
+        dur=fmt_secs(dur),
+        w=w,
+        h=h,
+        track=SCHEMATIC_TRACK_INDEX,
+    )
+
+
 def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
                      ctx_base: dict, w: int, h: int,
                      audio_files: list, image_records: list,
@@ -2374,7 +2499,9 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
     """
     mounts, audios, shots = [], [], []
     subtitle_files: list[tuple[str, str]] = []
+    schematic_files: list[tuple[str, str]] = []
     native_sub = bool(pack.get("compiled")) and scene_cues is not None
+    compiled_pack = bool(pack.get("compiled"))
     start = 0.0
     prev_ground_tone = None
     for i, (scene, dur, image_record) in enumerate(zip(scenes, durations, image_records), 1):
@@ -2404,6 +2531,15 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
                 f"{comp_id}.html",
                 emit_subtitle_composition(comp_id, cues, dur, w, h, prev_ground_tone)))
             mounts.append(emit_subtitle_mount(i, start, dur, w, h))
+        # P3 §6 示意标注：编译包里凡有**真实纹理图**在屏（grade!=real）强制注入，无开关。
+        # 挂在 3 轨（比字幕更高）⇒ 压在所有版式与字幕之上，任何入场元素都盖不住它。
+        # 存量手发包（compiled=False）一行标注都不生成，片子字节形状不变（同字幕轨的口径）。
+        if compiled_pack and schematic_needed(image_record):
+            sch_id = f"{SCHEMATIC_FILE_PREFIX}-{i}"
+            schematic_files.append((
+                f"{sch_id}.html",
+                emit_schematic_composition(sch_id, image_record, dur, w, h, prev_ground_tone)))
+            mounts.append(emit_schematic_mount(i, start, dur, w, h))
         if i <= len(audio_files):
             audios.append(emit_audio_mount(i, audio_files[i - 1], work_dir, start, dur))
         shots.append({"no": i, "layout": layout_name, "start": start, "dur": dur,
@@ -2425,7 +2561,7 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
     os.makedirs(dest_dir, exist_ok=True)
     for layout in pack["layouts"].values():
         shutil.copyfile(layout["path"], os.path.join(dest_dir, layout["file_name"]))
-    for file_name, text in subtitle_files:
+    for file_name, text in subtitle_files + schematic_files:
         write_text(os.path.join(dest_dir, file_name), text)
     return shots
 

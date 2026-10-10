@@ -238,6 +238,11 @@ def digest_bytes(path: str | Path) -> str:
 GRADE_ORDER = ("G2", "G1", "G0")
 #: 作者合同 `imageGrade` 的取值 → 内部档字符串。作者**不能**声明 G0（那是机器事实）。
 AUTHOR_GRADE_TO_CODE = {"scene": "G1", "material": "G2"}
+#: 保留档：`"real"` = "这张图就是报道对象本身的照片"（非纹理化示意）。
+#: Commons 取图链路**永远不产出这个值**（图只是纹理，裁决 3），所以它存在的意义是给
+#: §6 的"凡 grade != real 强制示意标注"一条可机判的判据：P3-8 的"grade=real 不注入"这一支
+#: 必须有这个哨兵才测得到。别把它当作者可写的 imageGrade —— 那是 AUTHOR_GRADE_TO_CODE 两档。
+REAL_GRADE = "real"
 #: 未声明时的默认档。设计 §3："作者没写 imageGrade → 默认 G1，不是 G0"。
 #: 默认 G0 会让"作者漏标一次就永久丢图"，过苛；G1 仍强制裁切+压色去识别，安全且可用。
 DEFAULT_AUTHOR_GRADE = "scene"
