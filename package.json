@@ -11,7 +11,7 @@
     "index":     "tsx tests/build-index.ts",
     "skills:install": "tsx scripts/install-skills.ts",
     "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
-    "test":      "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts"
+    "test":      "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
