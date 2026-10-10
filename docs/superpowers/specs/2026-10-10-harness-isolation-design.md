@@ -257,6 +257,16 @@ Gemini 会话：
 - **other 模式**下被 import 的 `harness-factory/CLAUDE.harness.md` 实际内容创建（本批次只建机制 + 路径，文件按需填；self 模式走 ENTRY.md 不依赖该文件）
 - 父仓库 CLAUDE.md 等远端的清理（设计上是「永远冻结」，无清理动作）
 
+## 12.1 范围外扩（v3，2026-10-10 后续批次完成）
+
+> 原始 §12 的"按需填"在这里落地。
+
+- ✅ `harness-factory/CLAUDE.harness.md`（v2 commit c63940a 已落）
+- ✅ `harness-factory/AGENTS.harness.md`（v3 commit 待定）
+- ✅ `harness-factory/GEMINI.harness.md`（v3 commit 待定）
+
+含义：other 模式 install 后，目标项目的三端入口（CLAUDE.md/AGENTS.md/GEMINI.md）条件读到的 `*.harness.md` 都有完整内容，不再是「读不到就静默跳过」。
+
 ## 13. 风险与回滚
 
 - **风险 1**：skip-worktree 在某些 git 操作下会失效（如 `git read-tree` 重建 index）。缓解：脚本在 .bak 保留原内容，失败可手动恢复。
