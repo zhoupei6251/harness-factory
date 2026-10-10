@@ -2611,12 +2611,19 @@ def t_hf_compile_variable_ids_are_emitter_derivable():
     assert set(hc._VAR_DEFAULTS) == used, (
         f"默认值表与契约用的 id 分家 —— 多: {sorted(set(hc._VAR_DEFAULTS) - used)}, "
         f"少: {sorted(used - set(hc._VAR_DEFAULTS))}")
-    # P3 图片门禁没接好之前不许出现图位（裁决 3：图片只做纹理，先过闸再上片）
-    assert not [v for ids in hc.CONTRACTS.values() for v in ids
-                if v in ("imagePath", "imageCredit")], "图位早于 P3 进了契约"
+    # P3 已接线：story 版式声明 imagePath（photo-local-crop 纹理图位，无图塌槽）。
+    # 图位仍只许在 story —— 其余六套不声明图位（裁决：先在一套版式打通含图端到端）。
+    image_slots = {layout: [v for v in ids if v in ("imagePath", "imageCredit")]
+                   for layout, ids in hc.CONTRACTS.items()
+                   if any(v in ("imagePath", "imageCredit") for v in ids)}
+    assert image_slots == {"story": ["imagePath"]}, \
+        f"P3 图位只该落在 story 的 imagePath，实际: {image_slots}"
     for layout, text in _compiled_texts().items():
         for var_id in hc.CONTRACTS[layout]:
-            bound = (f'data-var-text="{var_id}"' in text) or (f"vars.{var_id}" in text)
+            # 取用形式有三种：文字位 `data-var-text="id"`、点取 `vars.id`、
+            # 取图路径这类非文字位用方括号 `vars["id"]`（photo-local-crop 的 pre_js）。
+            bound = (f'data-var-text="{var_id}"' in text or f"vars.{var_id}" in text
+                     or f'vars["{var_id}"]' in text)
             assert bound, f"{layout}: 声明了 {var_id} 却没有任何元素/脚本取用它"
 
 
@@ -3757,6 +3764,110 @@ def t_p3_g0_person_declared_slot_is_banned():
         ig.crop_and_recheck = original
     assert rec_person["local_path"] == "", "person 普通镜 G0 该按声明半弃图"
     assert calls == [], "person 已被落位禁令判弃, 不该再付复检代价"
+
+
+def t_p3_grade_primitive_gate_fires_before_emit():
+    """端到端 P3-7/P3-10：发射前把「作者声明档 × 本版式取图原语」核一遍，误配即 EmitterError。
+
+    真实旗舰 story 带的是 photo-local-crop（允许 {G1,G2}），作者默认 scene(=G1) 永远过 ——
+    这条测的是**闸本身会不会咬**，所以把 story 的原语就地换成 photo-duotone（只允许 {G2}）：
+    - scene(=G1) × photo-duotone → 冲突 → 拒绝发射（文案点名 photo-duotone 与 G1）。
+    - material(=G2) × photo-duotone → 自洽 → 正常出片（证明不是恒真的假闸）。
+    判据用**作者声明档**不是检测器终档：G0 落位弃在上面 §7 已处理，§5 只管合同级误配。
+    """
+    pack = pb.load_style_pack("news-editorial-warm")
+    assert pack["compiled"] is True
+    # 先钉住真实旗舰 recipe 用的是 local-crop（不然后面换错了对象也测不到）
+    assert "photo-local-crop" in pack["layouts"]["story"]["primitives"], \
+        f"旗舰 story 原语应为 local-crop，实际: {pack['layouts']['story']['primitives']}"
+    assert "photo-duotone" not in pack["layouts"]["story"]["primitives"], \
+        "满屏 duotone 会被 drift-y 几何闸拒；旗舰不该带它"
+
+    # 就地造一个"作者想要满屏 duotone"的版式：local-crop → duotone
+    pack["layouts"]["story"]["primitives"] = tuple(
+        "photo-duotone" if p == "photo-local-crop" else p
+        for p in pack["layouts"]["story"]["primitives"]
+    )
+    scene_txt = {"title": "门诊新规", "body": PROBE_TEXT,
+                 "onscreen": "没人告诉他，他一直没问", "onscreenAccent": None}
+    rec = _p3_fake_image_record("G2")   # 纹理档，§7（只碰 G0）不动它 → 残留进 §5 闸
+
+    # ① 误配支：scene 默认声明(=G1) × photo-duotone(仅 G2) → 停机
+    scene_g1 = dict(scene_txt, image="示意测试图")
+    with tempfile.TemporaryDirectory() as d:
+        msg = expect_error(
+            lambda: pb.emit_composition(pack, [dict(scene_g1)],
+                                        [PROBE_SECONDS], d,
+                                        {"overrides": {}}, 1080, 1920, [],
+                                        [dict(rec)], scene_cues=[_probe_scene()]))
+    assert "photo-duotone" in msg and "G1" in msg, f"停机文案没点名冲突项: {msg}"
+    assert scene_g1.get("imageGrade", None) is None, "默认即 scene 档, 不该被写进 scene"
+
+    # ② 自洽支：material(=G2) × photo-duotone(允许 G2) → 正常出片
+    scene_g2 = dict(scene_txt, image="示意测试图", imageGrade="material")
+    with tempfile.TemporaryDirectory() as d:
+        shots = pb.emit_composition(pack, [scene_g2], [PROBE_SECONDS], d,
+                                    {"overrides": {}}, 1080, 1920, [],
+                                    [dict(rec)], scene_cues=[_probe_scene()])
+        assert len(shots) == 1, "material×duotone 该放行而非误拒"
+        assert (Path(d) / "compositions" / f"{pb.SCHEMATIC_FILE_PREFIX}-1.html").is_file(), \
+            "过闸后标注轨该照常生成"
+
+
+def _p3_emit_tree(work_dir: str) -> dict[str, str]:
+    """把发射产物整棵树读成 {相对路径: 文本}，供逐字节比对（判据 4a 的发射侧口径）。"""
+    root = Path(work_dir)
+    tree = {}
+    for p in sorted(root.rglob("*")):
+        if p.is_file():
+            tree[p.relative_to(root).as_posix()] = p.read_text(encoding="utf-8")
+    return tree
+
+
+def t_p3_emitter_photo_flow_is_deterministic():
+    """端到端 P3-10：同一含图旗舰发射两次，整棵产物逐字节相同，且图真绑进宿主、无墙钟/随机。
+
+    判据 4a 在发射侧的下界 —— 真渲染之前先证明"喂进去的字节是确定的"：
+    - story 版式的 photo 层把真实 local_path 填进 index.html 的 values（图真上屏，非塌槽）。
+    - schematic-tag 子合成同批生成（纹理图必标注）。
+    - 两次发射的**文件集合**与**每个文件字节**全等（抖动 = 重跑变样，这里必须为 0）。
+    - 产物里不出现 Date.now / Math.random（法则 10：时序抖动编译期烘焙，落盘无墙钟）。
+    """
+    pack = pb.load_style_pack("news-editorial-warm")
+    assert pack["compiled"] is True
+    import shutil
+    scene = {"title": "门诊新规", "body": PROBE_TEXT,
+             "onscreen": "没人告诉他，他一直没问", "onscreenAccent": None,
+             "image": "示意测试图"}
+    # local_path 每次调用造新 dict，避免两次发射共享同一 record 被就地改动
+    trees, dirs = [], []
+    for _ in range(2):
+        d = tempfile.mkdtemp()
+        dirs.append(d)
+        rec = _p3_fake_image_record("G2", local_path="media/shot_01.jpg")
+        pb.emit_composition(pack, [dict(scene)], [PROBE_SECONDS], d,
+                            {"overrides": {}}, 1080, 1920, [], [rec],
+                            scene_cues=[_probe_scene()])
+        trees.append(_p3_emit_tree(d))
+
+    # ① 含图那镜：photo 层的真实路径绑进了宿主 values（非塌槽空串）
+    index = trees[0]["index.html"]
+    assert "media/shot_01.jpg" in index, "含图旗舰没把 local_path 填进宿主 —— 图塌成无图态了"
+    assert f"compositions/{pb.SCHEMATIC_FILE_PREFIX}-1.html" in trees[0], "纹理图那镜该生成 schematic-tag"
+
+    # ② 两次发射逐字节全等（文件集合 + 内容）
+    assert trees[0].keys() == trees[1].keys(), \
+        f"两次发射文件集合不同: {set(trees[0]) ^ set(trees[1])}"
+    for rel in trees[0]:
+        assert trees[0][rel] == trees[1][rel], f"重跑抖了：{rel} 两次内容不一致"
+
+    # ③ 产物无墙钟/随机（判据 4a 前因；真渲染再补视频流哈希）
+    for rel, text in trees[0].items():
+        assert "Date.now" not in text and "Math.random" not in text, \
+            f"{rel} 里混进了墙钟/随机，重跑必抖"
+
+    for d in dirs:
+        shutil.rmtree(d, ignore_errors=True)
 
 
 if __name__ == "__main__":

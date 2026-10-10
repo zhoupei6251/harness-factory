@@ -105,8 +105,8 @@
 ### `story.html` — 合成 id `ew-story`
 
 - 地面：`paper` = `#f5efe3`（`tone` 变量可翻墨面）
-- 变量：`kicker`, `ordinal`, `tone`, `title`, `onscreen`, `slotSeconds`
-- 原语：`hairline`, `block-chip`, `char-rise`, `giant-numeral`, `rule-pull`, `cue-fade` + `drift-y`
+- 变量：`kicker`, `ordinal`, `tone`, `title`, `onscreen`, `imagePath`, `slotSeconds`
+- 原语：`hairline`, `block-chip`, `photo-local-crop`, `char-rise`, `giant-numeral`, `rule-pull`, `cue-fade` + `drift-y`
 
 ### `closer.html` — 合成 id `ew-closer`
 

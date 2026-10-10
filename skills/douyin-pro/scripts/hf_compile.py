@@ -92,6 +92,9 @@ _VAR_DEFAULTS = {
     "tone": ("地面明暗", "light"),
     "title": ("小标题", "一个标题"),
     "onscreen": ("屏句(唯一上屏整句, 不进配音)", "没人告诉他这件事"),
+    # P3 §4/§5：story 的纹理图位。默认空串 → photo-local-crop 的 pre_js 空路径塌槽
+    # （display:none），无图那镜退化为纯文字 story。产线构建期由 _resolve_shot_image 填。
+    "imagePath": ("配图路径(纹理, 无则塌槽)", ""),
     "value": ("主数值", "0"),
     "unit": ("主单位", "元"),
     "label": ("主数值说明", "说明"),
@@ -136,7 +139,7 @@ CONTRACTS: dict = {
     "catalog": ["kicker", "title", "step1Index", "step1Label", "step1Body",
                 "step2Index", "step2Label", "step2Body",
                 "step3Index", "step3Label", "step3Body", "slotSeconds"],
-    "story": ["kicker", "ordinal", "tone", "title", "onscreen", "slotSeconds"],
+    "story": ["kicker", "ordinal", "tone", "title", "onscreen", "imagePath", "slotSeconds"],
     "closer": ["kicker", "cta", "ctaAccent", "channel", "slotSeconds"],
 }
 
@@ -384,6 +387,13 @@ def _steps(layout: str, tok: hp.Tok, p: str) -> list:
 
     elif layout == "story":
         masthead("sy")
+        # P3 §5：story 挂一块 photo-local-crop 纹理图（左半、标题与强调条之间的空档 43..56cqh）。
+        # 用 local-crop 而非 duotone：duotone 是无 `top` 的满幅层，会触发 geometry_violations
+        # 那条"满幅盒 + drift-y 顶边出 #root"硬拒（法则 15）；local-crop 带 top/height，
+        # 正常参与收区间，且非文字位不进法则 18 的重叠判定。构建期 imagePath 空 → pre_js 塌槽。
+        s.append(Step("photo-local-crop", f"{p}-sy-photo",
+                     dict(path_var="imagePath", top=43.0, height=13.0, width=40.0,
+                          delay=0.3), 13.0))
         s.append(Step("char-rise", f"{p}-sy-title",
                      dict(var_id="title", role="display", size=8.4, top=24.0,
                           max_width=88.0, line_height=1.24, delay=0.45),
@@ -588,11 +598,16 @@ def composition_html(spec, tok: hp.Tok, layout: str) -> str:
         raise CompileError(f"{spec.id}/{layout} 的变量契约里有单引号 —— 属性用 ' 包裹，会截断 JSON")
 
     body = "\n".join(f"          {part.strip()}" for part in html_parts)
+    # 把本版式用到的原语名烘进 #root 的一个属性 —— 构建期 `load_style_pack` 读它,
+    # `check_layout_grade` 拿"这一版式用了哪些取图原语"与逐镜终档核一致（设计 §5/P3-7）。
+    # 单点事实源：原语清单来自配方 `_steps`，不在发射器里重述一份，配方改了属性自跟着变。
+    primitives_csv = ",".join(dict.fromkeys(step.prim for step in steps))
     template = string.Template(COMPOSITION_TPL).safe_substitute(
         variables_json=variables_json,
         faces="\n\n".join(css),
         comp_id=comp_id,
         tone_attr=tone_attr,
+        primitives=primitives_csv,
         width=WIDTH,
         height=HEIGHT,
         col_id=col_id,
@@ -620,7 +635,7 @@ COMPOSITION_TPL = """<!doctype html>
 $faces
 
 $tone_css      </style>
-      <div id="root" data-composition-id="$comp_id"$tone_attr data-width="$width" data-height="$height">
+      <div id="root" data-composition-id="$comp_id" data-hf-primitives="$primitives"$tone_attr data-width="$width" data-height="$height">
         <div id="$col_id">
 $body
         </div>

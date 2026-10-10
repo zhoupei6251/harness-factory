@@ -6,6 +6,7 @@
 > · P3-7（grade⟷原语映射，G1 只走 local-crop / G0 全禁 photo-*）
 > · P3-8（示意标注 schematic-tag 强制注入，track 序最高=3）
 > · P3-9（落位禁令：G0 不进首镜/closer/人物镜/含专名镜；普通镜复检仍命中才弃）
+> · P3-10（含图旗舰同稿双渲染 · 判据 4a 视频流哈希一致 —— 见 K30）
 > 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成 + 原语映射表）
 > 探针：`skills/douyin-pro/scripts/p3_probe.py`（跑同一份实现，把结论落 JSON）
 > 接线：`path_b_build._resolve_shot_image`（构建期单点定档，写进 image_record）
@@ -13,7 +14,7 @@
 > 标注：`path_b_build.schematic_needed / emit_schematic_composition / emit_schematic_mount`（3 轨叠加）
 > 落位禁令：`path_b_build.image_deprecated`（纯判决）+ `emit_composition`（置空 local_path → §4 塌槽 + `image_gate.crop_and_recheck` 复检）
 > 预检：`routes/news/scripts/check_scene_contract.py`（写稿期抓坏合同）
-> 自检：`path_b_selftest.py` 的 26 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 167 项，全绿）
+> 自检：`path_b_selftest.py` 的 28 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 169 项，全绿）
 
 ## K17 检测器分离度 —— 一张真脸 + 一张真齿轮，四条通道并集分开
 
@@ -300,6 +301,54 @@ grade 之后**。这是设计措辞与实现的**唯一分歧点**：语义等�
 
 **确定性**：判决是入参纯函数；`crop_and_recheck` 内部走 `detect_faces`（图字节纯函数，切片 1 法则 3），
 故同图同弃留，不破判据 4a。测试里用打桩替换 `ig.crop_and_recheck` 保证 e2e 不依赖 cv2/文件、可离线复现。
+
+## K30 含图旗舰 + 发射前 grade×原语闸 + 判据 4a 真渲染（切片 7，P3-7/P3-10/P3-审）
+
+**版式落地**：编译期把 `photo-local-crop` 烤进 story 配方（`hf_compile._steps`，masthead 之后一步，
+`top=43/height=13/width=40cqh·cqw`，`delay=0.3`），并把本版式用到的原语名烘进 `#root` 的
+`data-hf-primitives` 属性 —— 单一事实源，构建期 `path_b_build._layout_primitives` 反解该属性拿原语，
+不在构建侧重复一份"哪个版式用哪个取图原语"的知识。选 local-crop 而非 duotone：满幅（无 `top`）步
+会被 `geometry_violations` 的 drift-y 规则拒（drift 把满幅框顶出 `#root`），local-crop 带 `top/height`
+正常参与、`imagePath` 空时塌槽（`display:none` → 无图态）。story 契约新增 `imagePath`（默认空串）。
+重编 9 个产物（`python hf_compile.py news-editorial-warm`），`t_hf_compile_is_deterministic_and_the_tracked_files_are_compile_output`
+绿 ⇒ 仓库里那 9 个文件仍是编译产物、无人手改。
+
+**发射前 grade×原语一致闸（P3-7）**：`emit_composition` 循环里，图真会上屏（有 `local_path` 且版式带
+`photo-*` 原语）时，用**作者声明档**（`scene.get("imageGrade")`→`AUTHOR_GRADE_TO_CODE`，默认 scene=G1）
+× `layout["primitives"]` 跑 `ig.check_layout_grade`，冲突即 `EmitterError` 停机。
+关键口径：判据用**作者声明档**不是检测器合成终档 —— 检测器抬到 G0 是 §7 落位弃的领域（上面那段已处理），
+§5 只管"作者想满屏 duotone 却标 scene"这类合同级误配。真实旗舰 story 带 local-crop（允许 {G1,G2}），
+作者默认 scene(=G1) 恒过；`t_p3_grade_primitive_gate_fires_before_emit` 把 story 原语就地换成
+photo-duotone（仅允许 {G2}）证明闸会咬：scene(=G1)×duotone → 抛错且文案点名 `photo-duotone`/`G1`，
+material(=G2)×duotone → 放行并照常出标注（反面兜住"恒真假闸"）。
+
+**发射级确定性（P3-10 前因）**：`t_p3_emitter_photo_flow_is_deterministic` 同一含图旗舰发射两次，
+整棵产物（index.html + 全部 compositions/*.html）逐字节全等，图真绑进宿主 values（`media/shot_01.jpg`
+非空塌槽），schematic-tag-1.html 同批生成，产物无 `Date.now`/`Math.random`。
+
+**判据 4a 真渲染（Node 22.20.0 · 软件光栅）**：含图旗舰（story · light 地面 · 一镜 192 帧 @30fps）
+同一份发射产物渲染两遍 `--no-browser-gpu`：
+
+| 口径 | A | B | 结论 |
+|---|---|---|---|
+| 容器 `silent_*.mp4` sha256[:16] | `4342bd6896959485` | `4342bd6896959485` | 本轮连容器头都一致（P2 那轮差在 mvhd，这轮同发射同软栅未复现） |
+| H.264 流（`-an -c:v copy`）| `160085d719e3d583` | `160085d719e3d583` | 逐字节相同（2,804,890 B） |
+| 解码 yuv（`-pix_fmt yuv420p`）| `f248ee57c658a5…` | `f248ee57c658a5…` | 逐帧相同（597,196,800 B = 192×1080×1920×1.5） |
+
+⇒ **P3-10 过**：含图旗舰画面可复现，检测器纯函数 + 编译期烘焙抖动，落盘无墙钟。Commons 取图是否命中
+是 asset 层既有非确定性（设计 §8 明记"继承、不新增破口"）—— 本轮渲染用**离线种子缓存**
+（`media/shot_01.jpg` + `media-manifest.json` 命中 `cache_hit`，不联网）把图字节钉死，只测渲染这一维。
+
+**P3-审（人工 · 未自批）**：出帧落在 `routes/news/evidence/2026-10-10-p3-render/`：
+`photo_{1.5,3.5,6.0}s.png`（含图：story 排版 + 齿轮 photo-local-crop + 底部"示意画面·图:David…·CC BY 2.0"
+标注轨(3) + 墨字白描边字幕轨(2)）与 `nophoto_3.5s.png`（同稿 image:false → 图位塌槽、无标注，排版不变）。
+含图 silent.mp4=2.7 MB vs 无图=958 KB，佐证图真进流非摆设。**审美放行是 owner 独占判据，agent 不代签** ——
+切片 7 代码/产物/证据可提交，但 P3 收官以 owner 认可这两帧为准；不认可则 photo 版式几何/标注文案回炉。
+
+**存量包不动**：photo 版式只在编译包（`compiled=True`）生效，grade×原语闸、发射、渲染全在
+`if compiled_pack` 之内；31 套 path_b 手发包 `compiled=False` 不带 photo-*、不传 scene_cues，字节冻结。
+
+自检全绿 **169/169**（P3 探针 26 → 落位禁令 +2 → 切片 7 的 grade 闸 + 发射确定性 +2 = 28 条 `t_p3_*`）。
 
 **自检计数**：164 → **167/167** 全绿（切片 6 加 3 条 P3-9 断言：纯判决穷举 / 首镜+普通镜端到端调用次序 /
 person 声明位端到端）。`hf_compile --check news-editorial-warm` 仍 ✓（落位禁令是构建期判定，不碰编译产物）。

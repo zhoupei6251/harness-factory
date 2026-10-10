@@ -318,6 +318,20 @@ VARIABLE_ATTR_RE = re.compile(
 ROOT_COMPOSITION_ID_RE = re.compile(
     r'<div[^>]*\bid="root"[^>]*data-composition-id="(?P<id>[^"]+)"', re.S
 )
+#: 编译包把本版式用到的原语名烘在 #root 的 data-hf-primitives 上（`hf_compile` 配方单点源）。
+#: 构建期 `check_layout_grade` 靠它拿"这一版式用了哪些取图原语"逐镜核终档一致。存量手发包
+#: 没这个属性 → 空元组（不参与 grade 判定，与它们无 photo-* 配方一致）。
+ROOT_PRIMITIVES_RE = re.compile(
+    r'<div[^>]*\bid="root"[^>]*data-hf-primitives="(?P<prims>[^"]*)"', re.S
+)
+
+
+def _layout_primitives(text: str) -> tuple[str, ...]:
+    """从编译版式 HTML 读出 `data-hf-primitives`（无则空 —— 存量手发包不带这个属性）。"""
+    m = ROOT_PRIMITIVES_RE.search(text)
+    if not m:
+        return ()
+    return tuple(name for name in m.group("prims").split(",") if name)
 #: 版式的地面 = 它自己 ``#root`` 上的 background。发射器用它决定相邻镜头要不要
 #: 换明暗 ("三段混调"里唯一可机械判定的部分: 同一套设计系统, 逐镜换地面)。
 #: 只认 ``#root { … }`` 本体, 带属性选择器的 ``#root[data-tone=…] {`` 不当地面看。
@@ -1730,6 +1744,7 @@ def load_style_pack(style: str) -> dict:
             "ground_hex": ground_hex,
             "ground_tone": GROUND_TONE_BY_HEX[ground_hex],
             "variables": contract,
+            "primitives": _layout_primitives(text),
         }
     if not layouts:
         ready = ready_packs()
@@ -2569,6 +2584,20 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
             if reason:
                 image_record["local_path"] = ""    # 置空 → 复用 §4 空路径塌槽, 图消失退化为无图态
                 log(f"  分镜{i} 弃图（{reason}）：G0 落位禁令 → 该镜退化为无图态")
+        # P3 §5 / P3-7 grade⟷原语一致：作者声明的档 × 本版式取图原语 必须自洽。
+        # 判据用**作者声明档**（scene→G1 / material→G2，默认 scene），不是检测器合成的终档 ——
+        # 检测器把某镜抬到 G0 是 §7 落位弃的领域（上面那段已处理：G0 到这儿要么已置空、要么是
+        # 普通位复检干净的残留纹理），§5 只管"作者想满屏 duotone 却标了 scene"这类合同级误配。
+        # 只在图真会上屏（有 local_path 且版式带 photo-* 原语）时核 —— 无图那镜原语塌槽、不判。
+        if (compiled_pack and image_record and image_record.get("local_path")
+                and any(p in ig.GRADE_ALLOWED_PRIMITIVES for p in layout["primitives"])):
+            author_key = scene.get("imageGrade") or ig.DEFAULT_AUTHOR_GRADE
+            author_code = ig.AUTHOR_GRADE_TO_CODE[author_key]
+            conflicts = ig.check_layout_grade(list(layout["primitives"]), author_code)
+            if conflicts:
+                raise EmitterError(
+                    f"分镜{i} {layout_name}: grade×原语不一致 → 拒绝发射。作者声明 "
+                    f"{author_key!r}(={author_code}) —— {'; '.join(conflicts)}")
         values = fill_variables(layout, scene, ctx)
         mounts.append(emit_mount(i, layout, values, start, dur, w, h))
         # 本镜实际呈现的地面: 固定地面的版式用装包时算好的, 可换面的版式(story)

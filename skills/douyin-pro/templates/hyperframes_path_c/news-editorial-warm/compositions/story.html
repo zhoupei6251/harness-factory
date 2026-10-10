@@ -5,6 +5,7 @@
     {"id": "tone", "type": "string", "label": "地面明暗", "default": "light"},
     {"id": "title", "type": "string", "label": "小标题", "default": "一个标题"},
     {"id": "onscreen", "type": "string", "label": "屏句(唯一上屏整句, 不进配音)", "default": "没人告诉他这件事"},
+    {"id": "imagePath", "type": "string", "label": "配图路径(纹理, 无则塌槽)", "default": ""},
     {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
   ]'>
   <head>
@@ -40,6 +41,10 @@
 #ew-sy-kicker { position: absolute; top: 4.5cqh; left: 6cqw; max-width: 22.4cqw; background: #B45309; color: #ffffff; font-size: 2.8cqw; font-weight: 900; padding: 0.85cqh 1.9cqw; transform-origin: 0% 50%; }
 
 
+#ew-sy-photo { position: absolute; top: 34.5cqh; left: 6cqw; width: 40cqw; height: 13cqh; overflow: hidden; display: none; }
+#ew-sy-photo img { width: 100%; height: 100%; display: block; object-fit: cover; object-position: 50% 40%; }
+
+
 #ew-sy-title { position: absolute; top: 15.5cqh; left: 6cqw; max-width: 88cqw; font-family: HF Serif CJK, serif; font-size: 8.4cqw; font-weight: 900; line-height: 1.24; letter-spacing: -0.01em; color: #1f1b16; }
 .ew-sy-title-ch { display: inline-block; }
 
@@ -58,10 +63,11 @@
 #root[data-tone="dark"] #ew-sy-ordinal { color: #ddd3bf; }
 #root[data-tone="dark"] #ew-sy-title { color: #f5efe3; }
       </style>
-      <div id="root" data-composition-id="ew-story" data-tone="light" data-width="1080" data-height="1920">
+      <div id="root" data-composition-id="ew-story" data-hf-primitives="hairline,block-chip,photo-local-crop,char-rise,giant-numeral,rule-pull,cue-fade" data-tone="light" data-width="1080" data-height="1920">
         <div id="ew-story-col">
           <div id="ew-sy-rule"></div>
           <div id="ew-sy-kicker" data-var-text="kicker"></div>
+          <figure id="ew-sy-photo"><img alt="" /></figure>
           <div id="ew-sy-title" data-var-text="title"><span class="ew-sy-title-ch"></span></div>
           <div id="ew-sy-ordinal"><span class="ew-sy-ordinal-value" data-var-text="ordinal"></span></div>
           <div id="ew-sy-bar"></div>
@@ -79,6 +85,11 @@
         const tone = String(vars.tone || "light").toLowerCase();
         rootEl.dataset.tone = tone === "dark" ? "dark" : "light";
         const tl = gsap.timeline({ paused: true });
+        const ewSyPhotoSrc = String(vars["imagePath"] || "").trim();
+        if (ewSyPhotoSrc) {
+          document.getElementById("ew-sy-photo").style.display = "block";
+          document.querySelector("#ew-sy-photo img").src = ewSyPhotoSrc;
+        }
         const ewSyTitleChars = Array.from(String(vars["title"] || "").trim());
         const ewSyTitleBox = document.getElementById("ew-sy-title");
         ewSyTitleBox.removeAttribute("data-var-text");
@@ -91,6 +102,7 @@
         });
         tl.fromTo("#ew-sy-rule", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)", duration: 0.6, ease: "power3.out" }, 0);
         tl.fromTo("#ew-sy-kicker", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.25);
+        tl.fromTo("#ew-sy-photo", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)", duration: 0.7, ease: "power3.out" }, 0.3);
         tl.fromTo(".ew-sy-title-ch", { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, stagger: 0.045, ease: "power3.out" }, 0.45);
         tl.fromTo("#ew-sy-ordinal", { clipPath: "inset(0 0 100% 0)" }, { clipPath: "inset(0 0 0 0)", duration: 1.4, ease: "power3.out" }, 0.6);
         tl.fromTo("#ew-sy-bar", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 1.1);
