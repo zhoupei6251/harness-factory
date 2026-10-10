@@ -504,7 +504,10 @@ SUBTITLE_OUTLINE_EM = round(ASS_FONT_H_FRAC / ASS_OUTLINE_H_FRAC, 4)   # (h/32)/
 #: 强调是"词的着色"。**填充随地面翻色**（裁决 2026-10-10 改，推翻原"统一白字"）：
 #: `check --strict` 实测白字 #fff 在旗舰暖纸浅地面 rgb(234,229,217) 上只有 1.26:1，
 #: 不过 WCAG AA 3:1（深地面则过）。浅地面改墨字 + 白描边、深地面保持白字 + 黑描边。
-#: 强调色 #B45309 在旗舰所有地面上都 ≥3（浅纸 3.8–4.4、墨面 3.4，见证据 K16），两 tone 通用。
+#: 强调色 #B45309 在旗舰两面上都 ≥3（浅纸 4.39、近黑墨面 3.41，见 spec on-ink-accent）——
+#: 但**不写死成"两 tone 通用"**：这只因旗舰 dark 面是近黑墨。换中彩度蓝底（钴蓝 #1f3a68）
+#: 琥珀只有 2.24，会破大字线。这条不靠注释兜，由 `hf_style_spec.contrast_violations`（判据 3）
+#: 逐对算，蓝底包复用琥珀在编译期即被拒（`t_hf_style_spec_contrast_gate_rejects_accent_on_a_light_dark_ground`）。
 SUBTITLE_LIGHT_COLOR = "#ffffff"    # 深地面用的白字
 SUBTITLE_INK_COLOR = "#1f1b16"      # 浅地面用的墨字（同 spec color.surfaces.ink）
 SUBTITLE_ACCENT_COLOR = "#B45309"

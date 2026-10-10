@@ -1780,6 +1780,30 @@ def t_hf_style_spec_contrast_gate_rejects_accent_as_body_text():
     assert "4.39" in problems[0] and "4.5" in problems[0], problems[0]
 
 
+def t_hf_style_spec_contrast_gate_rejects_accent_on_a_light_dark_ground():
+    """P5 根治：强调色"翻不翻面"不是靠注释兜，是判据 3 逐对算出来的。
+
+    P2 收官记了句"深底强调翻色留 P5 补"（琥珀压钴蓝 1.14 破线）。这条把它证伪成
+    "根本编不出来"：旗舰 dark 面是**近黑墨 #1f1b16**，琥珀 on-ink-accent 实测 3.41 过
+    大字线（基线零违规）；把同一份 spec 的 ink 面换成中彩度钴蓝 #1f3a68，那条琥珀强调
+    立刻 2.24 < 3.0 → `contrast_violations` 拒编。⇒ "蓝底复用琥珀"这条路编译期就断，
+    无需运行时按 tone 翻强调色的分支（YAGNI：没有已发布编译包踩得到，加了就是死代码）。
+    真要出蓝底包，判据 3 会逼作者给该面配一个过线的强调色，而不是悄悄糊上去。
+    """
+    # 基线：旗舰真实墨面（近黑）下琥珀过大字线，on-ink-accent 不该出现在违规里
+    base = hs.contrast_violations(hs.Spec(_flagship_raw()))
+    assert not any("on-ink-accent" in p for p in base), \
+        f"旗舰墨面琥珀该过 3.0，却被判违规: {base}"
+
+    # 反证：把 ink 面改成中彩度钴蓝，同一琥珀强调必须跌破大字线
+    raw = _flagship_raw()
+    raw["color"]["surfaces"]["ink"] = "#1f3a68"
+    problems = hs.contrast_violations(hs.Spec(raw))
+    hit = [p for p in problems if "on-ink-accent" in p]
+    assert len(hit) == 1, f"钴蓝墨面上的琥珀强调没被拒: {problems}"
+    assert "2.24" in hit[0] and "3.0" in hit[0], hit[0]
+
+
 def t_hf_style_spec_caption_reserve_reproduces_the_measured_constant():
     """D5 根治：禁入区从 spec 几何**反算**，且必须等于手量的 20.0 —— 不等就是有人在
     没签字的情况下把 227 个现存版式的闸口放宽或收紧了。
