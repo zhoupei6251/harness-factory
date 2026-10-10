@@ -2428,6 +2428,37 @@ def emit_subtitle_mount(mount_index: int, start: float, dur: float,
     )
 
 
+def image_deprecated(grade: str, *, is_first: bool, layout_name: str,
+                     person: bool, named_subject: bool,
+                     recheck_still_hit: bool) -> str | None:
+    """P3 §7 落位禁令：返回这一镜的 G0 图**该不该弃**（返回原因串）或不弃（None）。纯函数、零 I/O。
+
+    只有 `grade == "G0"`（机器检出可指认的脸 / 检测器失效保守）参与弃图判定；G1/G2 是纹理、
+    real 是本尊，都不在此列。G0 的弃图分两半，设计把可机器判的先判：
+
+    - **自动半**：`is_first`（首镜，指认性最高）或 `layout_name == "closer"`（片尾书挡），落位即弃。
+    - **声明半**：作者打了 `person` 或 `namedSubject`（人物镜 / 含专名镜），尊重其声明即弃。
+    - 两半都没命中的**普通镜**（中段、未标人物/专名、非 closer）：靠 `crop_and_recheck` 给逃生口 ——
+      掩掉连通域复检仍命中（`recheck_still_hit`）才弃；掩干净了就留（仍出示意标注，因 grade!=real）。
+
+    弃的具体动作在调用方（`emit_composition`）落实：把 `image_record["local_path"]` 置空 →
+    复用 §4 塌槽，图消失、版式退化为无图态。这里只出**判决**，不碰文件，便于逐分支机判（判据 P3-9）。
+    """
+    if grade != "G0":
+        return None
+    if is_first:
+        return "首镜指认性最高"
+    if layout_name == "closer":
+        return "closer 片尾书挡"
+    if person:
+        return "人物镜"
+    if named_subject:
+        return "含专名镜"
+    if recheck_still_hit:
+        return "裁掉人脸连通域复检仍命中"
+    return None
+
+
 def schematic_needed(image_record: dict | None) -> bool:
     """P3 §6 触发口径：**这一镜有真实图在屏上、且它不是"报道对象本尊"** ⇒ 必须挂示意标注。
 
@@ -2517,6 +2548,27 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
         })
         layout_name = choose_layout(pack, scene, ctx)
         layout = pack["layouts"][layout_name]
+        # P3 §7 落位禁令：G0（可指认的脸 / 检测器失效保守）图不进高指认性镜头。
+        # 判决全部交给纯函数 image_deprecated（判据 P3-9）；这里只落实"置空 local_path → §4 塌槽"。
+        # 首趟先以 recheck_still_hit=False 判"禁令位"：非禁令位才付一次 crop_and_recheck 复检代价，
+        # 掩完仍命中才补判为弃图。禁令位的弃不依赖复检，故不浪费那次检测。
+        if (compiled_pack and image_record and image_record.get("local_path")
+                and image_record.get("grade") == "G0"):
+            ban_kwargs = {
+                "is_first": i == 1,
+                "layout_name": layout_name,
+                "person": bool(image_record.get("person")),
+                "named_subject": bool(image_record.get("namedSubject")),
+            }
+            reason = image_deprecated("G0", recheck_still_hit=False, **ban_kwargs)
+            if reason is None:
+                abs_img = Path(work_dir) / image_record["local_path"]
+                faces = tuple(ig.Box(*f) for f in image_record.get("faces", ()))
+                if ig.crop_and_recheck(str(abs_img), faces):
+                    reason = image_deprecated("G0", recheck_still_hit=True, **ban_kwargs)
+            if reason:
+                image_record["local_path"] = ""    # 置空 → 复用 §4 空路径塌槽, 图消失退化为无图态
+                log(f"  分镜{i} 弃图（{reason}）：G0 落位禁令 → 该镜退化为无图态")
         values = fill_variables(layout, scene, ctx)
         mounts.append(emit_mount(i, layout, values, start, dur, w, h))
         # 本镜实际呈现的地面: 固定地面的版式用装包时算好的, 可换面的版式(story)

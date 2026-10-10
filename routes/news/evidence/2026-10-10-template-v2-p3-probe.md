@@ -5,13 +5,15 @@
 > · P3-4（grade 合成四组合）· P3-5（检测器失效→G0）· P3-6（开闸迁移，asset→CALLSITE）
 > · P3-7（grade⟷原语映射，G1 只走 local-crop / G0 全禁 photo-*）
 > · P3-8（示意标注 schematic-tag 强制注入，track 序最高=3）
+> · P3-9（落位禁令：G0 不进首镜/closer/人物镜/含专名镜；普通镜复检仍命中才弃）
 > 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成 + 原语映射表）
 > 探针：`skills/douyin-pro/scripts/p3_probe.py`（跑同一份实现，把结论落 JSON）
 > 接线：`path_b_build._resolve_shot_image`（构建期单点定档，写进 image_record）
 > 开闸：`hf_compile._IMAGE_GATE_READY = capability_ok()`；`hf_primitives.CALLSITE_REQUIRES["asset"]`
 > 标注：`path_b_build.schematic_needed / emit_schematic_composition / emit_schematic_mount`（3 轨叠加）
+> 落位禁令：`path_b_build.image_deprecated`（纯判决）+ `emit_composition`（置空 local_path → §4 塌槽 + `image_gate.crop_and_recheck` 复检）
 > 预检：`routes/news/scripts/check_scene_contract.py`（写稿期抓坏合同）
-> 自检：`path_b_selftest.py` 的 23 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 164 项，全绿）
+> 自检：`path_b_selftest.py` 的 26 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 167 项，全绿）
 
 ## K17 检测器分离度 —— 一张真脸 + 一张真齿轮，四条通道并集分开
 
@@ -267,13 +269,54 @@ grade 之后**。这是设计措辞与实现的**唯一分歧点**：语义等�
 
 ---
 
+## K29 落位禁令：G0 图不进高指认性镜头，判决是纯函数、弃图动作是置空塌槽
+
+切片 6 交付 P3-9「G0 不得进首镜 / closer / 人物镜 / 含专名镜」。设计 §7 把这条按**可判性拆两半**，
+落地也照这两半走，中间夹一个复检逃生口：
+
+| 判据分支 | 触发条件 | 弃/留 | 依据 |
+|---|---|---|---|
+| 自动半 | `grade==G0` ∧（`shot_index==1` 首镜 ∨ `layout==closer` 片尾） | **弃** | 位置指认性，机器必判 |
+| 声明半 | `grade==G0` ∧（`person` ∨ `namedSubject`） | **弃** | 尊重作者标记 |
+| 复检口 | `grade==G0` ∧ 上面都没中 ∧ `crop_and_recheck` 仍命中 | **弃** | §6.5 硬规则 2 |
+| ★保留 | `grade==G0` ∧ 普通位 ∧ 复检干净 | **留**（仍出标注，因 grade!=real） | P3-9 反面 |
+| 不参与 | `grade ∈ {G1, G2, real}` | 留 | 落位禁令只针对"可指认的脸" |
+
+**判决与动作分离**（可机判的关键）：
+- `image_deprecated(grade, *, is_first, layout_name, person, named_subject, recheck_still_hit) -> str|None`
+  是 **纯函数、零 I/O**，只出判决（返回弃因或 None）。`t_p3_image_deprecated_predicate` 逐分支穷举，
+  含 G1/real 面对"禁令位全开"仍返回 None 的反证（证明非 G0 不进这条闸）。
+- **弃图动作**在 `emit_composition` 里落实：置空 `image_record["local_path"]` → 复用 §4 空路径塌槽，
+  图消失、版式退化为无图态。这与 `schematic_needed` 的口径咬合：图被弃 ⇒ 屏上无图 ⇒ 不挂"示意画面"
+  （切片 5 那句注释预告的正是这里）。
+
+**复检只在必要时付代价**：发射循环先以 `recheck_still_hit=False` 跑一次纯判决 —— 命中禁令位就直接弃、
+**不跑** `crop_and_recheck`（禁令不依赖复检）；只有落到"普通位 G0"（判决返回 None）才付一次
+`image_gate.crop_and_recheck` 掩脸复检，仍命中才补判为弃。`t_p3_g0_placement_ban_wired_at_build_time`
+用打桩把这套调用次序钉死：首镜 G0 不出现在复检调用集里、两个普通镜 G0（干净→留 / 命中→弃）才走复检。
+
+**存量手发包不动**：整段禁令在 `if compiled_pack` 之内，`compiled=False` 的 31 套 path_b 包一行弃图逻辑
+都不跑（字节冻结，同字幕轨/标注轨口径，裁决 3）。
+
+**确定性**：判决是入参纯函数；`crop_and_recheck` 内部走 `detect_faces`（图字节纯函数，切片 1 法则 3），
+故同图同弃留，不破判据 4a。测试里用打桩替换 `ig.crop_and_recheck` 保证 e2e 不依赖 cv2/文件、可离线复现。
+
+**自检计数**：164 → **167/167** 全绿（切片 6 加 3 条 P3-9 断言：纯判决穷举 / 首镜+普通镜端到端调用次序 /
+person 声明位端到端）。`hf_compile --check news-editorial-warm` 仍 ✓（落位禁令是构建期判定，不碰编译产物）。
+
+**遗留到切片 7**：含 `photo-*` 版式的旗舰真渲染 —— 那时 `check_layout_grade`（切片 4 纯函数）在发射前接线，
+G1 scene 误配 `photo-duotone` 会 EmitterError；再补判据 4a 双跑哈希 + P3-审人工并排（需 `nvm use 22.20.0`
+与渲染同一次调用）。
+
+---
+
 ## 附录 · 一图档 · 复算命令
 
 ```bash
 # 从零刷新证据
 python skills/douyin-pro/scripts/p3_probe.py
 # 只跑 P3 自检（本地过滤）
-python skills/douyin-pro/scripts/path_b_selftest.py 2>&1 | grep -E "t_p3_|164"
+python skills/douyin-pro/scripts/path_b_selftest.py 2>&1 | grep -E "t_p3_|167"
 ```
 
 `probe-result.json` 与本地 selftest 断言必须同步；任何一方改检测参数、图字节或阈值，`t_p3_probe_artifact_is_committed` 会拿 JSON 里的 floor / hits 与 fresh 运行结果做对比，任一分歧即红。

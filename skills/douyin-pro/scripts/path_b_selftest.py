@@ -3523,14 +3523,15 @@ def t_p3_check_layout_grade_rejects_unknown_grade():
 
 # ---- P3 示意标注（schematic-tag）判据 P3-8 ----------------------------------
 
-def _p3_fake_image_record(grade, *, local_path="media/shot_01.jpg"):
+def _p3_fake_image_record(grade, *, local_path="media/shot_01.jpg", faces=None):
     """造一条**像产线出品**的 image_record：有 local_path、给定终档、带署名所需字段。
 
     `attribution_text` 只读 `license`/`artist`，故这两条必须有；`grade` 由调用方钉死
-    （产线里它是 `synth_grade` 出来的，本测只测标注触发，不重复测合成）。
+    （产线里它是 `synth_grade` 出来的，本测只测标注触发，不重复测合成）。`faces` 供 §7
+    落位禁令复检用（产线里是 `[[x,y,w,h],…]`），默认无脸。
     """
     return {"local_path": local_path, "grade": grade, "detector_available": True,
-            "faces": [], "person": False, "namedSubject": False,
+            "faces": list(faces or []), "person": False, "namedSubject": False,
             "title": "示意测试图", "artist": "Jane Doe", "license": "CC BY 4.0",
             "source_url": "https://commons.example/f"}
 
@@ -3628,6 +3629,134 @@ def t_p3_schematic_tag_emitted_at_highest_track_when_texture_image():
                             {"overrides": {}}, 1080, 1920, [], [rec_img])
         comp = Path(d) / "compositions" / f"{pb.SCHEMATIC_FILE_PREFIX}-1.html"
         assert not comp.is_file(), "存量手发包被误加了 schematic-tag"
+
+
+# ---- P3 落位禁令 + crop_and_recheck 判据 P3-9 --------------------------------
+
+def t_p3_image_deprecated_predicate():
+    """`image_deprecated` 判决分支穷举（设计 §7）：非 G0 一律留、四路禁令位弃、普通镜看复检。"""
+    # 非 G0（纹理 G1/G2 与本尊 real）永不参与落位弃 —— 落位禁令只针对"可指认的脸"
+    assert pb.image_deprecated("G1", is_first=True, layout_name="closer",
+                                person=True, named_subject=True,
+                                recheck_still_hit=True) is None
+    assert pb.image_deprecated(ig.REAL_GRADE, is_first=True, layout_name="closer",
+                               person=True, named_subject=True,
+                               recheck_still_hit=True) is None
+    # 自动半：首镜 / closer 片尾 —— 指认性由位置定, 机器必判
+    assert pb.image_deprecated("G0", is_first=True, layout_name="story",
+                               person=False, named_subject=False,
+                               recheck_still_hit=False) is not None
+    assert pb.image_deprecated("G0", is_first=False, layout_name="closer",
+                               person=False, named_subject=False,
+                               recheck_still_hit=False) is not None
+    # 声明半：作者打了 person / namedSubject —— 尊重声明即弃
+    assert pb.image_deprecated("G0", is_first=False, layout_name="story",
+                               person=True, named_subject=False,
+                               recheck_still_hit=False) is not None
+    assert pb.image_deprecated("G0", is_first=False, layout_name="story",
+                               person=False, named_subject=True,
+                               recheck_still_hit=False) is not None
+    # 普通镜（中段、未标人物/专名、非 closer）：复检仍命中才弃, 掩干净则留
+    assert pb.image_deprecated("G0", is_first=False, layout_name="story",
+                               person=False, named_subject=False,
+                               recheck_still_hit=True) is not None
+    # ★ 判据 P3-9 反面：未声明标记的普通镜 G0、复检干净 → 不弃图（仍出标注, 但落位禁令不触发）
+    assert pb.image_deprecated("G0", is_first=False, layout_name="story",
+                               person=False, named_subject=False,
+                               recheck_still_hit=False) is None
+
+
+def t_p3_g0_placement_ban_wired_at_build_time():
+    """端到端 P3-9：首镜 G0 被置空塌槽、普通镜 G0 复检干净则留(带标注)、复检命中则弃。
+
+    `crop_and_recheck` 打桩（不碰 cv2/文件），保证判决路径与调用次数可机判：
+    - 分镜1 首镜 G0 → 禁令位弃, **不该**触发复检（禁令不依赖复检, 省一次检测）。
+    - 分镜2 中段 G0 + 复检 False → 留图 → 出标注。
+    - 分镜3 中段 G0 + 复检 True → 弃 → 不出标注。
+    - 分镜4 无图 → 不进弃图路径。
+    """
+    pack = pb.load_style_pack("news-editorial-warm")
+    assert pack["compiled"] is True
+    base = {"title": "门诊新规", "body": PROBE_TEXT,
+            "onscreen": "没人告诉他，他一直没问", "onscreenAccent": None}
+
+    rec_a = _p3_fake_image_record("G0", local_path="media/shot_01.jpg")
+    rec_b = _p3_fake_image_record("G0", local_path="media/shot_02.jpg", faces=[[10, 10, 40, 40]])
+    rec_c = _p3_fake_image_record("G0", local_path="media/shot_03.jpg", faces=[[10, 10, 40, 40]])
+    scenes = [dict(base), dict(base), dict(base), dict(base)]
+    records = [rec_a, rec_b, rec_c, None]
+
+    calls: list[str] = []
+
+    def fake_recheck(image_path, faces):
+        calls.append(os.path.basename(image_path))
+        return "shot_03" in image_path      # 分镜3 掩完仍命中→弃；分镜2 干净→留
+
+    original = ig.crop_and_recheck
+    ig.crop_and_recheck = fake_recheck
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            pb.emit_composition(pack, scenes, [PROBE_SECONDS] * 4, d,
+                                {"overrides": {}}, 1080, 1920, [], records,
+                                scene_cues=[_probe_scene()] * 4)
+    finally:
+        ig.crop_and_recheck = original
+
+    # 禁令位（首镜）不弃在复检上：shot_01 不该被复检；只有两个普通镜 G0 走复检
+    assert "shot_01.jpg" not in calls, "首镜 G0 应直接按落位禁令弃, 不该付复检代价"
+    assert set(calls) == {"shot_02.jpg", "shot_03.jpg"}, f"复检只该落在非禁令位的普通镜: {calls}"
+
+    # 弃图动作 = 置空 local_path（复用 §4 塌槽）：首镜与复检命中镜被置空, 干净镜保留
+    assert rec_a["local_path"] == "", "首镜 G0 该被置空"
+    assert rec_c["local_path"] == "", "复检仍命中的普通镜 G0 该被置空"
+    assert rec_b["local_path"] == "media/shot_02.jpg", "复检干净的普通镜 G0 不该被落位禁令误弃"
+
+    # 标注只在"图真留在屏上"的镜出现：只有分镜2
+    with tempfile.TemporaryDirectory() as d:
+        ig.crop_and_recheck = fake_recheck
+        try:
+            pb.emit_composition(pack, [dict(base, **{}) for _ in scenes],
+                                [PROBE_SECONDS] * 4, d,
+                                {"overrides": {}}, 1080, 1920,
+                                [], [_p3_fake_image_record("G0", local_path="media/shot_01.jpg"),
+                                     _p3_fake_image_record("G0", local_path="media/shot_02.jpg", faces=[[1, 1, 4, 4]]),
+                                     _p3_fake_image_record("G0", local_path="media/shot_03.jpg", faces=[[1, 1, 4, 4]]),
+                                     None],
+                                scene_cues=[_probe_scene()] * 4)
+        finally:
+            ig.crop_and_recheck = original
+        comp_dir = Path(d) / "compositions"
+        assert not (comp_dir / f"{pb.SCHEMATIC_FILE_PREFIX}-1.html").is_file(), "被弃的首镜不该出标注"
+        assert (comp_dir / f"{pb.SCHEMATIC_FILE_PREFIX}-2.html").is_file(), "留下的普通镜 G0 该出标注"
+        assert not (comp_dir / f"{pb.SCHEMATIC_FILE_PREFIX}-3.html").is_file(), "复检命中被弃的镜不该出标注"
+
+
+def t_p3_g0_person_declared_slot_is_banned():
+    """声明半端到端：作者标 `person` 的普通位 G0 → 置空弃图（尊重声明）；未标的普通位 G0 不触发落位弃。"""
+    pack = pb.load_style_pack("news-editorial-warm")
+    base = {"title": "门诊新规", "body": PROBE_TEXT,
+            "onscreen": "没人告诉他，他一直没问", "onscreenAccent": None}
+    # 分镜2 中段（非首非尾）person=True → 落位禁令; 复检不该被调用
+    rec_person = _p3_fake_image_record("G0", local_path="media/shot_02.jpg")
+    rec_person["person"] = True
+    calls: list[str] = []
+
+    def fake_recheck(image_path, faces):
+        calls.append(os.path.basename(image_path))
+        return False
+
+    original = ig.crop_and_recheck
+    ig.crop_and_recheck = fake_recheck
+    try:
+        with tempfile.TemporaryDirectory() as d:
+            pb.emit_composition(pack, [dict(base), dict(base)], [PROBE_SECONDS] * 2, d,
+                                {"overrides": {}}, 1080, 1920, [],
+                                [None, rec_person],
+                                scene_cues=[_probe_scene()] * 2)
+    finally:
+        ig.crop_and_recheck = original
+    assert rec_person["local_path"] == "", "person 普通镜 G0 该按声明半弃图"
+    assert calls == [], "person 已被落位禁令判弃, 不该再付复检代价"
 
 
 if __name__ == "__main__":
