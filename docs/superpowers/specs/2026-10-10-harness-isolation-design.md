@@ -112,21 +112,27 @@ CLI 签名：
 
 ```bash
 npx tsx scripts/install-into-project.ts --target <path> [--dry-run] [--force]
+# 特殊形态：对自己父仓库与对自己（harness-factory）效果不同，详见 §14
 ```
 
 执行步骤（顺序固定，幂等）：
 
 1. 校验 `--target` 路径存在且可写
-2. 检测目标根是否已有 `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`：
+2. **判定 self / other**（§14）：
+   - `--target` 解析后等于 `__dirname/..` → self 模式
+   - 否则 → other 模式
+3. 检测目标根是否已有 `CLAUDE.md` / `AGENTS.md` / `GEMINI.md`：
    - 无 → 直接从 templates/ 写入
    - 有 → 备份为 `<name>.bak-YYYYMMDD-HHMMSS.md` 后再写（除非 `--force`，则提示用户二次确认）
-3. 替换 `${PROJECT_BIRDS_EYE}` 占位：若用户提供 `--birds-eye-file <path>` 则读该文件，否则用 `project-birds-eye.template.md` 的 stub
-4. 检测目标是否为 git 仓库（`git rev-parse --git-dir`）：
+4. 替换占位符：
+   - `${PROJECT_BIRDS_EYE}`：若用户提供 `--birds-eye-file <path>` 则读该文件，否则用 `project-birds-eye.template.md` 的 stub
+   - `${HARNESS_FACTORY_IMPORT}`：self 模式填 `@ENTRY.md`（同目录）；other 模式填 `@harness-factory/CLAUDE.harness.md`（同级目录）
+5. 检测目标是否为 git 仓库（`git rev-parse --git-dir`）：
    - 是 → 把 `harness-factory` 加进 `.git/info/exclude`；若已有 `CLAUDE.md/AGENTS.md/GEMINI.md`，运行 `git update-index --skip-worktree <each>`（仅当文件已追踪）
    - 否 → 跳过本地化步骤
-5. 输出：本机就绪；模板备份路径列表；skip-worktree / info/exclude 操作摘要
+6. 输出：本机就绪；模板备份路径列表；skip-worktree / info/exclude 操作摘要
 
-退出码：`0` 成功 / `1` 参数错误 / `2` 写入失败。
+退出码：`0` 成功 / `1` 参数错误 / `2` 写入失败 / `3` self 模式前置检查失败（harness-factory 缺 ENTRY.md 等关键文件）。
 
 ### 5.3 组件 ③：`harness-factory/tests/install-template.test.ts`
 
@@ -225,16 +231,22 @@ Gemini 会话：
 
 ## 11. 落地步骤（顺序固定）
 
-1. harness-factory/：创建 `templates/` 5 个文件
-2. harness-factory/：写 `scripts/install-into-project.ts`
-3. harness-factory/：写 `tests/install-template.test.ts`，跑通三个用例
-4. harness-factory/：写 `docs/superpowers/specs/2026-10-10-harness-isolation-design.md`（本文件）+ `docs/superpowers/plans/2026-10-10-harness-isolation.md`
+1. harness-factory/：创建 `templates/` 5 个文件（target-CLAUDE.md / target-AGENTS.md / target-GEMINI.md / project-birds-eye.template.md / README.md）
+2. harness-factory/：写 `scripts/install-into-project.ts`（含 self / other 分支、占位符替换、skip-worktree、info/exclude、退出码 0/1/2/3）
+3. harness-factory/：写 `tests/install-template.test.ts`（3 用例：干净目标 / 重复注入 / 同事场景模拟）
+4. harness-factory/：跑 `npm run validate` 全绿
 5. aigc_platfrom_back/：**本地操作**：
-   - 跑 `npx tsx harness-factory/scripts/install-into-project.ts --target . --dry-run` 预览
-   - 真跑（不带 dry-run）
-   - 手动跑 skip-worktree 与 git rm --cached + info/exclude（步骤 5 的脚本可附 `print-post-install.sh` 给出确切命令）
-6. harness-factory/：git add + commit（main，按 memory「直接在 main 上开发」）
-7. 父仓库：仅本地状态，**不 add / 不 commit / 不 push**
+   - `npx tsx harness-factory/scripts/install-into-project.ts --target . --dry-run` 预览
+   - 真跑（不带 dry-run；other 模式）
+   - 手动 `git update-index --skip-worktree CLAUDE.md AGENTS.md GEMINI.md .claude/HARNESS-RULES.md`
+   - `git rm --cached -r harness-kit/` + `.git/info/exclude` 加 `harness-kit/`
+6. harness-factory/：**self 模式自举**（验证 install 脚本能对自己工作）：
+   - `npx tsx scripts/install-into-project.ts --target . --dry-run` 预览
+   - 真跑（self 模式；会写 `harness-factory/CLAUDE.md` 等）
+   - `git update-index --skip-worktree CLAUDE.md AGENTS.md .mcp.json`（如已追踪）
+   - 检查前置条件：ENTRY.md 存在、core/ 存在、AGENTS.md 存在（由脚本自检；任一缺失退出码 3）
+7. harness-factory/：git add + commit（main，按 memory「直接在 main 上开发」；含 install 脚本本身，但 CLAUDE.md 等被 skip-worktree 不会进 commit）
+8. 父仓库：仅本地状态，**不 add / 不 commit / 不 push**
 
 ## 12. 非目标（明确不做）
 
@@ -242,7 +254,7 @@ Gemini 会话：
 - Tier 1 分级流水线（独立 issue）
 - 证据段模板（独立 issue）
 - 多端投影目标从仓库级改为 `~/.claude/`（未来增强，本批次不动 bootstrap.ts）
-- `CLAUDE.harness.md` / `AGENTS.harness.md` / `GEMINI.harness.md` 实际内容创建（本批次只建机制，文件可后续按需填）
+- **other 模式**下被 import 的 `harness-factory/CLAUDE.harness.md` 实际内容创建（本批次只建机制 + 路径，文件按需填；self 模式走 ENTRY.md 不依赖该文件）
 - 父仓库 CLAUDE.md 等远端的清理（设计上是「永远冻结」，无清理动作）
 
 ## 13. 风险与回滚
@@ -251,3 +263,59 @@ Gemini 会话：
 - **风险 2**：同事若未来升级 .gitignore，`.gitignore:86` 的 `harness-factory/` 被删，本地化依赖 .git/info/exclude 兜底。缓解：.git/info/exclude 是双保险。
 - **风险 3**：harness-factory/ 路径在父仓库里硬编码为相对路径 `harness-factory/...`。如果未来 harness-factory 改名/移动，所有 @import 失效。缓解：本次先在 install-into-project.ts 阶段检查 `harness-factory/` 是否存在并在 README 强调「不要改名」。
 - **回滚**：父仓库所有操作都未 commit，删除本地工作树文件 + `git update-index --no-skip-worktree <files>` + `git checkout -- .` 即可恢复。
+
+## 14. Self-Dogfooding（harness-factory 自举）
+
+### 14.1 现状
+
+harness-factory 自己的仓库已有 `CLAUDE.md` / `ENTRY.md` / `AGENTS.md` / `.mcp.json`，是手工维护的「harness 自用版」。bootstrap.ts 通过 `npm run bootstrap` 把它投影到本仓库的五端目录。本批次新增 `install-into-project.ts` 后，harness-factory 也想用同一套机制注入自己——这叫**自举**。
+
+### 14.2 为什么自举
+
+- install-into-project.ts 若不被作者自己的开发流程使用，永远缺少 dogfood 测试；
+- 父子项目「harness 形状」一致：跨项目看到什么，自己开发就用什么；
+- 模板迭代在 harness-factory 自己开发时立即生效，逼出 bug。
+
+### 14.3 self 模式 vs other 模式
+
+`install-into-project.ts --target <path>` 在执行步骤 §5.2 第 2 步判定：
+
+| 模式 | 判定条件 | `${HARNESS_FACTORY_IMPORT}` 替换为 | 模板写到哪里 |
+|---|---|---|---|
+| **self** | `<path>` 解析后等于 `__dirname/..`（即 harness-factory 自己的根） | `@ENTRY.md` | 覆盖 harness-factory/CLAUDE.md 等 |
+| **other** | 其他任意路径 | `@harness-factory/CLAUDE.harness.md` | 写入 `<path>/CLAUDE.md` 等 |
+
+self 模式直接 import `ENTRY.md`（同目录、内容已存在、就是 harness 的入口），所以**自我应用立即生效**，不依赖后续的 `CLAUDE.harness.md` 创建。
+
+other 模式下 import 的 `harness-factory/CLAUDE.harness.md` 暂不存在（设计 §7 明确该文件不在本批次）—— import 会静默失败，跨项目看到的还是项目鸟瞰。后续若要让跨项目也有完整 harness 内容，再在 harness-factory 里创建该文件（不阻塞本批次）。
+
+### 14.4 self 模式的前置检查（退出码 3）
+
+self 模式在 §5.2 第 2 步之后、第 3 步之前，必须验证：
+
+- `ENTRY.md` 存在且非空
+- `core/` 目录存在
+- `AGENTS.md` 存在（Codex/Qoder 模式要加载它）
+
+任一不满足 → 退出码 3，输出缺失清单，**不写任何文件**（避免把 harness-factory 自己的根搞坏）。
+
+### 14.5 self 模式的本地化（与父仓库本地化等价）
+
+`install-into-project.ts --target .` 跑成功后，harness-factory 自己也要走：
+
+- `git update-index --skip-worktree CLAUDE.md AGENTS.md`（如果已追踪）
+- `.git/info/exclude` 加 `harness-factory/` 自身不存在所以跳过（但 `templates/` 不需要 exclude，harness-factory 自己的 git 当然要追踪它）
+- `.mcp.json` 同样 skip-worktree
+
+**关键**：如果不做这步，install 每次重写 CLAUDE.md 都会让 harness-factory 自己的 git status 脏——回到了用户最初的痛点（"每次都会变这些文件"），只不过这次污染的是 harness-factory 而不是父仓库。所以 self 模式必须把本地化执行到位。
+
+### 14.6 自举的副作用：install 脚本修改自身
+
+`install-into-project.ts` 自己也是 harness-factory 仓库里的一个文件。**它的修改必然走正常 git 流程**（commit 可见），不能 skip-worktree——否则脚本本身的演进就脱缰了。本地化只针对被它生成的产物（CLAUDE.md / AGENTS.md / .mcp.json），不对脚本本身。
+
+这是 self 模式与「CLAUDE.md 演进零 commit」目标的唯一张力：CLAUDE.md 自身被 skip-worktree（本地化生效），但驱动它生成的脚本受 git 常规管控。设计接受这个张力：脚本是「写规则的工具」，受控是合理的；规则本身（CLAUDE.md）频繁变，本地化才合理。
+
+## 15. 设计修订记录
+
+- v1（commit 9cb5a56）：初始设计，§1-13 涵盖分层结构、迁移映射、本地化机制、模板化、验证、落地步骤。
+- v2（本次）：新增 §14 self-dogfooding，install 脚本支持 self / other 模式分支；更新 §5.2 退出码；§7 数据流不变（self 模式 import ENTRY.md，other 模式 import CLAUDE.harness.md，两态都符合同一加载模型）。
