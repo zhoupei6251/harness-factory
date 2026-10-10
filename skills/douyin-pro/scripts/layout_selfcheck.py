@@ -45,14 +45,34 @@ CAPTION_RESERVE_CQH = 20.0
 #: 每个版式都必须声明的镜头时长变量名（动量预算依赖它）
 SLOT_VARIABLE = "slotSeconds"
 
+#: 编译包（path_c）的字幕收进 HyperFrames 后，发射器每镜生成一个 ``subtitle-<i>.html``
+#: 子合成挂在 2 轨。**文件名词干**是唯一识别口径（发射器 `path_b_build.SUBTITLE_FILE_PREFIX`
+#: 用同一个串拼文件名，两处分家 = 字幕文件被当成普通版式、动量/禁入区两条误判红）。
+#: 字幕子合成天然不守两条版式不变量：① 动量预算（字幕是文字层，不做整段位移呼吸）；
+#: ② 底部字幕禁入区（字幕**就住在**那条带里，那 20cqh 本就是给它留的）。其余不变量全核。
+SUBTITLE_FILE_STEM = "subtitle"
+
 #: 动量预算必须写成具名常数，不许把数字直接塞进 Math.min/Math.max
 BUDGET_CONSTANTS = ("INTRO_END", "MIN_DRIFT")
 
 #: 引擎自带的拉丁显示族：写 local() 会让自动下载失效，必须留裸族名
 CANONICAL_LATIN_FAMILIES = ("League Gothic", "JetBrains Mono", "Inter")
 
-#: 中文族：字体审计按文件走，每个版式必须自带这条 @font-face
+#: 中文族：字体审计按文件走，每个版式必须自带其中之一的 @font-face。
+#: **必须精确族名匹配** —— 旧判定 `CJK_FAMILY in block` 是子串，而
+#: `"HF CJK" in "HF CJK Serif"` 为 True（2026-10-09 P0 实测），自造前缀式族名会被静默放行。
+#: `HF Serif CJK` 是 news-policy 5 个版式已在用的宋体（裁决 7 的杂志族要它，不能打进红区）。
 CJK_FAMILY = "HF CJK"
+CJK_FAMILIES = (CJK_FAMILY, "HF Serif CJK")
+
+#: 本机确证在装的中文 `local()` 名。口径: 2026-10-09 用 System.Drawing.InstalledFontCollection
+#: 点了 16 个候选名，只有这 5 个命中（`NotoSansSC-VF`/`Source Han Sans SC`/`Noto Sans CJK SC`/
+#: `PingFang SC`/`Source Han Serif SC`/`Songti SC`/`思源宋体` 等全部 absent）。
+#: 规则只能是"**至少一个**候选在装"，不能要求全装 —— 存量 face 的候选名里本来就混着没装的。
+CJK_INSTALLED_LOCALS = ("Noto Sans SC", "Microsoft YaHei", "Noto Serif SC", "SimSun", "DengXian")
+
+#: CSS `font-family` 列表尾部的通用关键字，不是具体族名，不参与声明核对
+GENERIC_FAMILY_KEYWORDS = ("sans-serif", "serif", "monospace", "cursive", "fantasy", "system-ui")
 
 #: 允许出现 px 的属性（纹理渐变里的 20px/40px 是合法的装饰尺度，不参与排版）
 PX_ALLOWED_PROPS = ("background", "background-image", "background-color", "mask-image")
@@ -91,6 +111,12 @@ CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
 ROOT_COMP_ID_RE = re.compile(r"<div[^>]*id=\"root\"[^>]*data-composition-id=\"([^\"]+)\"")
 TIMELINE_KEY_RE = re.compile(r"window\.__timelines\[\"([^\"]+)\"\]")
 FONT_FACE_BLOCK_RE = re.compile(r"@font-face\s*\{[^}]*\}", re.S)
+#: @font-face 块里的族名（引号内精确值）
+FONT_FACE_FAMILY_RE = re.compile(r"font-family\s*:\s*\"([^\"]+)\"")
+#: @font-face 块里的本机字体名
+LOCAL_NAME_RE = re.compile(r"local\(\s*\"([^\"]+)\"\s*\)")
+#: CSS 里的 font-family 声明值（整串，再按逗号拆）
+FONT_FAMILY_DECL_RE = re.compile(r"font-family\s*:\s*([^;}]+)")
 TEMPLATE_BLOCK_RE = re.compile(r"<template>(.*)</template>", re.S)
 STYLE_BLOCK_RE = re.compile(r"<style>(.*?)</style>", re.S)
 SCRIPT_BLOCK_RE = re.compile(r"<script>(.*?)</script>", re.S)
@@ -117,6 +143,26 @@ class Violation:
 
 def strip_css_comments(css: str) -> str:
     return CSS_COMMENT_RE.sub("", css)
+
+
+def font_families_used(css: str) -> set[str]:
+    """CSS 里**用到**的具体族名：先剔掉 `@font-face` 声明块，再拆逗号、去引号、丢通用关键字。"""
+    used: set[str] = set()
+    for value in FONT_FAMILY_DECL_RE.findall(FONT_FACE_BLOCK_RE.sub("", css)):
+        for token in value.split(","):
+            token = token.strip().strip("\"'").strip()
+            if token and token.lower() not in GENERIC_FAMILY_KEYWORDS:
+                used.add(token)
+    return used
+
+
+def declared_font_faces(css: str) -> dict[str, str]:
+    """{族名: @font-face 块}，族名取自块内的精确值（同一个块声明多个族名时都收）。"""
+    declared: dict[str, str] = {}
+    for block in FONT_FACE_BLOCK_RE.findall(css):
+        for name in FONT_FACE_FAMILY_RE.findall(block):
+            declared[name] = block
+    return declared
 
 
 def parse_css_rules(css: str) -> list[tuple[str, dict[str, str]]]:
@@ -243,6 +289,8 @@ def check_layout(path: Path) -> list[Violation]:
     file_name = path.name
     text = path.read_text(encoding="utf-8")
     violations: list[Violation] = []
+    # 字幕子合成只豁免两条对它无意义的不变量（动量预算 / 底部禁入区），见 SUBTITLE_FILE_STEM。
+    is_subtitle = file_name.startswith(f"{SUBTITLE_FILE_STEM}-")
 
     def fail(code: str, detail: str) -> None:
         violations.append(Violation(file_name, code, detail))
@@ -313,29 +361,53 @@ def check_layout(path: Path) -> list[Violation]:
             )
 
     # 6) 动量预算：具名常数 + 至少一条用 driftDur 的持续位移
-    for constant in BUDGET_CONSTANTS:
-        if not re.search(rf"\bconst\s+{constant}\s*=", script_blocks):
-            fail("MAGIC_BUDGET_VALUE", f"动量预算常数 {constant} 必须具名声明")
-    if "driftDur" not in script_blocks or not re.search(r"\bconst\s+driftDur\s*=", script_blocks):
-        fail("MISSING_DRIFT_DURATION", "必须按 frame.md 预算算出 driftDur")
-    drift_tweens = [t for t in enumerate_tweens(script_blocks) if "driftDur" in t[2]]
-    if not drift_tweens:
-        fail("MISSING_CONTINUOUS_MOTION", "没有任何补间使用 driftDur —— 该镜头尾段会冻住")
+    #    （字幕子合成豁免：文字层不做整段位移呼吸，见 SUBTITLE_FILE_STEM）
+    if not is_subtitle:
+        for constant in BUDGET_CONSTANTS:
+            if not re.search(rf"\bconst\s+{constant}\s*=", script_blocks):
+                fail("MAGIC_BUDGET_VALUE", f"动量预算常数 {constant} 必须具名声明")
+        if "driftDur" not in script_blocks or not re.search(r"\bconst\s+driftDur\s*=", script_blocks):
+            fail("MISSING_DRIFT_DURATION", "必须按 frame.md 预算算出 driftDur")
+        drift_tweens = [t for t in enumerate_tweens(script_blocks) if "driftDur" in t[2]]
+        if not drift_tweens:
+            fail("MISSING_CONTINUOUS_MOTION", "没有任何补间使用 driftDur —— 该镜头尾段会冻住")
 
-    # 7) 底部字幕禁入区
-    for selector, decls in rules:
-        if "bottom" in decls and bottom_is_intruding(decls["bottom"]):
-            fail("CAPTION_RESERVE_INTRUDED", f"{selector} 的 bottom:{decls['bottom']} 侵入 {CAPTION_RESERVE_CQH}cqh 字幕区")
-        if "inset" in decls:
-            bottom_value = inset_bottom(decls["inset"])
-            if bottom_value and bottom_is_intruding(bottom_value):
-                fail("CAPTION_RESERVE_INTRUDED", f"{selector} 的 inset 下边界 {bottom_value} 侵入字幕区")
+    # 7) 底部字幕禁入区（字幕子合成豁免：那 20cqh 本就是给它留的，见 SUBTITLE_FILE_STEM）
+    if not is_subtitle:
+        for selector, decls in rules:
+            if "bottom" in decls and bottom_is_intruding(decls["bottom"]):
+                fail("CAPTION_RESERVE_INTRUDED", f"{selector} 的 bottom:{decls['bottom']} 侵入 {CAPTION_RESERVE_CQH}cqh 字幕区")
+            if "inset" in decls:
+                bottom_value = inset_bottom(decls["inset"])
+                if bottom_value and bottom_is_intruding(bottom_value):
+                    fail("CAPTION_RESERVE_INTRUDED", f"{selector} 的 inset 下边界 {bottom_value} 侵入字幕区")
 
-    # 8) 字体：中文 @font-face 必备，拉丁族禁止 local() 覆盖
-    font_faces = FONT_FACE_BLOCK_RE.findall(strip_css_comments(style_blocks))
-    has_cjk_face = any(CJK_FAMILY in block for block in font_faces)
-    if not has_cjk_face:
-        fail("MISSING_CJK_FONT_FACE", f'缺少 @font-face {{ font-family: "{CJK_FAMILY}" }}（审计按文件走）')
+    # 8) 字体：中文 face 必备、用到的中文族必须本文件声明、声明的中文族必须有真落点
+    clean_styles = strip_css_comments(style_blocks)
+    font_faces = FONT_FACE_BLOCK_RE.findall(clean_styles)
+    declared = declared_font_faces(clean_styles)
+    cjk_declared = [name for name in CJK_FAMILIES if name in declared]
+    if not cjk_declared:
+        fail(
+            "MISSING_CJK_FONT_FACE",
+            f'缺少中文 @font-face（允许的族名: {" / ".join(CJK_FAMILIES)}；审计按文件走）',
+        )
+    undeclared = (font_families_used(clean_styles) & set(CJK_FAMILIES)) - set(declared)
+    for name in sorted(undeclared):
+        fail(
+            "CJK_FAMILY_USED_NOT_DECLARED",
+            f'正文用了 font-family:"{name}" 但本文件没有它的 @font-face —— '
+            "浏览器静默回落到系统默认字，字体降档不会有任何人报错",
+        )
+    for name in cjk_declared:
+        candidates = LOCAL_NAME_RE.findall(declared[name])
+        if not set(candidates) & set(CJK_INSTALLED_LOCALS):
+            fail(
+                "CJK_FONT_LOCAL_NOT_INSTALLED",
+                f'{name} 的 local() 候选（{candidates}）在本机一个都没装'
+                f"（在装口径: {list(CJK_INSTALLED_LOCALS)}）—— "
+                "这条 @font-face 形同虚设，中文会回落",
+            )
     for block in font_faces:
         for family in CANONICAL_LATIN_FAMILIES:
             if family in block and "local(" in block:

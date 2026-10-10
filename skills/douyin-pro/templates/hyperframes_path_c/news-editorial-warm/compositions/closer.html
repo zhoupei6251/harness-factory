@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "NEWS"},
+    {"id": "cta", "type": "string", "label": "行动指令前段", "default": "今天就查一下"},
+    {"id": "ctaAccent", "type": "string", "label": "行动指令强调", "default": "社保"},
+    {"id": "channel", "type": "string", "label": "频道/来源行", "default": "来源"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+@font-face {
+  font-family: "HF CJK";
+  src: local("Noto Sans SC"), local("Microsoft YaHei"), local("DengXian");
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "HF Serif CJK";
+  src: local("Noto Serif SC"), local("SimSun");
+  font-weight: 100 900;
+}
+
+#root { position: absolute; inset: 0; overflow: hidden;
+  background: #1f1b16;
+  color: #1f1b16;
+  font-family: "HF CJK", sans-serif;
+}
+
+#ew-closer-col { position: absolute; top: 12cqh; left: 0;
+  width: 100cqw; height: 62.52cqh; }
+
+#ew-cl-rule { position: absolute; top: 0cqh; left: 6cqw; width: 88cqw; height: 0.35cqh; background: #ddd3bf; }
+
+
+#ew-cl-kicker { position: absolute; top: 5cqh; left: 6cqw; max-width: 22.4cqw; background: #B45309; color: #ffffff; font-size: 2.8cqw; font-weight: 900; padding: 0.85cqh 1.9cqw; transform-origin: 0% 50%; }
+
+
+#ew-cl-cta { position: absolute; top: 18cqh; left: 6cqw; max-width: 88cqw; font-family: HF Serif CJK, serif; font-size: 7.2cqw; font-weight: 900; line-height: 1.24; letter-spacing: -0.01em; color: #f5efe3; }
+.ew-cl-cta-ch { display: inline-block; }
+
+
+#ew-cl-accent { position: absolute; top: 38cqh; left: 6cqw; max-width: 88cqw; font-family: HF Serif CJK, serif; font-size: 7.2cqw; font-weight: 900; color: #B45309; }
+
+
+#ew-cl-bar { position: absolute; top: 56cqh; left: 6cqw; width: 14cqw; height: 1cqh; background: #B45309; transform-origin: 0% 50%; }
+
+
+#ew-cl-channel { position: absolute; top: 60cqh; left: 6cqw; max-width: 60cqw; font-family: HF CJK, sans-serif; font-size: 3.2cqw; font-weight: 400; line-height: 1.4; color: #ddd3bf; }
+
+
+      </style>
+      <div id="root" data-composition-id="ew-closer" data-width="1080" data-height="1920">
+        <div id="ew-closer-col">
+          <div id="ew-cl-rule"></div>
+          <div id="ew-cl-kicker" data-var-text="kicker"></div>
+          <div id="ew-cl-cta" data-var-text="cta"><span class="ew-cl-cta-ch"></span></div>
+          <div id="ew-cl-accent" data-var-text="ctaAccent"></div>
+          <div id="ew-cl-bar"></div>
+          <div id="ew-cl-channel" data-var-text="channel"></div>
+        </div>
+      </div>
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        
+        const tl = gsap.timeline({ paused: true });
+        const ewClCtaChars = Array.from(String(vars["cta"] || "").trim());
+        const ewClCtaBox = document.getElementById("ew-cl-cta");
+        ewClCtaBox.removeAttribute("data-var-text");
+        ewClCtaBox.textContent = "";
+        ewClCtaChars.forEach(function (ch) {
+          const ewClCtaSpan = document.createElement("span");
+          ewClCtaSpan.className = "ew-cl-cta-ch";
+          ewClCtaSpan.textContent = ch;
+          ewClCtaBox.appendChild(ewClCtaSpan);
+        });
+        tl.fromTo("#ew-cl-rule", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)", duration: 0.6, ease: "power3.out" }, 0);
+        tl.fromTo("#ew-cl-kicker", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.25);
+        tl.fromTo(".ew-cl-cta-ch", { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, stagger: 0.045, ease: "power3.out" }, 0.5);
+        tl.fromTo("#ew-cl-accent", { opacity: 0 }, { opacity: 1, duration: 1.4, ease: "power3.out" }, 0.9);
+        tl.fromTo("#ew-cl-bar", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 1.2);
+        tl.fromTo("#ew-cl-channel", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 1.35);
+        tl.to("#ew-closer-col", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["ew-closer"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

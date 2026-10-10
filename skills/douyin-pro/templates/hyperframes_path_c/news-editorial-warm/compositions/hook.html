@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "NEWS"},
+    {"id": "headTop", "type": "string", "label": "标题第一行", "default": "标题第一行"},
+    {"id": "headBottomLead", "type": "string", "label": "标题第二行前段", "default": "第二行"},
+    {"id": "headAccent", "type": "string", "label": "标题第二行强调", "default": "强调"},
+    {"id": "support", "type": "string", "label": "辅助行", "default": "辅助信息"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+@font-face {
+  font-family: "HF CJK";
+  src: local("Noto Sans SC"), local("Microsoft YaHei"), local("DengXian");
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "HF Serif CJK";
+  src: local("Noto Serif SC"), local("SimSun");
+  font-weight: 100 900;
+}
+
+#root { position: absolute; inset: 0; overflow: hidden;
+  background: #f5efe3;
+  color: #1f1b16;
+  font-family: "HF CJK", sans-serif;
+}
+
+#ew-hook-col { position: absolute; top: 8.5cqh; left: 0;
+  width: 100cqw; height: 66.2906cqh; }
+
+#ew-hk-rule { position: absolute; top: 0cqh; left: 6cqw; width: 88cqw; height: 0.35cqh; background: #ddd3bf; }
+
+
+#ew-hk-kicker { position: absolute; top: 4.5cqh; left: 6cqw; max-width: 22.4cqw; background: #B45309; color: #ffffff; font-size: 2.8cqw; font-weight: 900; padding: 0.85cqh 1.9cqw; transform-origin: 0% 50%; }
+
+
+#ew-hk-top { position: absolute; top: 15.5cqh; left: 6cqw; max-width: 88cqw; font-family: HF Serif CJK, serif; font-size: 9.8cqw; font-weight: 900; line-height: 1.24; letter-spacing: -0.01em; color: #1f1b16; }
+.ew-hk-top-ch { display: inline-block; }
+
+
+#ew-hk-lead { position: absolute; top: 29.5cqh; left: 6cqw; max-width: 88cqw; font-family: HF Serif CJK, serif; font-size: 9.8cqw; font-weight: 900; line-height: 1.24; letter-spacing: -0.01em; color: #1f1b16; }
+.ew-hk-lead-ch { display: inline-block; }
+
+
+#ew-hk-accent { position: absolute; top: 44cqh; left: 6cqw; max-width: 88cqw; font-family: HF Serif CJK, serif; font-size: 9.8cqw; font-weight: 900; color: #B45309; }
+
+
+#ew-hk-bar { position: absolute; top: 58.5cqh; left: 6cqw; width: 14cqw; height: 1cqh; background: #B45309; transform-origin: 0% 50%; }
+
+
+#ew-hk-support { position: absolute; top: 63cqh; left: 6cqw; max-width: 66cqw; font-family: HF CJK, sans-serif; font-size: 3.9cqw; font-weight: 400; line-height: 1.5; color: #6b5f4f; }
+
+
+      </style>
+      <div id="root" data-composition-id="ew-hook" data-width="1080" data-height="1920">
+        <div id="ew-hook-col">
+          <div id="ew-hk-rule"></div>
+          <div id="ew-hk-kicker" data-var-text="kicker"></div>
+          <div id="ew-hk-top" data-var-text="headTop"><span class="ew-hk-top-ch"></span></div>
+          <div id="ew-hk-lead" data-var-text="headBottomLead"><span class="ew-hk-lead-ch"></span></div>
+          <div id="ew-hk-accent" data-var-text="headAccent"></div>
+          <div id="ew-hk-bar"></div>
+          <div id="ew-hk-support" data-var-text="support"></div>
+        </div>
+      </div>
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        
+        const tl = gsap.timeline({ paused: true });
+        const ewHkTopChars = Array.from(String(vars["headTop"] || "").trim());
+        const ewHkTopBox = document.getElementById("ew-hk-top");
+        ewHkTopBox.removeAttribute("data-var-text");
+        ewHkTopBox.textContent = "";
+        ewHkTopChars.forEach(function (ch) {
+          const ewHkTopSpan = document.createElement("span");
+          ewHkTopSpan.className = "ew-hk-top-ch";
+          ewHkTopSpan.textContent = ch;
+          ewHkTopBox.appendChild(ewHkTopSpan);
+        });
+        const ewHkLeadChars = Array.from(String(vars["headBottomLead"] || "").trim());
+        const ewHkLeadBox = document.getElementById("ew-hk-lead");
+        ewHkLeadBox.removeAttribute("data-var-text");
+        ewHkLeadBox.textContent = "";
+        ewHkLeadChars.forEach(function (ch) {
+          const ewHkLeadSpan = document.createElement("span");
+          ewHkLeadSpan.className = "ew-hk-lead-ch";
+          ewHkLeadSpan.textContent = ch;
+          ewHkLeadBox.appendChild(ewHkLeadSpan);
+        });
+        tl.fromTo("#ew-hk-rule", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)", duration: 0.6, ease: "power3.out" }, 0);
+        tl.fromTo("#ew-hk-kicker", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.25);
+        tl.fromTo(".ew-hk-top-ch", { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, stagger: 0.045, ease: "power3.out" }, 0.45);
+        tl.fromTo(".ew-hk-lead-ch", { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: 0.7, stagger: 0.045, ease: "power3.out" }, 0.75);
+        tl.fromTo("#ew-hk-accent", { opacity: 0 }, { opacity: 1, duration: 1.4, ease: "power3.out" }, 1.05);
+        tl.fromTo("#ew-hk-bar", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 1.3);
+        tl.fromTo("#ew-hk-support", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 1.5);
+        tl.to("#ew-hook-col", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["ew-hook"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

@@ -136,7 +136,9 @@ hook→rail→story→stat→closer = dark/light/**dark**/light/dark，正是第
    `MISSING_DRIFT_DURATION`）。漂移禁止作用在带 `.clip` 的挂载元素上。
 5. 排版：字号用 `cqw/cqh`（`PX_TYPOGRAPHY`，只有 `background/mask` 类属性允许 `px`）；
    底部 `20cqh` 留给字幕（`CAPTION_RESERVE_INTRUDED`；这个数是量出来的，见 `frame.md` 法则 1）；
-   中文自己声明 `@font-face` 到 `"HF CJK"`（`MISSING_CJK_FONT_FACE`），拉丁显示族写裸名（`CANONICAL_FONT_LOCAL_OVERRIDE`）。
+   中文族（允许名单 `HF CJK` / `HF Serif CJK`）自己声明 `@font-face`，用到的中文族必须本文件有声明、
+   声明里的 `local()` 候选必须至少一个在本机已装（`MISSING_CJK_FONT_FACE` /
+   `CJK_FAMILY_USED_NOT_DECLARED` / `CJK_FONT_LOCAL_NOT_INSTALLED`）；拉丁显示族写裸名（`CANONICAL_FONT_LOCAL_OVERRIDE`）。
 
 写完后每个 GSAP 目标都要有 `id`（法则 9），带 `background` 且压字的片块禁止 `opacity` 补间（法则 8）。
 验收两条命令：`--check-only`（自检 + `check --strict`）与一次 `draft` 渲染看联络表。
@@ -181,6 +183,7 @@ hook→rail→story→stat→closer = dark/light/**dark**/light/dark，正是第
 | `index.html` 里挂载重复两份 | host 注释写了占位符原文 | 注释里只写不带 `{{}}` 的名字（`emit_host` 会拦住） |
 | `stat` 永远选不上 | 数字没配单位，或同句两个数字共用整句标签 | `NUMBER_UNIT_RE` 收时间单位；`number_phrase()` 按小句给每个数字配独立标签 |
 | 中文显示成宋体/方框 | 版式文件自己没声明 `@font-face` | 偏离 b；自检 `MISSING_CJK_FONT_FACE` |
+| 中文**悄悄**降档（字体不像设计稿，但渲染不报错） | 正文用了没声明的中文族，或 `local()` 候选名本机一个都没装 | 2026-10-09 前的旧判定是子串（`"HF CJK" in block`），这两条**全绿放过**；现自检报 `CJK_FAMILY_USED_NOT_DECLARED` / `CJK_FONT_LOCAL_NOT_INSTALLED` |
 | 拉丁显示族没下载 | 给 `League Gothic` 等加了 `local()` | 写裸族名（偏离 b 的另一面） |
 | `duplicate_audio_track`：相邻两镜配音窗"重叠"（打印出来的却是 23.7 vs 23.688） | 引擎浮点相加算终点，`+2e-15` 让严格不等式成立（偏离 k） | 配音窗留 `AUDIO_MOUNT_HEADROOM_SECONDS`（已实现）。别去关 lint，也别给画面窗加缝——画面加了就是黑帧 |
 | `check --strict` 说 1 warning 就拒渲染 | `--strict` 把 warning 升级为失败，本包按 0 error 0 warning 验收 | 读 `check.json` 的 `lint.findings[].code` 定位，别猜 |

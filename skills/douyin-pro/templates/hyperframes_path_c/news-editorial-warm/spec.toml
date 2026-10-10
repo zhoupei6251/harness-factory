@@ -1,0 +1,150 @@
+# 杂志族·暖纸 —— 新闻域模板 v2 的旗舰包（P1 决策门）
+# 真源就是这份文件；frame.md 由编译器生成，勿在此抄第二份色值表（D10/D20 的教训）。
+# 数值出处：§5 杂志行 + 裁决 7（思源宋体 900 标题）+ 裁决 13（强调色 #B45309）
+#          + 字幕几何逐条取自 path_b_build 的 ASS_* 实测常数（改那儿要改这儿）。
+
+schema = "hf-style/1"
+id = "news-editorial-warm"
+family = "editorial"
+name = "杂志·暖纸"
+# 七个具名版式必须列全（§6.3：版式名是发射器唯一的契约面）。
+# 只能待在顶层 —— TOML 里表头之后的裸键会归属到那张表。
+layouts = ["hook", "stat", "rail", "quote", "catalog", "story", "closer"]
+
+[grid]
+grammar = "asymmetric-columns"
+columns = 12
+
+[grid.safe]
+left = 6
+right = 6
+bottom = "auto"
+
+[type]
+# display/body 写成"族名/字重"，因为它是判据 5 的可比较轴，不是 CSS 片段。
+# CJK 只能 local()（裁决 7），拉丁写裸名由引擎自动供给（§5 的结构性不对称）。
+# 但"自动供给"是**闭集**：引擎只捆绑 18 个拉丁族（hf_style_spec.LATIN_CANONICAL_FAMILIES，
+# 出处 hyperframes/dist/chunk-HBBJFK6I.js:33-135）。写了集合外的名字会撞
+# font_family_without_font_face（error 级）⇒ `check --strict` 拒收，且字面静默回落。
+# 原设计稿给杂志族点了 Libre Bodoni / Newsreader，两个都不在捆绑集里（§5 已订正），
+# 这里换成同类的对页高对比衬线 Playfair Display + 旧体 EB Garamond。
+display = "HF Serif CJK/900"
+body = "HF CJK/400"
+latin = ["Playfair Display", "EB Garamond"]
+
+[color]
+# 暖纸四色 + 墨底反相面。#f5efe3/#e8dfcb 都在 path_b_build.GROUND_TONE_BY_HEX 已登记，
+# 所以发射器的"相邻镜地面明暗交替"不需要为新包加登记就能工作。
+# rule 是分隔线色（阶梯第三档），它只承载线不承载字，所以不进 color.text。
+surfaces = { paper = "#f5efe3", panel = "#e8dfcb", rule = "#ddd3bf", ink = "#1f1b16", accent = "#B45309" }
+
+# 明度阶梯（%，纸→面板→分隔线→墨）。"看起来像什么"由这条序列决定，不是色值表。
+# 数的是上面四个非强调面的 HSL 明度实测值（92.55/85.29/80.78/10.39，四舍五入），
+# 口径与容差见 hf_style_spec.LADDER_TOLERANCE —— 对不上面色就拒编，这串数字不许漂。
+value-ladder = [93, 85, 81, 10]
+
+# 每一个会出现在画面上的文字/底色对都在这里列全 —— 判据 3 编译前逐条核 WCAG。
+# 实测比值（本包出帧前复算，audit_pack_contrast.contrast_ratio）：
+#   #1f1b16/#f5efe3 14.95 · #1f1b16/#e8dfcb 12.92 · #6b5f4f/#f5efe3 5.43
+#   #B45309/#f5efe3 4.39（过不了 body 的 4.5，只许当大字）· #ffffff/#B45309 5.02
+[[color.text]]
+role = "display"
+hex = "#1f1b16"
+on = "paper"
+size = "large"
+
+[[color.text]]
+role = "body"
+hex = "#1f1b16"
+on = "paper"
+size = "body"
+
+[[color.text]]
+role = "secondary"
+hex = "#6b5f4f"
+on = "paper"
+size = "body"
+
+[[color.text]]
+role = "panel-body"
+hex = "#1f1b16"
+on = "panel"
+size = "body"
+
+# 墨底（closer 固定地面 + story 的 dark 翻面）上的三条。
+# 文字色只用色板里已有的三个值：纸色当正文、分隔线色当辅助、强调色当大字 ——
+# 不为了暗面新造第六个色，"同一系统换地面"（frame.md §5 三段混调）才成立。
+# 实测比值（audit_pack_contrast.contrast_ratio，1920 高竖屏）：
+#   #f5efe3/#1f1b16 14.95 · #ddd3bf/#1f1b16 11.53 · #B45309/#1f1b16 3.41（只够大字档）
+[[color.text]]
+role = "on-ink"
+hex = "#f5efe3"
+on = "ink"
+size = "body"
+
+[[color.text]]
+role = "on-ink-soft"
+hex = "#ddd3bf"
+on = "ink"
+size = "body"
+
+[[color.text]]
+role = "on-ink-accent"
+hex = "#B45309"
+on = "ink"
+size = "large"
+
+[[color.text]]
+role = "kicker"
+hex = "#B45309"
+on = "paper"
+size = "large"
+
+[[color.text]]
+role = "on-accent"
+hex = "#ffffff"
+on = "accent"
+size = "body"
+
+[color.saturation-budget]
+# 一帧只允许一个高彩度色相（治 D6）。`-S` 的口径是彩度 (max−min)/255，见 hf_style_spec.chroma()。
+max-hues-per-frame = 1
+accent-min-S = 0.45
+support-max-S = 0.15
+
+[[color.accents]]
+hex = "#B45309"
+# 4.39:1 落在"仅大字"档（≥3.0、<4.5），所以角色只能到 shape-or-large-text，
+# 不许当正文色 —— 这个 role 不是审美偏好，是判据 3 算出来的。
+role = "shape-or-large-text"
+
+[motion]
+signature = "clip-rise-char"
+drift = "keep"
+# 杂志族招牌：界内满幅盒 + clip-path 同帧揭示（法则 15：入场不从画布外起跳），
+# 标题逐字 y:14→0（P0-1 已证 seek 稳定），整段 1.4s。
+entrance-seconds = 1.4         # 招牌入场时长；原语从这里取默认，写进版式就是手抄常数
+entrance-min-seconds = 0.5     # 法则 13 下限，char_rise 的单字时长按 max(下限, 招牌/2) 算
+
+[motion.easing]
+allowed = ["power3.out", "power2.out", "power1.out"]
+forbidden = ["back.out", "elastic", "bounce"]
+
+[subtitle]
+position = "底部居中（ASS Alignment 2 + ScaledBorderAndShadow），块底 = h − 0.09h"
+margin-bottom-frac = 0.09      # = ASS_MARGIN_BOTTOM_H_FRAC，1920 高 → 172px
+line-height-frac = 0.03125     # = 1/ASS_FONT_H_FRAC(32)，1920 高 → 60px，行距=字号
+worst-case-lines = 3           # 闸按最坏 3 行留位；发射器把每条封顶 2 行（CAPTION_MAX_LINES）
+
+# 法则 13：禁忌必须是编译期断言。check 是断言名（编译器按名取实现），why 是拒编时打给人看的话。
+[[taboos]]
+check = "no-overshoot"
+why = "杂志族的力量来自收着，过冲（back/elastic/bounce）一秒钟就变成促销海报"
+
+[[taboos]]
+check = "entrance-not-faster-than-0p5s"
+why = "小于 0.5s 的入场在读完之前就结束了，读者只会觉得画面闪了一下"
+
+[[taboos]]
+check = "no-border-radius"
+why = "圆角是 UI 语言，纸面上只有直角与裁边；一旦圆角，暖纸就变成 App 截图"

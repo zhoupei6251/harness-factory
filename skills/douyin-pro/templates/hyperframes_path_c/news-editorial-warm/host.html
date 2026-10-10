@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* 宿主骨架（杂志·暖纸 · 编译产物，勿手改）。
+         六个双花括号占位符原样留着，由发射器填充：合成 id、画布宽高、
+         全片秒数、N 个挂载 clip、N 个挂载 audio。本文件不写任何版式几何，
+         地面/版式/时间轴全在各版式的子合成里。 */
+      html,
+      body {
+        margin: 0;
+        background: #1a1a1a;
+      }
+      #root {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        container-type: size;
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+      /* 配音轨不参与版面：抽出来给零尺寸，免得它的行盒撑高 #root 把画面顶偏一位。
+         时间轴与可见性由 data-start / data-duration 决定，与 CSS 无关。 */
+      audio {
+        position: absolute;
+        width: 0;
+        height: 0;
+        overflow: hidden;
+        pointer-events: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="root"
+      data-composition-id="{{COMPOSITION_ID}}"
+      data-width="{{W}}"
+      data-height="{{H}}"
+      data-duration="{{TOTAL}}"
+    >
+{{SCENES}}
+{{AUDIOS}}
+    </div>
+    <script>
+      window.__timelines["{{COMPOSITION_ID}}"] = gsap.timeline({ paused: true });
+    </script>
+  </body>
+</html>

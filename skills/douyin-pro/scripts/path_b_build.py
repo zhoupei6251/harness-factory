@@ -6,7 +6,7 @@ Path B 全链路串联脚本 · 抖音短视频生产专家团
 把"优化好的脚本文字"变成带 AI 配音 + 字幕的竖屏 MP4，全程零云费:
 
     脚本文本 ──▶ ① 分段            (按空行 / JSON 场景)
-              ──▶ ② edge-tts 配音   (免费, 微软接口) → 每段 .mp3 + .vtt
+              ──▶ ② edge-tts 配音   (免费, 微软接口) → 每段 .mp3 + 词级 cues.json
               ──▶ ③ 发射合成 HTML    (读 --style 设计系统包, 逐镜挂子合成)
               ──▶ ④ 版式自检        (layout_selfcheck: 结构不变量, 渲染前)
               ──▶ ⑤ check 门禁      (hyperframes check --strict: 不过就不渲染)
@@ -24,7 +24,7 @@ Path B 全链路串联脚本 · 抖音短视频生产专家团
 
 依赖 (先跑 install_path_b_deps.py 装好):
     - Python >= 3.10
-    - edge-tts          (pip install edge-tts)
+    - edge-tts          (pip install edge-tts · 词级时序只在其 Python API 上)
     - Node.js >= 22     (https://nodejs.org)
     - hyperframes       (npm install -g hyperframes)
     - ffmpeg + ffprobe  (https://ffmpeg.org)
@@ -107,6 +107,60 @@ ALL_TEMPLATES = (
 )
 #: --style / --template 选择映射; 选模板看 news-workflow/SKILL.md 的"模板决策树"或
 #: routes/news/MEMORY.md videos[].template 字段 (ALL_TEMPLATES 里任何一个都合法)。
+
+# ------------------------- pack 根（裁决 14 双轨） -------------------------
+#: 编译产物包（`hf_compile.py` 从 spec.toml 出）落在隔壁根，老包原地不动：
+#: 同稿并排比水位（P1-3e）要求两代包**同时可寻址**，而不是把老包迁走或让新包挤进老目录。
+PATH_C_ROOT = os.path.join(os.path.dirname(SCRIPT_DIR), "templates", "hyperframes_path_c")
+
+#: 查找顺序 = 可寻址范围。老的 path_b 根永远在前，所以两边同名时**存量优先**，
+#: 编译包不可能悄悄顶掉一条产线在用的包。
+PACK_ROOTS = [TEMPLATE_ROOT, PATH_C_ROOT]
+
+
+def set_packs_root(roots) -> None:
+    """换 pack 根的查找范围（测试与工具用；传单个字符串或路径列表都行）。
+
+    存在性在 `pack_dir()` 里逐根查，不在这张表上 —— 根目录不存在不是错误，
+    只是那一代包还没有。传空表回落到默认两根，避免"忘了配"表现为"哪个包都不在"。
+    """
+    if isinstance(roots, (str, os.PathLike)):
+        roots = [roots]
+    PACK_ROOTS[:] = [os.fspath(r) for r in roots] or [TEMPLATE_ROOT, PATH_C_ROOT]
+
+
+def pack_dir(style: str) -> str:
+    """包目录：`PACK_ROOTS` 里第一个**存在**的 `<root>/<style>`。
+
+    一个都不存在时返回第一个根下的路径，好让 `load_style_pack` 的报错指着一个
+    真实合理的落点说"这个包不存在"，而不是说"没找着"。
+    """
+    for root in PACK_ROOTS:
+        candidate = os.path.join(root, style)
+        if os.path.isdir(candidate):
+            return candidate
+    return os.path.join(PACK_ROOTS[0], style)
+
+
+def available_templates() -> list[str]:
+    """现在能被 `--template` 点名的 pack：**手写名单在前，编译包按目录自动补在后**。
+
+    编译包不进 `ALL_TEMPLATES`：那张表是存量包的决策树顺序（T1–T19），P5 每铺一套
+    都要回来加一行的话，就等于"加新模板只改目录、不动发射器主逻辑"（`:80` 的口径）失效。
+    目录里有 `host.html` 才算数 —— 只有 `spec.toml` 还没编译的半成品不该变成一个
+    能选、但一选就停在 `load_style_pack` 的选项。
+    """
+    names = list(ALL_TEMPLATES)
+    for root in PACK_ROOTS:
+        if not os.path.isdir(root):
+            continue
+        for entry in sorted(os.listdir(root)):
+            if entry in names or not os.path.isdir(os.path.join(root, entry)):
+                continue
+            if os.path.isfile(os.path.join(root, entry, "host.html")):
+                names.append(entry)
+    return names
+
 
 #: 占位 composition 的文件名(=版式名)。每个新 pack 先放它凑齐三层目录, 但它
 #: **不是版式**: `load_style_pack` 直接跳过它, 于是"只有占位"的 pack 会在加载阶段
@@ -279,6 +333,7 @@ GROUND_TONE_BY_HEX = {
     "#f5efe3": TONE_LIGHT,   # paper 主地面
     "#e8dfcb": TONE_LIGHT,   # paper-dark 卡衬地面(条目卡底)
     "#1f3a68": TONE_DARK,    # cobalt 地面(暗面翻面 + closer 书挡)
+    "#1f1b16": TONE_DARK,    # 暖纸杂志族的墨面(spec color.surfaces.ink, HSL L 10.39)
     "#000000": TONE_DARK,    # auto-extended (polarity 极简纯黑)
     "#080808": TONE_DARK,    # auto-extended (0.03 L)
     "#0a0a0a": TONE_DARK,    # auto-extended (0.04 L)
@@ -350,13 +405,6 @@ SENTENCE_END = ("。", "，", "、", "：")
 QUOTE_OPENERS = ("“", "\"", "「", "『")
 QUOTE_CLOSERS = ("”", "\"", "」", "』")
 
-# 整条字幕事件: 时间轴行 + 其后直到空行/文件尾的文本
-CUE_RE = re.compile(
-    r"(\d{2}):(\d{2}):(\d{2})[.,](\d{3})\s*-->\s*"
-    r"(\d{2}):(\d{2}):(\d{2})[.,](\d{3})[^\n]*\n(.*?)(?=\n[ \t]*\n|\Z)",
-    re.S,
-)
-
 #: scdet 每帧可能按色平面打多条分数, 取每帧最大值
 MOTION_PTS_RE = re.compile(r"pts_time:([0-9.]+)")
 MOTION_SCORE_RE = re.compile(r"lavfi\.[\w.]*score=([0-9.eE+-]+)")
@@ -418,6 +466,95 @@ AUDIO_TPL = (
     ' data-start="{start}" data-duration="{dur}"'
     ' data-track-index="{track}" data-volume="1"></audio>'
 )
+
+# ---------------- 字幕轨（HyperFrames 原生，裁决 2 / 20 / 22） ----------------
+#: 画面走 1 轨 (MOUNT_TPL)，配音走 0 轨 (AUDIO_TRACK_INDEX)，字幕单独走 2 轨：
+#: 三层互不遮挡，字幕永远压在版式之上 —— 这是"字幕收进合成"的物理形态。
+SUBTITLE_TRACK_INDEX = 2
+#: 生成字幕子合成的文件名词干。真源在 `layout_selfcheck.SUBTITLE_FILE_STEM`（自检靠它认字幕
+#: 文件并豁免两条不变量），发射器引用同一个串拼 `comp_id` / 文件名 / 挂载 —— 两处分家 = 字幕
+#: 文件既挂上了又没被自检认出豁免，或反过来。
+SUBTITLE_FILE_PREFIX = layout_selfcheck.SUBTITLE_FILE_STEM
+#: 字幕几何全部从本文件已有的 ASS 常数推导 —— 不再开第二份真源。spec.toml `[subtitle]`
+#: 写的是同一组比值（margin-bottom-frac=0.09=9cqh、line-height-frac=1/32=3.125cqh、
+#: frame.md 左右 6cqw），改任何一处三处都要一起改，所以这里只从常数算，不手抄像素。
+SUBTITLE_BOTTOM_CQH = round(ASS_MARGIN_BOTTOM_H_FRAC * 100, 4)        # 块底 = 9cqh
+SUBTITLE_FONT_CQH = round(100.0 / ASS_FONT_H_FRAC, 4)                 # 字号 = 3.125cqh
+SUBTITLE_SIDE_CQW = round(ASS_MARGIN_W_FRAC * 100, 4)                 # 左右边距 = 6cqw
+SUBTITLE_MAX_WIDTH_CQW = round(100.0 - 2 * SUBTITLE_SIDE_CQW, 4)      # 盒宽 = 88cqw
+#: 描边按字号的 em 比例给（ASS 描边 = h/640 ≈ 3px、字号 h/32=60px ⇒ 0.05em 同口径），
+#: 用 text-shadow 的八向偏移画一圈黑：软件光栅下逐像素确定，且比 -webkit-text-stroke 更贴
+#: ASS 的"字芯 + 外描边"形状（描边长在字外面，不啃字）。
+SUBTITLE_OUTLINE_EM = round(ASS_FONT_H_FRAC / ASS_OUTLINE_H_FRAC, 4)   # (h/32)/(h/640)=20 → 1/20=0.05em
+#: 强调是"词的着色"（裁决：统一白字 + 黑描边，强调词换成固定高亮色且同样描边）。
+#: 高亮色取杂志族强调 #B45309：与黑描边在一起在任何地面上都够跳（描边把字与地面隔开）。
+SUBTITLE_TEXT_COLOR = "#ffffff"
+SUBTITLE_ACCENT_COLOR = "#B45309"
+SUBTITLE_STROKE_COLOR = "#000000"
+#: 字幕不呼吸、不做连续位移（帧自检的 drift/budget 两条对字幕文件豁免），但入场用
+#: 词级 fromTo、退场用整条 cue 淡出。单词淡入下限与退场时长是有理由的具名常数：
+SUBTITLE_ENTRANCE_MIN = 0.1          # 单字淡入不短于此（太短读成跳变，非"亮起来"）
+SUBTITLE_EXIT_SECONDS = 0.3          # 一条 cue 淡出时长（末条贴着 slot 尾收）
+
+#: 字幕子合成挂在 2 轨的 clip 模板（与 MOUNT_TPL 同形状，只有 track-index 与无变量不同：
+#: 字幕的文本与时间轴在**编译期烤进**子合成，挂载不再传 data-variable-values）。
+SUBTITLE_MOUNT_TPL = (
+    '      <div id="{mount_id}" class="clip"'
+    ' data-composition-id="{composition_id}"'
+    ' data-composition-src="compositions/{file_name}"'
+    ' data-start="{start}" data-duration="{dur}" data-track-index="{track}"'
+    ' data-width="{w}" data-height="{h}"></div>'
+)
+
+#: 一镜字幕子合成的骨架。**六个占位符**由 `emit_subtitle_composition` 填：合成 id、本镜秒数、
+#: 底/字号/边距/盒宽（cqh/cqw，全部从 ASS_* 常数推导）、逐 cue 容器、逐词+逐 cue 补间。
+#: `#root` 透明、`.sc-cue` 无背景 —— 版式自检的 SURFACE_OPACITY_TWEEN 只挡带背景的面淡入，
+#: 这里是纯文字带描边，opacity 补间合法（实测旧 ASS 出口也是描边字，几何一致）。
+SUBTITLE_COMP_TPL = '''<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+    {{"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": {slot}, "min": 1}}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+@font-face {{
+  font-family: "HF CJK";
+  src: local("Noto Sans SC"), local("Microsoft YaHei"), local("DengXian");
+  font-weight: 100 900;
+}}
+
+#root {{ position: absolute; inset: 0; overflow: hidden; background: transparent; }}
+
+#sc-wrap {{ position: absolute; left: {side}cqw; width: {maxw}cqw; bottom: {bottom}cqh;
+  font-family: "HF CJK", sans-serif; font-size: {font}cqh; font-weight: 700;
+  line-height: 1.24; text-align: center; color: {text};
+  text-shadow: {outline}em {outline}em 0 {stroke}, -{outline}em {outline}em 0 {stroke},
+    {outline}em -{outline}em 0 {stroke}, -{outline}em -{outline}em 0 {stroke},
+    0 {outline}em {outline}em rgba(0,0,0,0.35); }}
+
+.sc-cue {{ position: relative; }}
+.sc-row {{ display: block; }}
+.sc-w {{ display: inline-block; }}
+.sc-acc {{ color: {accent}; }}
+      </style>
+      <div id="root" data-composition-id="{comp_id}" data-width="{w}" data-height="{h}">
+        <div id="sc-wrap">{body}</div>
+      </div>
+      <script>
+        const tl = gsap.timeline({{ paused: true }});
+{tweens}
+        window.__timelines["{comp_id}"] = tl;
+      </script>
+    </template>
+  </body>
+</html>
+'''
+
+SUBTITLE_COMP_TPL = SUBTITLE_COMP_TPL.replace("{text}", SUBTITLE_TEXT_COLOR) \
+    .replace("{stroke}", SUBTITLE_STROKE_COLOR).replace("{accent}", SUBTITLE_ACCENT_COLOR)
 
 
 class EmitterError(RuntimeError):
@@ -566,6 +703,23 @@ def write_text(path: str, text: str) -> None:
         f.write(text)
 
 
+def read_json(path: str):
+    """读一份 JSON；不存在或读不出都返回 `None`，由调用方按"没有这份输入"处理。
+
+    容忍坏文件不是偷懒：`cues.json` 写在一次 12 秒的网络往返之后，中途断掉就会留下
+    半截 JSON。那种情况下正确的行为是**重新配音**，而不是让整条产线卡在一个解析错误上。
+    """
+    try:
+        with open(path, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return None
+
+
+def write_json(path: str, doc) -> None:
+    write_text(path, json.dumps(doc, ensure_ascii=False, indent=1) + "\n")
+
+
 def fmt_secs(value: float) -> str:
     """时间点一律三位小数, 与 data-duration 的解析精度对齐。"""
     return f"{value:.3f}"
@@ -702,30 +856,235 @@ def split_cue(start: float, end: float, text: str, line_chars: int,
     return cues
 
 
-def collect_cues(sub_files, durations, line_chars, max_lines=CAPTION_MAX_LINES):
-    """把 edge-tts 的分段 .vtt 按分镜起始时间平移, 汇总成 (start, end, text) 列表。
+# ---------------- 词级 cues 的取数面（P2-1 · spec §6.4 / 裁决 17） ----------------
 
-    行宽与行数上限见 caption_line_chars / split_cue。
+#: edge-tts 的 `WordBoundary` 事件直传服务原值，单位是 **100ns tick**（`/1e7` 才是秒）。
+#: 差七个数量级的错误不会报错，只会让字幕在第一帧之前就全部跑完 —— 所以换算只许在这一处做。
+TTS_TICK_PER_SECOND = 1e7
+
+#: 归一化口径。**词序列不含标点**（P2-0 实测：每镜丢的字数 == 正文里的标点数），
+#: 所以"词 vs 稿子"的一切比对都必须先压到同一个形状上。不归一化的后果不是"差一点"，
+#: 而是强调源（天然带 `，。`）**永远匹配不上** ⇒ 字幕上永远没有高亮，且没人报警。
+#: 竖线 `｜` 也必须在这里剥：它是作者点强调的**标记**，服务不念它 —— 实测
+#: `门诊新规｜全国执行。` 只回 4 个词（`_pipe_probe` 探针），留着它就比词表多 1 个字，
+#: 于是每一条点了强调的稿子都必然归组失配、整片掉进退化支。
+CAPTION_PUNCT_RE = re.compile(
+    r"[\s，。、！？；：,.!?;:“”‘’\"'()（）【】《》〈〉~—–\-·・｜\|]+")
+
+#: 句子级 cue 的切分点。逗号**不**断条：一条 cue 要能读完一个完整语义，
+#: 逗号处断会让每句变成两到三次跳动，读的人眼睛要一直找。
+SENTENCE_END_RE = re.compile(r"[。！？；!?;]")
+
+#: 兜底切分（拿不到服务时序时）的词形：拉丁词与数字串成一节，其余一字一节。
+FALLBACK_TOKEN_RE = re.compile(r"[A-Za-z0-9]+|.")
+
+
+def caption_norm(text: str) -> str:
+    """压成"词序列的形状"：去掉空白与标点，其余原样（`10月` 不许被压成 `月`）。"""
+    return CAPTION_PUNCT_RE.sub("", text or "")
+
+
+def _tick_to_sec(ticks) -> float:
+    return round(float(ticks) / TTS_TICK_PER_SECOND, 3)
+
+
+def words_from_events(events, duration):
+    """服务原值 → `[{w, s, e}]`：tick 换算、夹单调、丢空词与越界词。
+
+    两处要在取数面处理掉的形状，不能留给下游假设"数据是干净的"：
+      · **相切**（P2-1 tick 级复算：五镜 106 个间隙里 33 处 `gap = 0.000000`，负数 0 处）——
+        相邻词背对背排布是正常形状，所以夹的是 `s = max(s, prev_e)` 而不是加安全间隔。
+        这一支今天**没有实测负空隙作依据**，属防御性：服务若改切分让词重叠，一条 `fromTo`
+        的 start 就会排进前一条的退场里，逐词入场变成乱序闪，而且只在个别镜上发生。
+        它在自测里由一条标注为合成的重叠事件证明会执行（`path_b_selftest.py`）；
+      · 末词右沿比音频早 0.56–0.68s —— 这里**不**把末词拉长到镜尾，尾段留不给字幕，
+        那是版式的事（法则 17 的底部留白口径），不是取数面的事。
+
+    ``duration`` 给 `None` 表示"没有可信的音频时长"（ffprobe 不可用时的估算值不算可信），
+    此时只夹单调不夹上界 —— 拿估算值去裁真数据会成批丢词。
+    """
+    out = []
+    floor = 0.0
+    for ev in events or []:
+        word = (ev.get("text") or "").strip()
+        if not word:
+            continue
+        ticks = int(ev.get("offset") or 0)
+        start = max(_tick_to_sec(ticks), floor)
+        end = _tick_to_sec(ticks + int(ev.get("duration") or 0))
+        if duration is not None:
+            end = min(end, float(duration))
+        if end <= start:
+            continue
+        out.append({"w": word, "s": start, "e": end})
+        floor = end
+    return out
+
+
+def words_from_text(text: str, duration: float) -> list:
+    """降级支：**只降级时序，不降级"哪个词"**。
+
+    词表由正文自己切（拉丁/数字成串、其余一字一节），时长按字符数比例摊到整段音频上。
+    这里的"比例"和法则 5 禁止的那个"比例"不是一回事：这里分的是**没有外部时序数据时
+    每个词该占多长**，被明令禁止的是**猜哪个词该被强调** —— 后者在两条支上都走同一个
+    `match_accent`，所以降级不会改变画面上亮起来的是哪几个字。
+    """
+    tokens = FALLBACK_TOKEN_RE.findall(caption_norm(text))
+    total = sum(len(t) for t in tokens)
+    if not total:
+        return []
+    out, acc = [], 0.0
+    span = float(duration)
+    for i, tok in enumerate(tokens):
+        start = round(acc, 3)
+        acc += span * len(tok) / total
+        end = round(acc, 3) if i < len(tokens) - 1 else round(span, 3)
+        if end <= start:
+            continue
+        out.append({"w": tok, "s": start, "e": end})
+    return out
+
+
+def cues_from_words(text: str, words, duration: float) -> list:
+    """把词按**原文句子标点**归成 cue：`{text, start, end, words}`。
+
+    文本取原文那一段（带标点 —— 那是给人读的），时间取该段首词 start / 末词 end。
+    归组用**精确消费字符数**：一段 cue 的归一化长度必须 == 它吞掉的词的归一化长度之和。
+    对不上就抛，不许按比例猜着分：猜开的结果是一条 cue 上屏的字和实际念的字不是同一串，
+    而两边看起来都还是绿的（法则 5 同一立场）。
+    """
+    if not words:
+        return []
+    segments, buf = [], ""
+    for ch in text:
+        buf += ch
+        if SENTENCE_END_RE.match(ch):
+            segments.append(buf)
+            buf = ""
+    if buf.strip():
+        segments.append(buf)
+    cues, i = [], 0
+    for seg in segments:
+        need = len(caption_norm(seg))
+        if not need:
+            continue
+        picked, got = [], 0
+        while i < len(words) and got < need:
+            picked.append(words[i])
+            got += len(words[i]["w"])
+            i += 1
+        if got != need:
+            raise EmitterError(
+                f"字幕归组对不上：这一段 {seg!r} 归一化 {need} 字，词表给到 {got} 字 —— "
+                "词序列与稿子不是同一份（缓存脏了或服务切分变了），不能猜着分")
+        cues.append({"text": seg.strip(), "start": picked[0]["s"], "end": picked[-1]["e"],
+                     "words": picked})
+    if i != len(words):
+        raise EmitterError(
+            f"词表多出 {len(words) - i} 个词没有归属的 cue（稿子末尾没有句读？）—— "
+            "这些字上了屏也没人念，宁可拒编")
+    return cues
+
+
+def match_accent(words, source: str) -> list:
+    """强调三源（`onscreenAccent` / `｜` 切分 / 数字+单位）与词表做**精确子串匹配**。
+
+    匹配不上返回空 = 不高亮。**禁止按比例猜**（法则 5）：猜中的强调会挂在没念过的词上，
+    画面与配音对不上而两道门禁都还是绿的。
+    两条口径细则：① 源要先归一化（词里没有标点，源里通常有）；② **词内不切** ——
+    源必须被整词覆盖，`国执` 不算命中 `全国执行`，因为半个字的强调比没有更难看。
+    """
+    needle = caption_norm(source)
+    if not needle:
+        return []
+    hay = "".join(w["w"] for w in words)
+    pos = hay.find(needle)
+    if pos < 0:
+        return []
+    out, acc = [], 0
+    for word in words:
+        nxt = acc + len(word["w"])
+        if acc >= pos and nxt <= pos + len(needle):
+            out.append(word)
+        acc = nxt
+    return out
+
+
+def cue_accent_words(cue, scene) -> list:
+    """一条 cue 里该亮起来的词 —— 三个来源，取**第一个匹配得上的**，匹配不上就不亮。
+
+    优先级抄 `pick_accent`（屏上位用的就是这一套）：① 作者点的 `｜`，② 原文里的
+    "数字+单位"，③ 屏句的强调段。字幕轨不许自定第二套口径 —— 两处不一致的表现是同一支
+    片子里标题亮 `10月`、字幕亮别的词，每一处单看都"合理"，合起来像 bug 而无法归因。
+
+    ③ 只在**屏句真被这一镜念出来**时才亮：`onscreen` 不进正文（`synthesize_audio` 只念
+    `body`），所以大多数稿子里它匹配不上，返回空是正常结果而不是失败。
+    只在 `cue["words"]` 这一段里匹配，不在整镜词表里匹配 —— 否则同一个短语在两句里出现，
+    亮的是第一句而第二句也跟着亮。
+    """
+    words = (cue or {}).get("words") or []
+    if not words:
+        return []
+    text = (cue or {}).get("text") or ""
+    if ONSPLIT in text:
+        head, tail = (part.strip("，,、 ：:") for part in text.split(ONSPLIT, 1))
+        if head and tail:
+            hits = match_accent(words, tail)
+            if hits:
+                return hits
+    m = NUMBER_UNIT_RE.search(text)
+    if m and m.group(2):
+        hits = match_accent(words, m.group(0))
+        if hits:
+            return hits
+    source = caption_norm((scene or {}).get("onscreenAccent") or "")
+    return match_accent(words, source) if source else []
+
+
+def cue_cache_key(text: str, voice: str) -> str:
+    """缓存键 = (归一化正文, 音色)。改一个字、换一个音色都必须重配 ——
+    拿旧 cues 配新稿会让字幕和配音对不上，而 mp3 与 cues.json **两边都还是绿的**。
+    """
+    digest = hashlib.sha256(f"{caption_norm(text)}|{voice}".encode("utf-8")).hexdigest()
+    return digest[:16]
+
+
+CUES_NAME = "cues.json"
+CUES_SCHEMA = "hf-cues/1"
+
+
+def collect_cues(scene_cues, durations, line_chars, max_lines=CAPTION_MAX_LINES):
+    """把逐镜 cue 平移成全片 `(start, end, text)` 列表，交给 ASS / WebVTT 两条出口。
+
+    入参从"逐镜字幕文件"换成取数面交出的结构 —— 一处真源。旧实现读 `scene_i.vtt`
+    再按时间轴行正则解析，那个文件其实是 **SRT 体**（7.2.8 的 `SubMaker` 只有 `get_srt`），
+    文件名一直在骗人。行宽与行数上限见 `caption_line_chars` / `split_cue`。
     """
     cues = []
     start = 0.0
-    for path, dur in zip(sub_files, durations):
-        raw = read_text(path).replace("\r\n", "\n").replace("\r", "\n")
-        for m in CUE_RE.finditer(raw):
-            g = m.groups()
-            t1 = int(g[0]) * 3600 + int(g[1]) * 60 + int(g[2]) + int(g[3]) / 1000.0
-            t2 = int(g[4]) * 3600 + int(g[5]) * 60 + int(g[6]) + int(g[7]) / 1000.0
-            text = " ".join(line.strip() for line in g[8].split("\n") if line.strip())
-            if not text:
-                continue
+    for scene, dur in zip(scene_cues, durations):
+        for cue in scene:
             # 平移后夹到本分镜区间内, 防止跨场景字幕重叠
-            s = min(start + t1, start + max(0.0, dur - 0.2))
-            e = min(start + t2, start + dur)
+            s = min(start + cue["start"], start + max(0.0, dur - 0.2))
+            e = min(start + cue["end"], start + dur)
             if e - s < 0.15:
                 e = min(s + 0.8, start + dur)
-            cues.extend(split_cue(s, e, text, line_chars, max_lines))
+            cues.extend(split_cue(s, e, caption_display_text(cue["text"]),
+                                  line_chars, max_lines))
         start += dur
     return cues
+
+
+def caption_display_text(text: str) -> str:
+    """上屏文本：把服务不发的标点里**该显示**的那些留着，压掉连续空白与强调标记。
+
+    单独一个函数是因为 cue 的 `text` 来自原文（带标点），而词序列不带 —— 两者不能混用，
+    混用的表现是字幕少了逗号句号，读起来像电报。
+    `｜` 反过来要**去掉**：它既不进词表（服务不念）也不该上屏（观众看字幕不需要知道
+    作者在哪里点了强调）。cue 自己的 `text` 保留它 —— `cue_accent_words` 那一支 ① 要读。
+    """
+    return " ".join((text or "").replace(ONSPLIT, "").split())
+
 
 
 def aigc_badge_font_size(w: int, h: int) -> int:
@@ -1224,7 +1583,7 @@ def pack_has_real_layout(style: str) -> bool:
     只查文件在不在, 不解析契约 —— 给"哪些 pack 能渲染"这类盘点用, 未落地的 pack
     调 `load_style_pack` 会直接停机, 拿它做批量统计不合适。
     """
-    comp_dir = os.path.join(TEMPLATE_ROOT, style, "compositions")
+    comp_dir = os.path.join(pack_dir(style), "compositions")
     if not os.path.isdir(comp_dir):
         return False
     return any(f.endswith(".html") and f != f"{PLACEHOLDER_LAYOUT}.html"
@@ -1232,24 +1591,24 @@ def pack_has_real_layout(style: str) -> bool:
 
 
 def ready_packs() -> list[str]:
-    """当前可选出真版式的 pack 名单(顺序跟 ALL_TEMPLATES)。"""
-    return [s for s in ALL_TEMPLATES if pack_has_real_layout(s)]
+    """当前可选出真版式的 pack 名单(顺序跟 `available_templates()`)。"""
+    return [s for s in available_templates() if pack_has_real_layout(s)]
 
 
 def load_style_pack(style: str) -> dict:
-    """读 ``templates/hyperframes_path_b/<style>/``: 宿主骨架 + 各版式契约。
+    """读 `<pack 根>/<style>/`: 宿主骨架 + 各版式契约（根按 `PACK_ROOTS` 顺序找，见 `pack_dir`）。
 
     ``placeholder.html`` 不进 ``layouts`` (D7): 它只是把三层目录凑齐的壳, 不是版式。
     跳掉之后若一个版式都不剩, 就在这里停 —— 报"这个 pack 还没有真版式 + 现在哪些有",
     而不是等配完音、发射到第 1 镜才抛"填不满任何版式"(那要白跑一趟网络与渲染)。
     """
-    pack_dir = os.path.join(TEMPLATE_ROOT, style)
-    host_path = os.path.join(pack_dir, "host.html")
-    comp_dir = os.path.join(pack_dir, "compositions")
-    if not os.path.isdir(pack_dir):
-        raise EmitterError(f"设计系统包不存在: {pack_dir}")
+    root_dir = pack_dir(style)
+    host_path = os.path.join(root_dir, "host.html")
+    comp_dir = os.path.join(root_dir, "compositions")
+    if not os.path.isdir(root_dir):
+        raise EmitterError(f"设计系统包不存在: {root_dir}")
     if not os.path.isfile(host_path) or not os.path.isdir(comp_dir):
-        raise EmitterError(f"{pack_dir} 缺少 host.html 或 compositions/")
+        raise EmitterError(f"{root_dir} 缺少 host.html 或 compositions/")
     layouts = {}
     for file_name in sorted(os.listdir(comp_dir)):
         if not file_name.endswith(".html"):
@@ -1299,8 +1658,11 @@ def load_style_pack(style: str) -> dict:
                else "当前没有任何 pack 有真版式。")
             + " 处理: 换用可渲染的 pack, 或按 frame.md 的设计契约补出真 composition。"
         )
-    return {"name": style, "dir": pack_dir, "host": read_text(host_path),
-            "compositions_dir": comp_dir, "layouts": layouts}
+    # 编译包（path_c，带 spec.toml）走 HyperFrames 原生字幕轨；存量手发包（path_b）
+    # 维持烧录 ASS。字幕收进合成是裁决 2 的落地，只对编译包开放，31 套存量片子节不变。
+    return {"name": style, "dir": root_dir, "host": read_text(host_path),
+            "compositions_dir": comp_dir, "layouts": layouts,
+            "compiled": os.path.isfile(os.path.join(root_dir, "spec.toml"))}
 
 
 def row_capacity(layout: dict) -> int:
@@ -1558,6 +1920,20 @@ def _indexed_item(var_id: str, slot: int):
     return derive
 
 
+def _indexed_index(slot: int):
+    """条目结构标号 stepNIndex（01/02/03）：不取场景数据，行存在就必然有这个号。
+
+    与 ``_indexed_item`` 同一条"行不存在 ⇒ None"的口径，缺行时由版式选择器换版式，
+    而不是屏上凭空多出一个没人对应的 03。
+    """
+    def derive(scene, ctx, layout):
+        if len(scene_items(scene)) <= slot:
+            return None
+        return f"{slot + 1:02d}"
+
+    return derive
+
+
 def layout_default(layout: dict, var_id: str):
     """版式自带 default: 只用于设计系统自己的标签词, 不用于事实。"""
     for var in layout["variables"]:
@@ -1594,8 +1970,8 @@ DERIVERS = {
     "ctaAccent": _cta_accent,
 }
 
-#: 条目类变量名的形态: item1Label / step2Body / …
-INDEXED_VAR_RE = re.compile(r"^(item|step)([1-9])(Label|Value|Body)$")
+#: 条目类变量名的形态: item1Label / step2Body / step3Index / …
+INDEXED_VAR_RE = re.compile(r"^(item|step)([1-9])(Label|Value|Body|Index)$")
 
 
 def register_indexed_derivers(variable_ids) -> None:
@@ -1604,7 +1980,10 @@ def register_indexed_derivers(variable_ids) -> None:
         match = INDEXED_VAR_RE.match(var_id)
         if not match:
             continue
-        DERIVERS.setdefault(var_id, _indexed_item(var_id, int(match.group(2)) - 1))
+        slot = int(match.group(2)) - 1
+        deriver = (_indexed_index(slot) if match.group(3) == "Index"
+                   else _indexed_item(var_id, slot))
+        DERIVERS.setdefault(var_id, deriver)
 
 
 def missing_variables(layout: dict, scene: dict, ctx: dict) -> list[str]:
@@ -1805,11 +2184,169 @@ def emit_audio_mount(mount_index: int, audio_path: str, work_dir: str,
     )
 
 
+def _subtitle_pieces(cue, display: str):
+    """把上屏串按词切片：每个词连同**紧跟其后**的标点切成一片（服务不念标点，观众要看见）。
+
+    逐字走 `display`（`caption_display_text` 的结果，已去 `｜`、留正常标点）：非标点字符
+    必须落进当前词，词消费完（`words[ti]["w"]` 长度到）才翻页；标点一律接到**前一个词**的尾巴上。
+    这样切片拼回去与 `display` 一字不差（裁决：强调/切片都不改上屏文本）。
+    """
+    words = cue.get("words") or []
+    if not words:
+        return []
+    pieces, cur, ti, tc = [], "", 0, 0
+    for ch in display:
+        if CAPTION_PUNCT_RE.fullmatch(ch):
+            cur += ch                          # 标点接在当前词后（此时 ti 仍是未完成的那个）
+            continue
+        if ti >= len(words):                    # 词已用尽却还有字 = 切片与稿子分家
+            raise EmitterError(
+                f"字幕切片多出字符 {ch!r}（cue {cue.get('text')!r}）—— "
+                "词序列比上屏文本短，宁可停机也不把多出来的字并进上一个词")
+        if tc == len(words[ti]["w"]):           # 上一个词吃满，结算后再开新词
+            pieces.append((words[ti], cur))
+            ti += 1
+            tc, cur = 0, ""
+        cur += ch
+        tc += 1
+    if ti < len(words):
+        pieces.append((words[ti], cur))
+    return pieces
+
+
+def subtitle_scene_cues(scene_cue: list, scene: dict, slot: float,
+                        line_chars: int) -> list[dict]:
+    """一镜的字幕上屏数据：逐 cue 的行/词 + 整条退场时刻（裁决 17 的每 cue 退场）。
+
+    强调在切片**之后**才着色（`accent` 标记打在词片上，文本一个字没动）：
+    取数面交出的 `words` 与整词匹配出的强调词按 `id` 对应，改颜色不改"亮哪个字"。
+    退场口径：非末条 cue 从 `cue.end` 起淡出，时长夹到与下一条开头的间隙（不许盖住下一条）；
+    末条贴着本镜尾收 `max(cue.end, slot - SUBTITLE_EXIT_SECONDS)`，读得完又不在下一镜残留。
+    """
+    accent_by_id = set()
+    cues = []
+    for cue in scene_cue:
+        for w in cue_accent_words(cue, scene):
+            accent_by_id.add(id(w))
+        lines = []
+        for piece_word, piece_text in _subtitle_pieces(cue, caption_display_text(cue["text"])):
+            seg = piece_text.strip()
+            if not seg:
+                continue
+            lines.append((piece_word, seg))
+        wrapped = _subtitle_lines_wrap(lines, line_chars, accent_by_id)
+        if not wrapped:
+            continue
+        cues.append({"start": cue["start"], "end": cue["end"], "lines": wrapped})
+    for j, item in enumerate(cues):
+        nxt = cues[j + 1]["start"] if j + 1 < len(cues) else None
+        if nxt is not None:
+            item["exit_at"] = round(item["end"], 3)
+            item["exit_dur"] = round(
+                min(SUBTITLE_EXIT_SECONDS, max(0.05, nxt - item["end"])), 3)
+        else:
+            item["exit_dur"] = SUBTITLE_EXIT_SECONDS
+            item["exit_at"] = round(max(item["end"], slot - SUBTITLE_EXIT_SECONDS), 3)
+    return cues
+
+
+def _subtitle_lines_wrap(segs, line_chars, accent_by_id) -> list[list[dict]]:
+    """把 (词, 文本) 序列按行宽折行，同时把强调标记打在词片上。只换行不丢字。"""
+    lines: list[list[dict]] = [[]]
+    width = 0
+    for word, seg in segs:
+        seg_len = len(caption_norm(seg))
+        if width and width + seg_len > line_chars:
+            lines.append([])
+            width = 0
+        lines[-1].append({"t": seg, "s": word["s"], "e": word["e"],
+                          "accent": id(word) in accent_by_id})
+        width += seg_len
+    return [ln for ln in lines if ln]
+
+
+def emit_subtitle_composition(composition_id: str, cues: list[dict],
+                              slot: float, w: int, h: int) -> str:
+    """把一镜的字幕编译成一份**子合成 HTML**（引擎克隆 `<template>`、按 `data-composition-id` 挂载）。
+
+    发射器在这里**把绝对时间烤进** timeline（每个词的 `at=` 用 `word.s`、每条 cue 的退场用
+    `exit_at`），运行时不读 `Date.now()`/随机 ⇒ 判据 4a 逐字节可复现。入场逐词 `fromTo`
+    （累积、不逐词消失），退场按整条 cue 容器 `to opacity 0`（裁决 17）。
+    文字色统一白、黑描边；强调词换成固定高亮色**同样描边**（只换字色，不动几何）。
+    """
+    # 每条 cue 一个容器，每个词一个 span：入场打 span、退场打容器（一次淡出整条）。
+    body_lines, tween_lines = [], []
+    for ci, cue in enumerate(cues):
+        box_id = f"sc-c{ci}"
+        rows = []
+        for li, line in enumerate(cue["lines"]):
+            cells = []
+            for wi, span in enumerate(line):
+                sid = f"sc-c{ci}-l{li}-w{wi}"
+                cells.append(f'<span id="{sid}"'
+                             f' class="sc-w{" sc-acc" if span["accent"] else ""}">'
+                             f'{html.escape(span["t"])}</span>')
+                # 逐词入场：opacity 0→1 + 轻微上浮，词与词错开（at=各自 start）
+                dur = round(max(SUBTITLE_ENTRANCE_MIN,
+                                min(0.32, span["e"] - span["s"])), 3)
+                tween_lines.append(
+                    f'        tl.fromTo("#{sid}", {{opacity: 0, y: 10}},'
+                    f' {{opacity: 1, y: 0, duration: {dur}, ease: "power2.out"}},'
+                    f' {round(span["s"], 3)});')
+            rows.append(f'<div class="sc-row">{"".join(cells)}</div>')
+        body_lines.append(f'<div id="{box_id}" class="sc-cue">{"".join(rows)}</div>')
+        # 整条 cue 退场（per-cue，非逐词）：容器淡出，盖住里面所有词。
+        tween_lines.append(
+            f'        tl.to("#{box_id}", {{opacity: 0, duration: {cue["exit_dur"]},'
+            f' ease: "power2.in"}}, {cue["exit_at"]});')
+    if not body_lines:
+        body_lines = ['<div id="sc-c0" class="sc-cue"></div>']
+        tween_lines = [f'        tl.set("#sc-c0", {{opacity: 0}}, 0);']
+    # 版式自检要求每个 `#id` 补间都能在本文件解析到元素 —— 空 cue 兜底也要有那个 div。
+    return SUBTITLE_COMP_TPL.format(
+        comp_id=composition_id,
+        slot=round(slot, 3),
+        w=w,
+        h=h,
+        bottom=SUBTITLE_BOTTOM_CQH,
+        font=SUBTITLE_FONT_CQH,
+        side=SUBTITLE_SIDE_CQW,
+        maxw=SUBTITLE_MAX_WIDTH_CQW,
+        outline=SUBTITLE_OUTLINE_EM,
+        body="".join(body_lines),
+        tweens="\n".join(tween_lines),
+    )
+
+
+def emit_subtitle_mount(mount_index: int, start: float, dur: float,
+                        w: int, h: int) -> str:
+    """字幕子合成挂在 2 轨：永远压在版式（1 轨）之上，配音（0 轨）与之无关。"""
+    return SUBTITLE_MOUNT_TPL.format(
+        mount_id=f"subtitle-{mount_index}",
+        composition_id=f"{SUBTITLE_FILE_PREFIX}-{mount_index}",
+        file_name=f"{SUBTITLE_FILE_PREFIX}-{mount_index}.html",
+        start=fmt_secs(start),
+        dur=fmt_secs(dur),
+        w=w,
+        h=h,
+        track=SUBTITLE_TRACK_INDEX,
+    )
+
+
 def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
                      ctx_base: dict, w: int, h: int,
-                     audio_files: list, image_records: list) -> list[dict]:
-    """逐镜选版式 + 填变量 + 生成宿主与挂载, 并把用过的版式文件复制进工作目录。"""
+                     audio_files: list, image_records: list,
+                     scene_cues: list | None = None) -> list[dict]:
+    """逐镜选版式 + 填变量 + 生成宿主与挂载, 并把用过的版式文件复制进工作目录。
+
+    `scene_cues` 提供且 pack 是**编译包**（path_c，`pack["compiled"]`）时，额外把每镜字幕
+    编译成 2 轨子合成（`subtitle_<i>.html`）挂上去，并把该镜的字幕子合成文本收集到
+    `subtitle_files` 交给调用方落盘 —— 这是裁决 2「字幕收进 HyperFrames」的唯一接入点。
+    存量手发包（path_b）`scene_cues` 传 None，一行字幕子合成都不生成，片子字节形状不变。
+    """
     mounts, audios, shots = [], [], []
+    subtitle_files: list[tuple[str, str]] = []
+    native_sub = bool(pack.get("compiled")) and scene_cues is not None
     start = 0.0
     prev_ground_tone = None
     for i, (scene, dur, image_record) in enumerate(zip(scenes, durations, image_records), 1):
@@ -1827,6 +2364,14 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
         layout = pack["layouts"][layout_name]
         values = fill_variables(layout, scene, ctx)
         mounts.append(emit_mount(i, layout, values, start, dur, w, h))
+        if native_sub:
+            cues = subtitle_scene_cues(scene_cues[i - 1], scene, dur,
+                                       caption_line_chars(w, h))
+            comp_id = f"{SUBTITLE_FILE_PREFIX}-{i}"
+            subtitle_files.append((
+                f"{comp_id}.html",
+                emit_subtitle_composition(comp_id, cues, dur, w, h)))
+            mounts.append(emit_subtitle_mount(i, start, dur, w, h))
         if i <= len(audio_files):
             audios.append(emit_audio_mount(i, audio_files[i - 1], work_dir, start, dur))
         # 本镜实际呈现的地面: 固定地面的版式用装包时算好的, 可换面的版式(story)
@@ -1852,6 +2397,8 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
     os.makedirs(dest_dir, exist_ok=True)
     for layout in pack["layouts"].values():
         shutil.copyfile(layout["path"], os.path.join(dest_dir, layout["file_name"]))
+    for file_name, text in subtitle_files:
+        write_text(os.path.join(dest_dir, file_name), text)
     return shots
 
 
@@ -2070,43 +2617,145 @@ def doctor():
 
 
 # ------------------------- 配音 -------------------------
+def tts_word_events(text: str, voice: str, mp3_path: str):
+    """edge-tts 的 Python API：一次 stream 同时落盘 mp3 并交出词级时序原值。
+
+    返回 `(WordBoundary 事件列表, 音频字节数)`；事件里的 `offset`/`duration` 是**服务
+    原单位（100ns tick）**，换算成秒只许在 `words_from_events` 那一处做。
+
+    为什么非走 Python API 不可：命令行那一支只写句子级字幕 —— 7.2.8 的 `SubMaker`
+    只有 `get_srt`，压根没有词级出口；词边界只有 `Communicate(..., boundary="WordBoundary")`
+    这条路，而 `boundary` 这个参数只在 `Communicate` 的签名上（`TTSConfig` 属于
+    `data_classes`，不是公开入口）。P2-0 实测：同一次 stream 里 audio 与 WordBoundary
+    两类块交替出现，17 个词全部拿到（证据 §K1）。
+    """
+    import asyncio
+    import edge_tts
+
+    async def _collect():
+        events, written = [], 0
+        sink = open(mp3_path, "wb")
+        try:
+            com = edge_tts.Communicate(text, voice, boundary="WordBoundary")
+            async for chunk in com.stream():
+                kind = chunk.get("type")
+                if kind == "audio":
+                    data = chunk.get("data") or b""
+                    sink.write(data)
+                    written += len(data)
+                elif kind == "WordBoundary":
+                    events.append(chunk)
+        finally:
+            sink.close()
+        return events, written
+
+    return asyncio.run(_collect())
+
+
+def scene_cues_from_words(text: str, words, seconds: float, index: int) -> list:
+    """词表 → 逐镜 cue；归组对不上时**退到字符支**，不退到"猜"。
+
+    `cues_from_words` 用精确消费字符数归组，对不上就抛。抛在这里不往上冒是因为产线上
+    还有第二条正确出路：词形本来就取自稿子（`words_from_text`），换过去只降级时序精度，
+    画面上亮起来的字仍然由同一个 `match_accent` 决定。反过来若让它整片失败，一份稿子
+    因为服务多给了一个词就发不出去，而画面文本其实完全正确 —— 那是把取数面的抖动
+    放成产线的停机。退化必须**出声**（⚠️ 那行日志），否则没人知道这一片走的是兜底支。
+    """
+    try:
+        return cues_from_words(text, words, seconds)
+    except EmitterError as exc:
+        log(f"  ⚠️ 分镜{index} 词表与稿子对不上（{exc}）—— 本镜时序退到字符支")
+        return cues_from_words(text, words_from_text(text, seconds), seconds)
+
+
 def synthesize_audio(scenes, voice_default, work_dir):
-    """逐段 edge-tts 配音, 返回 (mp3 列表, vtt 列表, 时长列表)。"""
-    edge_tts_bin = which("edge-tts")
-    if not edge_tts_bin:
-        raise EmitterError(
-            "找不到 edge-tts 命令。请先: pip install edge-tts (并确认其 Scripts 目录在 PATH)")
-    audio_files, sub_files, durations = [], [], []
+    """逐镜配音并交出词级 cues；命中 `cues.json` 的那一镜**不碰服务**。
+
+    返回 `(mp3 列表, 逐镜 cue 列表, 时长列表)`。第二项从前的"逐镜 .vtt 路径"换成了
+    取数面交出的结构 —— 旧文件名一直在骗人（那是 SRT 体），而且解析它等于让一份
+    已经算好的时序再过一次正则。
+
+    `cues.json` 落盘的两个真理由（§6.4 订正后，原来写的"两条路径时序不同"已被 P2-0
+    实测推翻 —— 同稿同音色两次请求逐词差 ≤0.000s）：
+      · 这一片走的是词级支还是字符支只有落下来才证明得了，判据 4a 要对着它核；
+      · 配音段实测 12.1–12.9s 全是网络往返，重跑门禁不该再花一次，更不该在微软服务
+        抖动时把一份已经合格的稿子变成失败。
+    缓存键是 (归一化正文, 音色) 的哈希：改一个字、换一个音色都必须重配 —— 拿旧 cues
+    配新稿会让字幕和配音对不上，而 mp3 和 cues.json **两边都还是绿的**。
+    """
+    doc = read_json(os.path.join(work_dir, CUES_NAME))
+    cached = doc["scenes"] if isinstance(doc, dict) and doc.get("schema") == CUES_SCHEMA \
+        and isinstance(doc.get("scenes"), list) else []
+    audio_files, scene_cues, durations, entries = [], [], [], []
     for i, sc in enumerate(scenes, 1):
         voice = sc.get("voice") or voice_default
-        mp3 = os.path.join(work_dir, f"scene_{i}.mp3")
-        vtt = os.path.join(work_dir, f"scene_{i}.vtt")
-        log(f"→ 配音 分镜{i} (voice={voice})")
-        # Windows 下 run() 走 shell=True(cmd.exe)，参数里的换行会截断命令，
-        # 导致 --write-media 丢失、音频被吐到 stdout。朗读语义不受影响，压平空白。
+        mp3_name = f"scene_{i}.mp3"
+        mp3 = os.path.join(work_dir, mp3_name)
+        # 朗读语义不受影响，压平空白：换行会让服务的韵律分段和稿子的句子切分不一致
         speak_text = " ".join(sc["body"].split())
         if not speak_text:
             raise EmitterError(f"分镜{i} 正文为空, 无话可配 —— 删掉这条或补正文")
-        r = run([edge_tts_bin, "--voice", voice, "--text", speak_text,
-                 "--write-media", mp3, "--write-subtitles", vtt])
-        if r.returncode != 0 or not os.path.exists(mp3):
-            raise EmitterError(
-                f"分镜{i} 配音失败 (检查网络是否能连微软语音服务 / edge-tts 是否安装)")
-        dur = ffprobe_duration(mp3)
-        if dur is None:
-            dur = estimate_duration(sc["body"])
-            log(f"  (ffprobe 不可用, 估算时长 {dur:.1f}s)")
+        key = cue_cache_key(speak_text, voice)
+        hit = next((e for e in cached
+                    if e.get("index") == i and e.get("key") == key
+                    and e.get("mp3") == mp3_name and isinstance(e.get("words"), list)
+                    and e["words"] and e.get("seconds")
+                    and os.path.isfile(mp3)), None)
+        if hit is not None:
+            mode, seconds = str(hit.get("mode", "word")), float(hit["seconds"])
+            words = [{"w": w["w"], "s": w["s"], "e": w["e"]} for w in hit["words"]]
+            log(f"→ 配音 分镜{i} 复用 cues.json (voice={voice}, {mode} 支 {len(words)} 词)")
         else:
-            log(f"  时长 {dur:.1f}s")
-        if dur < MIN_SLOT_SECONDS:
+            log(f"→ 配音 分镜{i} (voice={voice})")
+            try:
+                events, written = tts_word_events(speak_text, voice, mp3)
+            except Exception as exc:
+                raise EmitterError(
+                    f"分镜{i} 配音失败: {exc} (检查网络是否能连微软语音服务 / "
+                    "pip install edge-tts)") from exc
+            if written <= 0:
+                raise EmitterError(f"分镜{i} 配音返回 0 字节音频 —— 服务没给声音")
+            measured = ffprobe_duration(mp3)
+            seconds = measured if measured is not None else estimate_duration(speak_text)
+            # 估算值**不参与词表裁剪**：拿 estimate_duration 去当上界会成批丢词，
+            # 然后 cues_from_words 因为"词表多出没归属的字"而拒编 —— 那是估算的锅。
+            words = words_from_events(events, measured)
+            mode = "word"
+            if not words:
+                mode = "char"
+                words = words_from_text(speak_text, seconds)
+                log(f"  ⚠️ 分镜{i} 服务没给词级时序 —— 本镜时序退到字符支")
+            else:
+                log(f"  词级 {len(words)} 个")
+        if seconds < MIN_SLOT_SECONDS:
             raise EmitterError(
-                f"分镜{i} 配音只有 {dur:.2f}s, 低于版式契约下限 {MIN_SLOT_SECONDS}s —— "
+                f"分镜{i} 配音只有 {seconds:.2f}s, 低于版式契约下限 {MIN_SLOT_SECONDS}s —— "
                 "这一镜太短, 请与相邻分镜合并"
             )
+        cues = scene_cues_from_words(speak_text, words, seconds, i)
+        log(f"  时长 {seconds:.3f}s · {len(cues)} 条 cue")
         audio_files.append(mp3)
-        sub_files.append(vtt)
-        durations.append(dur)
-    return audio_files, sub_files, durations
+        scene_cues.append(cues)
+        durations.append(seconds)
+        entries.append({"index": i, "voice": voice, "key": key, "text": speak_text,
+                        "seconds": seconds, "mode": mode, "mp3": mp3_name, "words": words})
+    write_json(os.path.join(work_dir, CUES_NAME),
+               {"schema": CUES_SCHEMA, "scenes": entries})
+    return audio_files, scene_cues, durations
+
+
+def fallback_scene_cues(text: str, seconds: float, index: int) -> list:
+    """不配音（`--skip-render`）时的逐镜 cue：走的是同一字符支，词形仍来自稿子。
+
+    发射链路要能脱离网络和 ffprobe 单验，但字幕结构必须是**真的那一种** —— 这里交出
+    的和降级支逐字同形，P2-3 的字幕合成拿它当真输入跑，不会出现"跳过渲染就绕过字幕"
+    的第二条代码路径。
+    """
+    speak_text = " ".join((text or "").split())
+    if not speak_text:
+        raise EmitterError(f"分镜{index} 正文为空, 无话可配 —— 删掉这条或补正文")
+    return cues_from_words(speak_text, words_from_text(speak_text, seconds), seconds)
+
 
 
 # ------------------------- 音频 + 字幕合成 -------------------------
@@ -2262,7 +2911,10 @@ def mux_and_burn(silent, audio_files, cues, work_dir, final, w, h,
     aigc_meta = aigc_metadata_json(aigc_producer, silent) if write_meta else None
     meta_args = [] if aigc_meta is None else ["-metadata", f"{AIGC_METADATA_KEY}={aigc_meta}"]
     ff = which("ffmpeg") or "ffmpeg"
-    if not cues:
+    # 字幕轨为空**且**这一档不烧角标 ⇒ 没东西可烧，直接 copy 视频流。
+    # 编译包（path_c）把字幕收进 HyperFrames 后传 `cues=[]`，但 AIGC 角标仍走 ASS 烧：
+    # `burn_badge` 为真时必须进滤镜支，否则合规的开场显式标识会被静默丢掉。
+    if not cues and not burn_badge:
         log("⚠️ 字幕轨为空, 跳过烧录字幕(仅合成配音)")
         cmd = [ff, "-y", "-i", silent, "-i", narr] + stream_maps + [
             "-c:v", "copy", "-c:a", "aac", "-shortest"] + movflags + meta_args + [final]
@@ -2352,11 +3004,12 @@ def main():
     ap.add_argument("--input", help="脚本文件 (.txt/.md 或 .json 场景列表)")
     ap.add_argument("--output", default="output.mp4", help="最终 MP4 路径 (默认 output.mp4)")
     ap.add_argument("--template", "--style", dest="style", default=DEFAULT_STYLE,
-                    choices=ALL_TEMPLATES,
                      help="节目包 (设计系统) 名 (兼容旧名 --style); 默认 " + DEFAULT_STYLE
-                     + "; " + str(len(ALL_TEMPLATES)) + " 个可选项: "
-                     + ", ".join(ALL_TEMPLATES)
+                     + "; 两个 pack 根（存量 path_b + 编译产物 path_c）下现存的包都可选，"
+                       "名单由 `available_templates()` 现算 (见 --list-templates)"
                      + ". 见 templates/hyperframes_path_b/ 与 news-workflow/SKILL.md 模板决策树")
+    ap.add_argument("--list-templates", action="store_true",
+                    help="打印当前可点名的 pack 名单（含编译包）后退出")
     ap.add_argument("--voice", default="zh-CN-XiaoxiaoNeural", help="edge-tts 音色")
     ap.add_argument("--resolution", default="1080x1920", help="分辨率, 如 1080x1920(竖) 或 1920x1080(横)")
     ap.add_argument("--doctor", action="store_true", help="只做环境自检")
@@ -2388,7 +3041,9 @@ def main():
     ap.add_argument("--fps", type=int, default=DEFAULT_FPS, help=f"渲染帧率 (默认 {DEFAULT_FPS})")
     ap.add_argument("--quality", default=DEFAULT_QUALITY, choices=QUALITY_CHOICES,
                     help=f"渲染质量 (默认 {DEFAULT_QUALITY})")
-    ap.add_argument("--gpu", action="store_true", help="用 GPU 光栅化 (--browser-gpu, 本机 Intel Arc 实测可用)")
+    ap.add_argument("--gpu", action="store_true",
+                    help="改用 GPU 光栅化 (--browser-gpu)。默认软件光栅：硬件路径实测不产出"
+                         "逐字节可复现的码流（判据 4a），只在排查渲染本身时开")
     ap.add_argument("--work-dir", help="指定中间文件目录(存在则复用, 且不清理)")
     ap.add_argument("--hyperframes-bin",
                     help="显式指定 hyperframes 可执行(跳过自动探测); 排查与新机器用")
@@ -2399,6 +3054,11 @@ def main():
     ap.add_argument("--keep", action="store_true", help="保留中间文件")
     ap.add_argument("--timing-out", help="分段计时 JSON 落点(默认 <成片目录>/timing.json)")
     args = ap.parse_args()
+
+    if args.list_templates:
+        for name in available_templates():
+            print(name)
+        sys.exit(0)
 
     if args.hyperframes_bin:
         hf_init(args.hyperframes_bin)
@@ -2412,6 +3072,14 @@ def main():
 
     if not args.input:
         ap.error("必须提供 --input 脚本文件 (或用 --doctor 自检)")
+
+    # 包名校验从 argparse 的 `choices` 挪到这里：可寻址范围取决于**磁盘上现在有哪些包**
+    # （编译一套就多一套），建 parser 时算一次就冻住了，P5 每套都要回来改这个文件 = 双轨失效。
+    known_templates = available_templates()
+    if args.style not in known_templates:
+        ap.error(f"--template {args.style!r} 不是可点名的 pack"
+                 f"（两个根下现有 {len(known_templates)} 个）: "
+                 + ", ".join(known_templates))
 
     if not os.path.isfile(args.input):
         log(f"❌ 找不到输入文件: {args.input}")
@@ -2457,10 +3125,13 @@ def main():
         with timed("dub"):
             if args.skip_render:
                 # 没有配音就没有真实时长, 用文本估算保证发射链路照样能验
-                audio_files, sub_files = [], []
+                audio_files = []
                 durations = [estimate_duration(sc["body"]) for sc in scenes]
+                scene_cues = [fallback_scene_cues(sc["body"], dur, i)
+                              for i, (sc, dur) in enumerate(zip(scenes, durations), 1)]
             else:
-                audio_files, sub_files, durations = synthesize_audio(scenes, args.voice, work)
+                audio_files, scene_cues, durations = synthesize_audio(
+                    scenes, args.voice, work)
 
         ctx_base = {
             "kicker": args.kicker,
@@ -2485,8 +3156,11 @@ def main():
                     else:
                         log(f"  镜{i} 图: 降级为无图")
         with timed("emit"):
+            # 编译包（path_c）把字幕收进 HyperFrames 2 轨（传 scene_cues）；存量手发包不传，
+            # 字幕仍走烧录 ASS。这条开关的唯一判据是 pack 有没有 spec.toml，不在这里猜。
             shots = emit_composition(pack, scenes, durations, work, ctx_base, w, h,
-                                     audio_files, image_records)
+                                     audio_files, image_records,
+                                     scene_cues=scene_cues if pack.get("compiled") else None)
             log(f"→ 合成 HTML 已生成: {os.path.join(work, 'index.html')}")
 
         with timed("gate"):
@@ -2512,8 +3186,15 @@ def main():
             render_cmd = hf_argv("render", "-c", "index.html",
                                  "-o", "silent.mp4", "-f", str(args.fps),
                                  f"--quality={args.quality}")
-            if args.gpu:
-                render_cmd.append("--browser-gpu")
+            # 默认走**软件光栅**（判据 4a 的决定性证据）：同一次发射渲染两遍，
+            # 硬件路径（ANGLE / 本机 Intel Arc）的 H.264 码流两次不同 —— 最终几何实测
+            # 1290 帧里编译包 464 帧、存量包 710 帧像素不同（两次流哈希也不同）；
+            # `--no-browser-gpu` 两遍逐帧 md5 全同、流哈希逐字节一致。存量包同样复现，
+            # 所以这不是编译包引入的，但产线的"同稿同片"口径必须由发射器钉住，不能靠机器。
+            # 代价：软件光栅更慢（渲染段 编译包 61.4/59.9s vs 硬件 57.2/48.9s；
+            # 存量包 66.0/63.2s vs 硬件 40.9/36.2s），但硬件那两条时间自身就有 17% 抖动，
+            # 而确定性是门禁、时长只是预算。`--gpu` 保留给"我就是想看硬件那条路"。
+            render_cmd.append("--browser-gpu" if args.gpu else "--no-browser-gpu")
             # HyperFrames 要求入口文件必须留在项目目录内("Invalid composition path")，
             # 因此以 work 为 cwd、传相对路径，而不是传 Temp 下的绝对路径。
             r = run(render_cmd, cwd=work)
@@ -2528,7 +3209,7 @@ def main():
 
         with timed("mux"):
             # ⑧ 拼音频 + 烧字幕
-            cues = collect_cues(sub_files, durations, caption_line_chars(w, h))
+            cues = collect_cues(scene_cues, durations, caption_line_chars(w, h))
             log(f"字幕轨: {len(cues)} 条")
             merged = ["WEBVTT", ""]
             for s, e, text in cues:
@@ -2537,12 +3218,18 @@ def main():
             final = args.output
             os.makedirs(os.path.dirname(os.path.abspath(final)) or ".", exist_ok=True)
             log(f"→ ffmpeg 合成最终视频: {final}")
+            # 编译包（path_c）字幕已收进 HyperFrames 2 轨渲染进画面，烧录 ASS 只留角标：
+            # 这里传空 cue，mux_and_burn 靠 burn_badge 仍走滤镜烧开场 AIGC 标识。
+            # subs.vtt 照旧落盘（上传平台用的外挂字幕，与成片烧录无关）。
+            ass_cues = [] if pack.get("compiled") else cues
+            if pack.get("compiled"):
+                log("字幕: 编译包 → 字幕在 HyperFrames 内，ASS 只烧 AIGC 角标")
             # 显式标识时长 = 开场 AIGC_LABEL_ON_SECONDS 秒(不足则等于全片时长),
             # 由 mux_and_burn 卡 ≥ AIGC_LABEL_MIN_SECONDS: 单镜短片的真实时长可以低到
             # MIN_SLOT_SECONDS(1s), 达不到国标 2 秒线, 必须挡。
             # (这条线只在真烧角标那一档生效 —— no-badge 没有画面标识, 见 D14)
             badge_seconds = aigc_badge_seconds(sum(durations))
-            aigc_meta = mux_and_burn(silent, audio_files, cues, work, final, w, h,
+            aigc_meta = mux_and_burn(silent, audio_files, ass_cues, work, final, w, h,
                                      aigc_badge_seconds=badge_seconds,
                                      aigc_producer=args.aigc_producer,
                                      aigc_label=args.aigc_label,

@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "NEWS"},
+    {"id": "quoteBody", "type": "string", "label": "引文", "default": "引文内容"},
+    {"id": "attribution", "type": "string", "label": "归属", "default": "出处"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+@font-face {
+  font-family: "HF CJK";
+  src: local("Noto Sans SC"), local("Microsoft YaHei"), local("DengXian");
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "HF Serif CJK";
+  src: local("Noto Serif SC"), local("SimSun");
+  font-weight: 100 900;
+}
+
+#root { position: absolute; inset: 0; overflow: hidden;
+  background: #f5efe3;
+  color: #1f1b16;
+  font-family: "HF CJK", sans-serif;
+}
+
+#ew-quote-col { position: absolute; top: 8.5cqh; left: 0;
+  width: 100cqw; height: 64.1775cqh; }
+
+#ew-qt-rule { position: absolute; top: 0cqh; left: 6cqw; width: 88cqw; height: 0.35cqh; background: #ddd3bf; }
+
+
+#ew-qt-kicker { position: absolute; top: 4.5cqh; left: 6cqw; max-width: 22.4cqw; background: #B45309; color: #ffffff; font-size: 2.8cqw; font-weight: 900; padding: 0.85cqh 1.9cqw; transform-origin: 0% 50%; }
+
+
+#ew-qt-stripe { position: absolute; top: 11.5cqh; left: 6cqw; right: 92.4cqw; height: 42cqh; background: #B45309; }
+
+
+#ew-qt-body { position: absolute; top: 13.5cqh; left: 12cqw; max-width: 68cqw; font-family: HF Serif CJK, sans-serif; font-size: 6.4cqw; font-weight: 400; line-height: 1.5; color: #1f1b16; }
+
+
+#ew-qt-bar { position: absolute; top: 58cqh; left: 12cqw; width: 14cqw; height: 0.8cqh; background: #ddd3bf; transform-origin: 0% 50%; }
+
+
+#ew-qt-attr { position: absolute; top: 61.5cqh; left: 12cqw; max-width: 50cqw; font-family: HF CJK, sans-serif; font-size: 3.4cqw; font-weight: 400; line-height: 1.4; color: #6b5f4f; }
+
+
+      </style>
+      <div id="root" data-composition-id="ew-quote" data-width="1080" data-height="1920">
+        <div id="ew-quote-col">
+          <div id="ew-qt-rule"></div>
+          <div id="ew-qt-kicker" data-var-text="kicker"></div>
+          <div id="ew-qt-stripe"></div>
+          <div id="ew-qt-body" data-var-text="quoteBody"></div>
+          <div id="ew-qt-bar"></div>
+          <div id="ew-qt-attr" data-var-text="attribution"></div>
+        </div>
+      </div>
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        
+        const tl = gsap.timeline({ paused: true });
+
+        tl.fromTo("#ew-qt-rule", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)", duration: 0.6, ease: "power3.out" }, 0);
+        tl.fromTo("#ew-qt-kicker", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.25);
+        tl.fromTo("#ew-qt-stripe", { clipPath: "inset(100% 0 0 0)" }, { clipPath: "inset(0 0 0 0)", duration: 1.4, ease: "power3.out" }, 0.45);
+        tl.fromTo("#ew-qt-body", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.7, ease: "power3.out" }, 0.7);
+        tl.fromTo("#ew-qt-bar", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 1.5);
+        tl.fromTo("#ew-qt-attr", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 1.65);
+        tl.to("#ew-quote-col", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["ew-quote"] = tl;
+      </script>
+    </template>
+  </body>
+</html>

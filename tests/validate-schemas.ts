@@ -29,6 +29,37 @@ async function validateRuntimeDirs(): Promise<void> {
   }
 }
 
+// Evidence pointers are live: a tracked doc naming an evidence file is a promise
+// that file ships with the repo. Template paths (`<date>-…`) can't match this
+// pattern at all, because `<` is outside the allowed charset — no special case.
+const EVIDENCE_PTR = /routes\/[a-z0-9-]+\/evidence\/[A-Za-z0-9._\-/]+/g;
+const OLD_EVIDENCE_HOME = ".harness-news-runtime/verifications/";
+
+async function validateEvidence(): Promise<void> {
+  const tracked = new Set(trackedFiles());
+  // docs/superpowers/** is the historical record; its prose may name retired paths.
+  const docs = [...tracked].filter((p) => /\.(md|jsonl)$/.test(p) && !p.startsWith("docs/superpowers/"));
+  let bad = 0;
+  for (const p of docs) {
+    const text = await readFile(join(ROOT, p), "utf-8");
+    for (const m of text.match(EVIDENCE_PTR) ?? []) {
+      if (!tracked.has(m)) {
+        console.log(`[FAIL] ${p}: evidence pointer is not tracked -> ${m}`);
+        bad++;
+      }
+    }
+    if (text.includes(OLD_EVIDENCE_HOME)) {
+      console.log(`[FAIL] ${p}: evidence still referenced inside an ignorable runtime dir`);
+      bad++;
+    }
+  }
+  if (bad === 0) {
+    console.log(`[ok]   evidence pointers resolve; no live pointer in a runtime dir (${docs.length} tracked docs scanned)`);
+  } else {
+    fail = 1;
+  }
+}
+
 let fail = 0;
 
 async function isDir(path: string): Promise<boolean> {
@@ -112,6 +143,7 @@ await validateSchemas();
 await validateSkills();
 await validateArchiveSkills();
 await validateRuntimeDirs();
+await validateEvidence();
 
 if (fail === 0) {
   console.log("");

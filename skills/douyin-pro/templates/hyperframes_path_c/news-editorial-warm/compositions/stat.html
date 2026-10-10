@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN" data-composition-variables='[
+    {"id": "kicker", "type": "string", "label": "眉标", "default": "NEWS"},
+    {"id": "value", "type": "string", "label": "主数值", "default": "0"},
+    {"id": "unit", "type": "string", "label": "主单位", "default": "元"},
+    {"id": "label", "type": "string", "label": "主数值说明", "default": "说明"},
+    {"id": "compareValue", "type": "string", "label": "对比数值", "default": "0"},
+    {"id": "compareUnit", "type": "string", "label": "对比单位", "default": "元"},
+    {"id": "compareLabel", "type": "string", "label": "对比说明", "default": "对比"},
+    {"id": "slotSeconds", "type": "number", "label": "本镜可见秒数", "default": 4, "min": 1}
+  ]'>
+  <head>
+    <meta charset="UTF-8" />
+  </head>
+  <body>
+    <template>
+      <style>
+@font-face {
+  font-family: "HF CJK";
+  src: local("Noto Sans SC"), local("Microsoft YaHei"), local("DengXian");
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: "HF Serif CJK";
+  src: local("Noto Serif SC"), local("SimSun");
+  font-weight: 100 900;
+}
+
+#root { position: absolute; inset: 0; overflow: hidden;
+  background: #f5efe3;
+  color: #1f1b16;
+  font-family: "HF CJK", sans-serif;
+}
+
+#ew-stat-col { position: absolute; top: 8.5cqh; left: 0;
+  width: 100cqw; height: 64.5cqh; }
+
+#ew-st-rule { position: absolute; top: 0cqh; left: 6cqw; width: 88cqw; height: 0.35cqh; background: #ddd3bf; }
+
+
+#ew-st-kicker { position: absolute; top: 4.5cqh; left: 6cqw; max-width: 22.4cqw; background: #B45309; color: #ffffff; font-size: 2.8cqw; font-weight: 900; padding: 0.85cqh 1.9cqw; transform-origin: 0% 50%; }
+
+
+#ew-st-value { position: absolute; top: 13.5cqh; left: 6cqw; max-width: 88cqw; font-family: Playfair Display, sans-serif; font-size: 26cqw; line-height: 1.12; color: #1f1b16; }
+.ew-st-value-unit { font-family: HF CJK, sans-serif; font-size: 7.4cqw; font-weight: 400; }
+
+
+#ew-st-label { position: absolute; top: 41.5cqh; left: 6cqw; max-width: 66cqw; font-family: HF CJK, sans-serif; font-size: 4.2cqw; font-weight: 400; line-height: 1.5; color: #1f1b16; }
+
+
+#ew-st-panel { position: absolute; top: 49.5cqh; left: 6cqw; right: 6cqw; height: 15cqh; background: #e8dfcb; }
+
+
+#ew-st-cmp { position: absolute; top: 52cqh; left: 9.5cqw; max-width: 30cqw; font-family: Playfair Display, sans-serif; font-size: 8.6cqw; line-height: 1.12; color: #1f1b16; }
+.ew-st-cmp-unit { font-family: HF CJK, sans-serif; font-size: 3.6cqw; font-weight: 400; }
+
+
+#ew-st-cmp-label { position: absolute; top: 54cqh; left: 42cqw; max-width: 46cqw; font-family: HF CJK, sans-serif; font-size: 3.4cqw; font-weight: 400; line-height: 1.45; color: #1f1b16; }
+
+
+      </style>
+      <div id="root" data-composition-id="ew-stat" data-width="1080" data-height="1920">
+        <div id="ew-stat-col">
+          <div id="ew-st-rule"></div>
+          <div id="ew-st-kicker" data-var-text="kicker"></div>
+          <div id="ew-st-value"><span class="ew-st-value-value" data-var-text="value"></span><span class="ew-st-value-unit" data-var-text="unit"></span></div>
+          <div id="ew-st-label" data-var-text="label"></div>
+          <div id="ew-st-panel"></div>
+          <div id="ew-st-cmp"><span class="ew-st-cmp-value" data-var-text="compareValue"></span><span class="ew-st-cmp-unit" data-var-text="compareUnit"></span></div>
+          <div id="ew-st-cmp-label" data-var-text="compareLabel"></div>
+        </div>
+      </div>
+      <script>
+        const vars = window.__hyperframes.getVariables();
+        const slot = Number(vars.slotSeconds) || 4;
+        const INTRO_END = 1.5;
+        const MIN_DRIFT = 0.6;
+        const driftStart = Math.max(0, Math.min(INTRO_END, slot - MIN_DRIFT));
+        const driftDur = Math.max(MIN_DRIFT, slot - driftStart);
+        
+        const tl = gsap.timeline({ paused: true });
+
+        tl.fromTo("#ew-st-rule", { clipPath: "inset(0 100% 0 0)" }, { clipPath: "inset(0 0 0 0)", duration: 0.6, ease: "power3.out" }, 0);
+        tl.fromTo("#ew-st-kicker", { scaleX: 0 }, { scaleX: 1, duration: 0.5, ease: "power3.out" }, 0.25);
+        tl.fromTo("#ew-st-value", { clipPath: "inset(0 0 100% 0)" }, { clipPath: "inset(0 0 0 0)", duration: 1.4, ease: "power3.out" }, 0.5);
+        tl.fromTo("#ew-st-label", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 0.9);
+        tl.fromTo("#ew-st-panel", { clipPath: "inset(100% 0 0 0)" }, { clipPath: "inset(0 0 0 0)", duration: 1.4, ease: "power3.out" }, 1.1);
+        tl.fromTo("#ew-st-cmp", { clipPath: "inset(0 0 100% 0)" }, { clipPath: "inset(0 0 0 0)", duration: 1.4, ease: "power3.out" }, 1.25);
+        tl.fromTo("#ew-st-cmp-label", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.5, ease: "power3.out" }, 1.4);
+        tl.to("#ew-stat-col", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+        window.__timelines["ew-stat"] = tl;
+      </script>
+    </template>
+  </body>
+</html>
