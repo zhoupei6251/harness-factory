@@ -379,6 +379,8 @@ PD_PAGE = {
         },
     }],
 }
+#: PD_PAGE 拍平后的内部记录 —— 持久缓存测试直接拿它当"已选中的图"，无需再走 pick_candidate。
+PD_RECORD = cm.normalize_page(PD_PAGE)
 BY_SA_PAGE = {
     "title": "File:Changde Street.jpg",
     "index": 2,
@@ -624,6 +626,222 @@ def t_cache_entry_is_keyed_on_query_not_filename():
     assert cm.cache_hit({}, "shot_01.jpg", "Changde Hunan") is None, "空清单不可能命中"
     assert cm.cache_hit({"shot_01.jpg": {"title": "A", "query": "Changde Hunan"}},
                         "shot_01.jpg", "Changde Hunan") is None, "没有出处链接的条目按失效处理"
+
+
+def t_persistent_cache_key_binds_schema_version_and_query():
+    """口径 A 的寻址键 = 选图规则版本 + 查询词，两者都是纯函数入参。
+
+    为什么必须掺 SCHEMA_VERSION: 持久缓存刻意冻结某次选图(同稿同片)。改了选图逻辑
+    (pick_candidate/授权闸/尺寸闸/image_query 回落)却没清目录时，旧字节是"按旧规则选的"，
+    必须整体作废 —— 版本号进键就是这条失效口径的机器表达。
+    """
+    with_p1 = cm.cache_key("Changde Hunan")
+    assert with_p1 == cm.cache_key("Changde Hunan"), "同版本同词必须同键(否则跨 run 复用不了)"
+    assert with_p1 != cm.cache_key("Zhuzhou Hunan"), "换词必须换键(失效口径: query 变了重取)"
+    assert len(with_p1) == 64 and all(c in "0123456789abcdef" for c in with_p1), \
+        "键是十六进制摘要(目录名安全, 中文/斜杠查询词也能寻址)"
+    original = cm.CACHE_SCHEMA_VERSION
+    try:
+        cm.CACHE_SCHEMA_VERSION = original + 1
+        assert cm.cache_key("Changde Hunan") != with_p1, \
+            "版本号一改, 同词的键也变 ⇒ 旧持久缓存整批失效(选图规则改了的作废通道)"
+    finally:
+        cm.CACHE_SCHEMA_VERSION = original
+
+
+def t_persistent_cache_store_then_lookup_reuses_bytes_offline():
+    """存一条再取: 字节逐字相同、record 公开字段齐、且**全程零网络**(法则: 可离线复现)。
+
+    这是同稿同片的地基: 第二次构建命中持久缓存时返回的字节必须和第一次下载的一模一样,
+    否则 emit 会变、渲染会变、ProduceID 会变。`download` 打桩写死一份字节, 不碰网络。
+    """
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        cache = Path(td) / "commons-cache"
+        work = Path(td) / "pathb_1" / "media"
+        work.mkdir(parents=True)
+        dest = work / "shot_01.jpg"
+        dest.write_bytes(b"\xff\xd8FAKEJPG\xe9\xff-bytes-for-determinism")
+        rec = dict(PD_RECORD, source_url="https://commons/wiki/File:A.jpg", bytes=dest.stat().st_size)
+        cm.cache_store(cache, "Changde Hunan", dest, rec)
+        hit = cm.cache_lookup(cache, "Changde Hunan")
+        assert hit is not None, "存过的查询词必须能取回"
+        assert Path(hit["_cached_bytes"]).read_bytes() == dest.read_bytes(), \
+            "复用的是同一份字节(同稿同片的硬保证)"
+        assert hit["source_url"] == rec["source_url"] and hit["query"] == "Changde Hunan"
+        assert "local_path" not in hit, "持久缓存不存 local_path(它随 work_dir 变)"
+
+
+def t_persistent_cache_lookup_misses_on_query_change():
+    """失效口径的负路径: 换查询词必须回落到重取, 不许静默复用别的选题的图。
+
+    缓存按查询词寻址(与镜号无关) ⇒ 镜号不参与 key, 这里只验换词这一条真失效通道。
+    """
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        cache = Path(td) / "commons-cache"
+        work = Path(td) / "m"
+        work.mkdir()
+        dest = work / "shot_01.jpg"
+        dest.write_bytes(b"\xff\xd8A\xff\xd9")
+        cm.cache_store(cache, "Changde Hunan", dest,
+                       dict(PD_RECORD, source_url="https://x/y"))
+        assert cm.cache_lookup(cache, "Zhuzhou Hunan") is None, "换词必须 miss(失效口径: query 变了重取)"
+        assert cm.cache_lookup(None, "Changde Hunan") is None, "没给 cache_dir 一律 miss(现状)"
+
+
+def t_resolve_shot_image_reuses_persistent_cache_across_fresh_work_dirs():
+    """端到端: 两个全新 work_dir、同一查询词 ⇒ 第二次**不打网络**直接复用第一次的字节。
+
+    这就是 ProduceID 非确定性的真根因所在: 旧代码每次 work_dir 是新的, work_dir 内的
+    cache_hit 从跨 run 不生效, 于是每次都走检索, Commons 排序漂移 → pick 换图 → 换片。
+    打桩把 search_photos 换成"每次返回不同排序", 证明有了持久缓存后第二次根本不检索,
+    排序漂不漂都无所谓 —— 同稿锁死同片。
+    """
+    import tempfile
+    call_count = {"search": 0}
+    original_search = cm.search_photos
+    original_download = cm.download
+
+    def fake_search(query, log=print):
+        call_count["search"] += 1
+        # 每次返回**反序**候选, 模拟检索排序漂移; 若第二次真走了网络就会选到另一张图
+        return list(reversed([PD_PAGE, CJK_PAGE])) if call_count["search"] > 1 else [PD_PAGE, CJK_PAGE]
+
+    def fake_download(url, dest, log=print):
+        dest.write_bytes(b"\xff\xd8" + url.encode("utf-8")[-8:] + b"\xff\xd9")
+        return True
+
+    with tempfile.TemporaryDirectory() as td:
+        cache = Path(td) / "commons-cache"
+        cm.search_photos = fake_search
+        cm.download = fake_download
+        try:
+            # 第一次: 两个全新 work_dir 各自的 media 都是空的, 必须走网络取图
+            w1 = Path(td) / "pathb_100" / "media"
+            w1.mkdir(parents=True)
+            rec1 = cm.resolve_shot_image("Changde Hunan", w1 / "shot_01.jpg",
+                                         log=lambda *a, **k: None, cache_dir=cache)
+            assert rec1 is not None and call_count["search"] == 1, "首取应走一次网络"
+            bytes1 = (w1 / "shot_01.jpg").read_bytes()
+            # 第二次: 另一个全新 work_dir(旧代码这里会重检索并因排序漂移拿到别的图)
+            w2 = Path(td) / "pathb_200" / "media"
+            w2.mkdir(parents=True)
+            rec2 = cm.resolve_shot_image("Changde Hunan", w2 / "shot_01.jpg",
+                                         log=lambda *a, **k: None, cache_dir=cache)
+            assert call_count["search"] == 1, \
+                f"第二次必须命中持久缓存、零检索(否则排序漂移会换图): search={call_count['search']}"
+            assert (w2 / "shot_01.jpg").read_bytes() == bytes1, "同稿两次构建字节必须一致"
+            assert rec2["title"] == rec1["title"] == PD_PAGE["title"], "锁定同一张图(取检索序第一, 非反序)"
+        finally:
+            cm.search_photos = original_search
+            cm.download = original_download
+
+
+def t_resolve_shot_image_persistent_cache_off_by_default():
+    """不传 cache_dir 时行为与旧版逐字一致(向后兼容: smoke 探针 / 显式关闭走这条)。"""
+    import tempfile
+    original_search = cm.search_photos
+    original_download = cm.download
+    seen = {"n": 0}
+
+    def fake_search(query, log=print):
+        seen["n"] += 1
+        return [PD_PAGE]
+
+    def fake_download(url, dest, log=print):
+        dest.write_bytes(b"\xff\xd8\xff\xd9")
+        return True
+
+    with tempfile.TemporaryDirectory() as td:
+        cm.search_photos = fake_search
+        cm.download = fake_download
+        try:
+            media = Path(td) / "media"
+            media.mkdir()
+            # 无 cache_dir: 每次全新 work_dir 都要重检索(现状), 证明新参数默认无副作用
+            r = cm.resolve_shot_image("Changde Hunan", media / "shot_01.jpg",
+                                      log=lambda *a, **k: None)
+            assert r is not None and seen["n"] == 1
+            media2 = Path(td) / "m2"
+            media2.mkdir()
+            cm.resolve_shot_image("Changde Hunan", media2 / "shot_01.jpg",
+                                  log=lambda *a, **k: None)
+            assert seen["n"] == 2, "没开持久缓存时, 第二次仍应检索(保持旧行为, 不静默复用)"
+        finally:
+            cm.search_photos = original_search
+            cm.download = original_download
+
+
+def t_persistent_cache_record_only_public_fields():
+    """落盘的 record 只能是公开出处字段: 绝不带 local_path(随 work_dir 变), 也不带任何凭据。"""
+    import tempfile
+    with tempfile.TemporaryDirectory() as td:
+        cache = Path(td) / "c"
+        work = Path(td) / "m"
+        work.mkdir()
+        dest = work / "shot_01.jpg"
+        dest.write_bytes(b"\xff\xd8\xff\xd9")
+        rec = dict(PD_RECORD, local_path=str(dest), source_url="https://x/y", query="Changde Hunan")
+        cm.cache_store(cache, "Changde Hunan", dest, rec)
+        stored = json.loads((cache / cm.cache_key("Changde Hunan") / cm.CACHE_RECORD_NAME)
+                            .read_text(encoding="utf-8"))
+        assert set(stored) <= set(cm.RECORD_FIELDS), \
+            f"缓存字段越界(混入了非公开字段): {set(stored) - set(cm.RECORD_FIELDS)}"
+        assert "local_path" not in stored and "image_url" not in stored
+
+
+def t_resolve_shot_image_pb_layer_reuses_bytes_and_grade_across_work_dirs():
+    """path_b 的 `_resolve_shot_image`: 传 cache_dir 后, 两个全新 work_dir 同查询词
+    拿到**逐字相同的图字节 + 相同 grade** —— 把口径 A 接到发射器这一层。
+
+    判据 4a 已证「固定发射 → 固定渲染 → 固定 silent.mp4」，本测试证「固定取图」这一环:
+    detect_faces 跑在复用的同一份字节上 ⇒ grade/faces 也一致 ⇒ 发射入参完全确定,
+    ProduceID 稳定性就此落回取图侧(它本就是画面字节的哈希)。
+    """
+    import tempfile
+    face_fixture = _P3_FIXTURE_DIR / "face-01.jpg"
+    assert face_fixture.is_file()
+    original_search = cm.search_photos
+    original_download = cm.download
+
+    def fake_search(query, log=print):
+        return [PD_PAGE]
+
+    def fake_download(url, dest, log=print):
+        import shutil
+        shutil.copyfile(face_fixture, dest)
+        return True
+
+    with tempfile.TemporaryDirectory() as td:
+        cache = Path(td) / "commons-cache"
+        cm.search_photos = fake_search
+        cm.download = fake_download
+        try:
+            scene = {"image": "Changde Hunan", "imageGrade": "material"}
+            w1 = Path(td) / "pathb_1"
+            w1.mkdir()
+            r1 = pb._resolve_shot_image(str(w1), 1, scene, {},
+                                        log=lambda *a, **k: None, cache_dir=cache)
+            w2 = Path(td) / "pathb_2"
+            w2.mkdir()
+            r2 = pb._resolve_shot_image(str(w2), 1, scene, {},
+                                        log=lambda *a, **k: None, cache_dir=cache)
+            # 必须在 td 退出前比对: TemporaryDirectory 一关，两个 work_dir 的字节都没了
+            assert (w1 / "media" / "shot_01.jpg").read_bytes() == \
+                   (w2 / "media" / "shot_01.jpg").read_bytes(), \
+                "两个 work_dir 的图字节必须逐字相同(同稿同片)"
+        finally:
+            cm.search_photos = original_search
+            cm.download = original_download
+    assert r1 is not None and r2 is not None
+    # 复用同一份字节 → 相对路径同为 media/shot_01.jpg, 且 face fixture 的 grade 一致
+    assert r1["local_path"] == r2["local_path"] == "media/shot_01.jpg", \
+        f"发射入参路径应一致(相对 work_dir): {r1['local_path']} vs {r2['local_path']}"
+    assert r1["grade"] == r2["grade"] == "G0", \
+        "face fixture + 检测器 → 两跑合成同一档 grade"
+
+
 
 
 # 两条补正样本: 一条中文标题的真文件(实跑里确实检到过), 一条只命中半个地名的次相关条目。
@@ -3380,8 +3598,9 @@ def t_p3_resolve_shot_image_writes_grade_record():
     assert face_fixture.is_file()
 
     # 打桩：cm.resolve_shot_image 直接返回一个指向 fixture 的假 record（无网络）。
+    # 必须吃 cache_dir 关键字 —— _resolve_shot_image 现在总是把它转发下去（口径 A）。
     original = cm.resolve_shot_image
-    def fake(query, dest, log=None):
+    def fake(query, dest, log=None, cache_dir=None):
         import shutil
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(face_fixture, dest)
@@ -3411,7 +3630,7 @@ def t_p3_resolve_shot_image_refuses_bad_author_grade():
     """作者把 imageGrade 拼成 'G0' / 'g1' / 空串 —— `_resolve_shot_image` 抛 ValueError 而不是静默。"""
     face_fixture = _P3_FIXTURE_DIR / "face-01.jpg"
     original = cm.resolve_shot_image
-    def fake(query, dest, log=None):
+    def fake(query, dest, log=None, cache_dir=None):
         import shutil
         dest.parent.mkdir(parents=True, exist_ok=True)
         shutil.copyfile(face_fixture, dest)

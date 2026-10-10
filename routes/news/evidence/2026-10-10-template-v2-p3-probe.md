@@ -7,6 +7,7 @@
 > · P3-8（示意标注 schematic-tag 强制注入，track 序最高=3）
 > · P3-9（落位禁令：G0 不进首镜/closer/人物镜/含专名镜；普通镜复检仍命中才弃）
 > · P3-10（含图旗舰同稿双渲染 · 判据 4a 视频流哈希一致 —— 见 K30）
+> · P4-A（口径 A：跨 work_dir 持久取图缓存，锁死同稿同片 → 同 ProduceID —— 见 K31）
 > 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成 + 原语映射表）
 > 探针：`skills/douyin-pro/scripts/p3_probe.py`（跑同一份实现，把结论落 JSON）
 > 接线：`path_b_build._resolve_shot_image`（构建期单点定档，写进 image_record）
@@ -14,7 +15,8 @@
 > 标注：`path_b_build.schematic_needed / emit_schematic_composition / emit_schematic_mount`（3 轨叠加）
 > 落位禁令：`path_b_build.image_deprecated`（纯判决）+ `emit_composition`（置空 local_path → §4 塌槽 + `image_gate.crop_and_recheck` 复检）
 > 预检：`routes/news/scripts/check_scene_contract.py`（写稿期抓坏合同）
-> 自检：`path_b_selftest.py` 的 28 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 169 项，全绿）
+> 自检：`path_b_selftest.py` 的 28 条 `t_p3_*` + 7 条 `t_persistent_cache/t_resolve_shot_image`（口径 A）
+> + 重写的 `t_hf_primitives_gate_*`（共 177 项，全绿）
 
 ## K17 检测器分离度 —— 一张真脸 + 一张真齿轮，四条通道并集分开
 
@@ -356,6 +358,55 @@ person 声明位端到端）。`hf_compile --check news-editorial-warm` 仍 ✓�
 **遗留到切片 7**：含 `photo-*` 版式的旗舰真渲染 —— 那时 `check_layout_grade`（切片 4 纯函数）在发射前接线，
 G1 scene 误配 `photo-duotone` 会 EmitterError；再补判据 4a 双跑哈希 + P3-审人工并排（需 `nvm use 22.20.0`
 与渲染同一次调用）。
+
+---
+
+## K31 ProduceID 非确定性的真根因 + 口径 A 持久取图缓存（P4，owner 选 A）
+
+**问题重述（推翻 P2 那句"容器头 mvhd 漂移"的旧账）**：`ProduceID = sha256(silent.mp4)[:32]`
+按渲染画面字节派生（path_b_build:3048，注释 3036：稿件改了没渲新片不该发同号）。P2 evidence 曾把它的不稳定
+归因于"容器头 mvhd 漂移"。**本轮含图旗舰双渲染（K30）连容器哈希都逐字节一致（`4342bd68…`）—— 旧归因被证伪并公开反证**：
+渲染对**固定发射**本就是字节可复现的（判据 4a），破口不在容器，在**发射入参的取图那一侧**。
+
+**真根因**：`resolve_shot_image`（commons_media:542）的缓存只在 `cache_hit`（work_dir 内 media-manifest）这一层，
+而 `default_work_dir` 每次返回全新的 `pathb_{pid}`（path_b_build:3247）⇒ **work_dir 缓存跨 run 永不复用**，
+每次都走 `search_photos → pick_candidate → download`。Commons 检索排序会漂，`pick_candidate`（取命中最多、
+并列取检索序第一）于是可能对**同一查询词**选到不同图 → 换画面 → 换 silent.mp4 → 换 ProduceID。这才是"同稿不同片"的来源。
+
+**口径 A（同稿必须同片）落法**：给 Commons 取图加一层**跨 work_dir 的持久内容缓存**，寻址键
+`cache_key(query) = sha256(f"{CACHE_SCHEMA_VERSION}\n{query}")`（commons_media）。`resolve_shot_image`
+的取图次序变成三级：① work_dir 内 `cache_hit`（单次 run 复用，不变）→ ② **新增**持久缓存命中直接
+`copyfile` 缓存字节到 dest、写 work_dir manifest、返回缓存 record（**零网络**，字节逐字相同）→ ③ 全不中才联网，
+成功后 `cache_store` 落盘。默认缓存根 `DEFAULT_IMAGE_CACHE_ROOT = .harness-news-runtime/commons-cache/`
+（与 work 同域：`.gitignore` 覆盖、不被系统清理、跨 run 存活）。发射确定 ⇒ 同片 ⇒ 同 ProduceID **自动成立，不碰 ProduceID 公式**。
+
+**失效口径**（owner 要的那层）：
+- **查询词变** → hash 变 → 自动 miss 重取（与 work_dir `cache_hit` 的 query 校验同源，只是跨 run 生效）。
+- **选图规则变**（`pick_candidate` 打分口径、授权/尺寸闸、`image_query` 回落）→ 把 `CACHE_SCHEMA_VERSION` +1
+  ⇒ 旧缓存整批作废，无需手动清目录。这是"规则改了、查询词没改"时唯一的失效通道，`t_persistent_cache_key_binds_schema_version_and_query` 钉住。
+- **想强刷某张冻歪的图**：删那个 cache 文件夹（或整目录）。**缓存对"检索排序漂移"故意失效**（选中的图被钉死），
+  这正是口径 A 要的取舍——可复现优先于最新。
+
+**边界**：新参数 `cache_dir` 默认 `None` ⇒ 旧调用逐字节不变（smoke 探针、`--no-image-cache` 走这条，测的是联网选图现状）。
+path_b CLI 默认**开**持久缓存，`--image-cache-dir DIR` 覆盖、`--no-image-cache` 关闭。31 套 path_b 手发包仍字节冻结（取图与否在
+`if compiled_pack`/取图段之外无关，缓存只换"取到哪张图"的确定性，不改无图包的任何字节）。
+
+**机器证明（新增 8 条 selftest，169 → 177/177 全绿）**：
+- `t_persistent_cache_key_binds_schema_version_and_query`：键是 (版本, 查询词) 纯函数，换词/换版本都换键。
+- `t_persistent_cache_store_then_lookup_reuses_bytes_offline`：存后取回字节逐字相同、公开字段齐、全程零网络；不存 `local_path`。
+- `t_persistent_cache_lookup_misses_on_query_change`：换词 miss；`cache_dir=None` 一律 miss（现状）。
+- `t_resolve_shot_image_reuses_persistent_cache_across_fresh_work_dirs`：**两个全新 work_dir、同查询词 ⇒ 第二次零检索**
+  （打桩把 `search_photos` 每次反序模拟排序漂移，断言 `search` 只被调 1 次、两跑字节一致、锁定检索序第一那张）。
+- `t_resolve_shot_image_persistent_cache_off_by_default`：不传 `cache_dir` 时每次重检索，行为与旧版逐字一致。
+- `t_persistent_cache_record_only_public_fields`：落盘 record 只含 `RECORD_FIELDS`，无 `local_path`/凭据。
+- `t_resolve_shot_image_pb_layer_reuses_bytes_and_grade_across_work_dirs`：path_b 发射器层传 `cache_dir` 后两跑
+  图字节 + `grade` 全一致（把口径 A 接到发射入参这一层）。
+- 两个旧 P3 打桩 fake 补 `cache_dir` 关键字（`_resolve_shot_image` 现总转发该参）。
+
+**端到端离线并跑（跑完即弃，不入产线）**：把离线种子图灌进持久缓存后，两个全新 work_dir 各发射一遍，
+`index.html + 全部 compositions + media/shot_01.jpg` **整棵产物树 sha256 全等** ⇒ 固定发射（本轮证）
+× 判据 4a 固定渲染（K30 证，含真渲染 `silent` sha256[:32]=`4342bd6896959485174f2ec6aff0874d` 两跑相同）
+⇒ **同稿 → 同缓存 → 同发射 → 同片 → 同 ProduceID** 链条闭合。
 
 ---
 

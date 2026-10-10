@@ -25,9 +25,11 @@
 
 from __future__ import annotations
 
+import hashlib
 import html as html_mod
 import json
 import re
+import shutil
 import time
 import urllib.error
 import urllib.parse
@@ -539,11 +541,18 @@ def download(url: str, dest: Path, max_bytes: int = MAX_DOWNLOAD_BYTES, log=prin
     return True
 
 
-def resolve_shot_image(query: str, dest: Path, log=print) -> dict | None:
+def resolve_shot_image(query: str, dest: Path, log=print,
+                       cache_dir: Path | None = None) -> dict | None:
     """一镜一张: 检索 → 三道闸 → 下载缩略图到 dest, 返回带 ``local_path`` 的记录。
 
     任何一步不成都不停机: 返回 ``None``, 发射器降级到"绘制地面"那一层(它不依赖网络)。
     缓存判定见 ``cache_hit`` —— 查询词变了就必须重取, 只看文件名会复用上一版的图。
+
+    口径 A(同稿必须同片): 传入 ``cache_dir`` 时启用**跨 work_dir 的持久内容缓存**。
+    work_dir 内的 ``cache_hit`` 只在同一次 run 内复用(每次 run work_dir 是新的), 换一次
+    构建就失效 ⇒ Commons 检索排序漂移会让同稿选到不同图 → 不同片 → 不同 ProduceID。
+    持久缓存按 ``cache_key(query)`` 寻址, 首次取图落盘, 之后同查询词**直接复用同一份字节**,
+    选图从此与检索排序无关 → 发射确定 → 同片自动成立。失效见 ``CACHE_SCHEMA_VERSION``。
     """
     if dest.exists() and dest.stat().st_size > 0:
         cached = cache_hit(read_manifest(dest.parent, log=log), dest.name, query)
@@ -551,6 +560,14 @@ def resolve_shot_image(query: str, dest: Path, log=print) -> dict | None:
             log(f"    · 复用本地缓存 {dest.name}")
             return dict(cached, local_path=str(dest))
         log(f"    · {dest.name} 与当前查询词不匹配, 重新取图")
+    # 持久缓存(跨 work_dir): 同查询词只要历史上取过一次, 直接复用那份字节, 不再走网络。
+    hit = cache_lookup(cache_dir, query) if cache_dir else None
+    if hit:
+        bytes_path = hit.pop("_cached_bytes")
+        shutil.copyfile(bytes_path, dest)
+        write_manifest(dest.parent, dest.name, hit, log=log)
+        log(f"    · 复用持久缓存 {dest.name}（跨 work_dir，查询词命中 ⇒ 同稿同片）")
+        return dict(hit, local_path=str(dest))
     try:
         pages = search_photos(query, log=log)
     except (urllib.error.URLError, OSError, ValueError, json.JSONDecodeError) as exc:
@@ -570,12 +587,94 @@ def resolve_shot_image(query: str, dest: Path, log=print) -> dict | None:
     record["bytes"] = dest.stat().st_size
     record["query"] = query
     write_manifest(dest.parent, dest.name, record, log=log)
+    cache_store(cache_dir, query, dest, record)
     log(f"    · 取图 {record['title']} ({record['width']}x{record['height']} → {dest.name}, "
         f"{record['bytes'] // 1024}KB, 命中 {record['relevance']} 词) 授权: {record['license']}")
     return record
 
 
 MANIFEST_NAME = "media-manifest.json"
+
+#: 落盘记录里保留的公开字段（署名清单与持久缓存共用这一份口径，字段增减只改这里）。
+#: 绝不含 `local_path`（随 work_dir 变）与任何凭据。
+RECORD_FIELDS = ("query", "title", "artist", "license", "terms", "width", "height",
+                 "source_url", "thumb_url", "license_reason", "relevance", "bytes")
+
+#: 持久缓存的**失效版本号**（口径 A：同稿必须同片）。
+#: 为什么寻址键里要掺它：持久缓存刻意"冻结"某次选图结果 —— Commons 检索排序会漂，
+#: 但同稿必须渲同片（见 P4 evidence）。若哪天改了选图逻辑（pick_candidate 打分口径、
+#: 授权/尺寸闸、image_query 回落规则），旧缓存字节仍是"按旧规则选出的"，必须整批作废。
+#: 改这些逻辑时把这里 +1，等于声明"旧缓存不可信"，无需手动清目录。
+CACHE_SCHEMA_VERSION = 1
+
+#: 持久缓存目录（在 work_dir 之外，跨 run 复用；由 .gitignore 覆盖的运行时域）。
+PERSISTENT_CACHE_DIRNAME = "commons-cache"
+
+
+def cache_key(query: str) -> str:
+    """查询词 → 稳定十六进制键。**选图规则的版本 + 查询词**共同寻址。
+
+    为什么不只用查询词字面当目录名：查询词是中文/含斜杠/可超长，做路径不安全也难看；
+    为什么掺 SCHEMA_VERSION：见 CACHE_SCHEMA_VERSION（规则一改，旧键整体失效）。
+    键是纯函数（同 query+同版本永远同键）⇒ 缓存判定可离线复现，法则 3。
+    """
+    basis = f"{CACHE_SCHEMA_VERSION}\n{query}"
+    return hashlib.sha256(basis.encode("utf-8")).hexdigest()
+
+
+def persistent_cache_dir(root: Path) -> Path:
+    """持久缓存根目录：默认落在运行时 work 根的兄弟目录（跨 work_dir 共享）。"""
+    return Path(root) / PERSISTENT_CACHE_DIRNAME
+
+
+#: 持久缓存文件夹内的固定文件名: 缓存**按查询词寻址**(cache_key=query+版本)，一个查询词一张图，
+#: 与镜号无关 —— 同查询词本就应拿到同一张图，这正是口径 A 要的确定性。
+CACHE_IMAGE_NAME = "image.jpg"
+CACHE_RECORD_NAME = "record.json"
+
+
+def cache_lookup(cache_dir: Path, query: str) -> dict | None:
+    """持久缓存命中判定：查询词命中的文件夹里字节 + record 都在才算命中。
+
+    与 `cache_hit`（work_dir 内、按镜号+文件名）不同，这一层按 **cache_key(query)**
+    寻址，跨 work_dir 复用。缺 record、缺字节、或 query 与存的都对不上 → 未命中。
+    """
+    if not cache_dir or not query:
+        return None
+    folder = Path(cache_dir) / cache_key(query)
+    img = folder / CACHE_IMAGE_NAME
+    rec_path = folder / CACHE_RECORD_NAME
+    if not (img.exists() and img.stat().st_size > 0 and rec_path.exists()):
+        return None
+    try:
+        record = json.loads(rec_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    if not isinstance(record, dict) or record.get("query") != query or not record.get("source_url"):
+        return None
+    return {"_cached_bytes": str(img), **record}
+
+
+def cache_store(cache_dir: Path, query: str, dest: Path, record: dict) -> None:
+    """把一次成功取图落进持久缓存：字节一份、公开字段 record 一份，按 cache_key 寻址。
+
+    原子性：先写 .part 再 replace，避免半张图被下次 run 当命中读走（同 download 的口径）。
+    """
+    if not cache_dir or not query:
+        return
+    folder = Path(cache_dir) / cache_key(query)
+    folder.mkdir(parents=True, exist_ok=True)
+    public = {k: record.get(k) for k in RECORD_FIELDS}
+    public["query"] = query
+    img_path = folder / CACHE_IMAGE_NAME
+    tmp_img = img_path.with_suffix(".jpg.part")
+    shutil.copyfile(dest, tmp_img)
+    tmp_img.replace(img_path)
+    rec_path = folder / CACHE_RECORD_NAME
+    tmp_rec = rec_path.with_suffix(".json.part")
+    tmp_rec.write_text(json.dumps(public, ensure_ascii=False, indent=1), encoding="utf-8")
+    tmp_rec.replace(rec_path)
+
 
 
 def read_manifest(media_dir: Path, log=print) -> dict:
@@ -594,8 +693,6 @@ def read_manifest(media_dir: Path, log=print) -> dict:
 def write_manifest(media_dir: Path, name: str, record: dict, log=print) -> None:
     """写回一条(合并式, 不覆盖别镜的记录)。只存公开字段, 不含任何凭据。"""
     manifest = read_manifest(media_dir, log=log)
-    manifest[name] = {k: record.get(k) for k in
-                      ("query", "title", "artist", "license", "terms", "width", "height",
-                       "source_url", "thumb_url", "license_reason", "relevance", "bytes")}
+    manifest[name] = {k: record.get(k) for k in RECORD_FIELDS}
     (media_dir / MANIFEST_NAME).write_text(
         json.dumps(manifest, ensure_ascii=False, indent=1), encoding="utf-8")

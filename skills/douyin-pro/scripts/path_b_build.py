@@ -2176,13 +2176,17 @@ def choose_layout(pack: dict, scene: dict, ctx: dict) -> str:
 
 
 def _resolve_shot_image(work_dir: str, shot_index: int, scene: dict,
-                        ctx: dict, log=print):
+                        ctx: dict, log=print, cache_dir: Path | None = None):
     """为这一镜取一张真实图片(Wikimedia Commons); 任何环节失败都降级为无图。
 
     查询词复用 commons_media.image_query 的优先级: scene.image 显式(作者写
     false ⇒ 跳过该镜, 不许回落 kicker) > scene.kicker; 再回落 ctx.kicker
     (--kicker 全局眉标)。返回的 record["local_path"] 是相对 work_dir 的
     相对路径, 让 HTML 直接当 src 用, 不依赖引擎加载根。
+
+    `cache_dir` 是跨 work_dir 的持久取图缓存(口径 A)。传入时同查询词第二次构建直接
+    复用同一份字节 → 发射确定 → 同片同 ProduceID; 传 None 则退回到"每次联网重取"
+    (smoke 探针 --no-image-cache 走这条, 保持联网现状)。
     """
     if scene.get("image") is False:
         return None
@@ -2195,7 +2199,7 @@ def _resolve_shot_image(work_dir: str, shot_index: int, scene: dict,
     media_dir = Path(work_dir) / "media"
     media_dir.mkdir(parents=True, exist_ok=True)
     dest = media_dir / f"shot_{shot_index:02d}.jpg"
-    record = cm.resolve_shot_image(query, dest, log=log)
+    record = cm.resolve_shot_image(query, dest, log=log, cache_dir=cache_dir)
     if record is None:
         return None
     # P3 §3：图到手立刻定档，grade 写回 record，供 §5/§6/§7 只读一份事实。
@@ -3224,6 +3228,12 @@ def parse_resolution(text: str) -> tuple[int, int]:
 #: 渲染工作目录的默认根（2026-10-08 起，理由见 default_work_dir 的 docstring）
 DEFAULT_WORK_ROOT = Path(__file__).resolve().parents[3] / ".harness-news-runtime" / "work"
 
+#: 跨 work_dir 的 Commons 取图持久缓存根（口径 A：同稿必须同片）。默认落在 work 根的兄弟目录
+#: `.harness-news-runtime/commons-cache/` —— 与 work_dir 同域（.gitignore 覆盖、不被系统清理），
+#: 但**不随 work_dir 每次新建而清空**。work_dir 内的 media-manifest 只在单次 run 生效，
+#: 这一层才是跨 run 复用的原因（详见 commons_media.resolve_shot_image 的 docstring）。
+DEFAULT_IMAGE_CACHE_ROOT = DEFAULT_WORK_ROOT.parent / "commons-cache"
+
 
 def default_work_dir() -> str:
     """本次渲染的工作目录，**默认落在项目内而不是系统 temp**。
@@ -3293,6 +3303,13 @@ def main():
                     help="改用 GPU 光栅化 (--browser-gpu)。默认软件光栅：硬件路径实测不产出"
                          "逐字节可复现的码流（判据 4a），只在排查渲染本身时开")
     ap.add_argument("--work-dir", help="指定中间文件目录(存在则复用, 且不清理)")
+    ap.add_argument("--image-cache-dir", default=None, metavar="DIR",
+                    help="跨 work_dir 的 Commons 取图持久缓存目录 "
+                         "(默认 .harness-news-runtime/commons-cache/)。同稿必须同片(口径 A): "
+                         "同查询词第二次构建直接复用缓存字节, 选图与检索排序漂移无关 ⇒ 发射确定。")
+    ap.add_argument("--no-image-cache", action="store_true",
+                    help="禁用持久取图缓存, 每次联网重取(现状行为)。smoke 探针要测联网选图时用它; "
+                         "代价: 关掉后同稿不保证同片。")
     ap.add_argument("--hyperframes-bin",
                     help="显式指定 hyperframes 可执行(跳过自动探测); 排查与新机器用")
     ap.add_argument("--check-only", action="store_true", help="只发射+版式自检+check 门禁, 不渲染")
@@ -3391,13 +3408,20 @@ def main():
         with timed("images"):
             # 逐镜取图 (best-effort: 网络/授权/尺寸/相关性任何失败都降级为该镜无图)
             # --skip-render 与 --check-only 不打网络, 全部降级为无图。
+            # 持久缓存(口径 A): 默认开, 让同稿同片; --no-image-cache 退回每次联网重取。
+            image_cache = None if args.no_image_cache else Path(
+                args.image_cache_dir or DEFAULT_IMAGE_CACHE_ROOT)
             if args.skip_render or args.check_only:
                 image_records = [None] * len(scenes)
                 log("图: 跳过 (--skip-render / --check-only 不取图)")
             else:
+                if image_cache is not None:
+                    image_cache.mkdir(parents=True, exist_ok=True)
+                    log(f"图: 持久缓存 {image_cache}（同查询词复用同一份字节）")
                 image_records = []
                 for i, sc in enumerate(scenes, 1):
-                    rec = _resolve_shot_image(work, i, sc, ctx_base, log=log)
+                    rec = _resolve_shot_image(work, i, sc, ctx_base, log=log,
+                                              cache_dir=image_cache)
                     image_records.append(rec)
                     if rec is not None:
                         log(f"  镜{i} 图: {rec['title']} ({rec['width']}x{rec['height']}, "
