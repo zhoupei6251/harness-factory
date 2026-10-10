@@ -1,10 +1,13 @@
 # 模板 v2 · P3 图片门禁 · 探针入库（2026-10-10）
 
-> 上游：`docs/superpowers/specs/2026-10-10-news-p3-image-gate-design.md` §2/§8
+> 上游：`docs/superpowers/specs/2026-10-10-news-p3-image-gate-design.md` §2/§3/§8
 > 覆盖判据：P3-1（分离度）· P3-2（黑名单非摆设）· P3-3（探针入库）
-> 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器本体）
+> · P3-4（grade 合成四组合）· P3-5（检测器失效→G0）
+> 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成）
 > 探针：`skills/douyin-pro/scripts/p3_probe.py`（跑同一份实现，把结论落 JSON）
-> 自检：`path_b_selftest.py` 的 6 条 `t_p3_*`（共 147 项，全绿）
+> 接线：`path_b_build._resolve_shot_image`（构建期单点定档，写进 image_record）
+> 预检：`routes/news/scripts/check_scene_contract.py`（写稿期抓坏合同）
+> 自检：`path_b_selftest.py` 的 13 条 `t_p3_*`（共 154 项，全绿）
 
 ## K17 检测器分离度 —— 一张真脸 + 一张真齿轮，四条通道并集分开
 
@@ -67,6 +70,78 @@ face-01 上的三个框（原图像素坐标）：`(168,536,179²)`（alt2 mirro
 `_DENIED_CASCADES` 从 `image_gate.py` 移除后，`detect_faces(gear, cascade_names=_DENIED_CASCADES)` 会 AttributeError 而非返回零命中，`t_p3_blacklist_denials_are_not_decorative` 报错而不是通过 —— 这条测试**不需要一个"删除即红"的反证**，因为常量本身是它的引用面；红线来自引用不存在的名字。
 
 真正的漂移风险是"有人悄悄把 blacklist 加进 `_ALLOWED_CASCADES`"—— 那时 `t_p3_gear_fixture_hits_nothing_on_whitelist` 立刻红（gear 在 default+upperbody 上有 7 命中）。这条已经被 K17 的"四通道并集全零"覆盖了。
+
+---
+
+## K22 档合成：`max(author, floor)` 序 G0>G1>G2，G0 只有两个来源
+
+设计 §3 把 "G0" 定义成**机器事实**，作者合同只写 `imageGrade: "scene" | "material"`，
+`None` 默认 scene。合成规则（`image_gate.synth_grade`）：
+
+| 作者档 | 检测器 floor | 终档 | 依据 |
+|---|---|---|---|
+| material (G2) | G0（检出脸）| **G0** | 机器抬 |
+| scene (G1) | None（无脸）| G1 | 作者档就是终档 |
+| material (G2) | None | G2 | 同上 |
+| None（未声明）| None | **G1**（不是 G0）| "作者漏标一次就永久丢图"过苛；G1 仍强裁切+压色 |
+| 任一 | 检测器不可用 | **G0** | §6.5 硬规则 3：不能相信"没测到脸" |
+
+作者**不能**声明 G0（`AUTHOR_GRADE_TO_CODE` 只认 scene/material）；`None` 或拼错串
+（`"G0"`/`"g1"`/`""`/`"material "`）→ `ValueError` 停机，不静默回落。判据 P3-4 的
+"四组合"和 P3-5 的"检测器失效→G0" 全在 `t_p3_synth_grade_matrix_four_combinations` /
+`t_p3_synth_grade_refuses_author_g0_and_typos` / `t_p3_synth_grade_unavailable_detector_bumps_to_g0`
+三条测试里落死，加一条反向 `t_p3_synth_grade_g0_is_only_from_face_or_unavailable` 断言
+"G0 只能来自 face/unavailable"（防作者合同将来偷偷多出 G0 的写法）。
+
+## K23 构建期单点定档：`_resolve_shot_image` 把 grade 写进 image_record
+
+设计 §3 强调"检测成本单点、结论单点" —— §5/§6/§7 只读一份 record，不各自检测。
+`path_b_build._resolve_shot_image`（`:2092`）在 `cm.resolve_shot_image` 成功后立刻：
+
+```python
+detection = ig.detect_faces(abs_path)
+record["detector_available"] = detection.detector_available
+record["faces"] = [list(b.to_tuple()) for b in detection.faces]
+record["grade"] = ig.synth_grade(scene.get("imageGrade"), detection)
+record["person"] = bool(scene.get("person", False))
+record["namedSubject"] = bool(scene.get("namedSubject", False))
+```
+
+`local_path` 保留 work_dir 相对，其他四字段是切片 3-6 的唯一读源。渲染日志一行
+`档=G0 (检测器ok, 脸=3)` 让人一眼看到"这一镜是被检测器拦的还是作者标的"。
+
+**测**：`t_p3_resolve_shot_image_writes_grade_record` 用 face-01 fixture + monkey-patch
+`cm.resolve_shot_image` 走完整构建路径，断 record 五字段齐全；作者声明 `material`
+但 fixture 是 face → grade 被抬到 G0（这条同时打穿"合成正确"和"单点定档落到 record"）。
+`t_p3_resolve_shot_image_refuses_bad_author_grade` 断拼错串走 ValueError 而不是静默。
+
+## K24 写稿期预检：`check_scene_contract` 提前抓合同缺陷
+
+`routes/news/scripts/check_scene_contract.py:38` 的 `check_scene` 加第 6 段：只在
+`scene["image"]` 有值时才查（无图不查，`scene["image"]=False` 跳过整段）。抓两类：
+- `imageGrade ∉ {"scene","material",None}` → 报问题，说明"渲染会在 `_resolve_shot_image` 抛"。
+- `person`/`namedSubject` 存在但非 bool → 报问题，说明"§7 落位禁令按 `is True` 判"。
+
+这条不是重复劳动 —— `check_scene_contract` 是**写稿那一刻**跑的（无渲染、无网络），
+`synth_grade` 的 ValueError 是**构建期**才炸。预检让作者不必等 15 分钟才知道自己
+把 `imageGrade` 写成 `"G0"`。测在 `t_p3_scene_contract_preflight_catches_bad_author_fields`
+（三断言：坏 imageGrade / 坏 person / 干净合同不误报）。
+
+## K25 当前产线状态：门仍关，检测器与合成已就位但原语未接线
+
+切片 2 交付后，`_resolve_shot_image` 已经把 grade 落到 record，但：
+- `image-gate-ready` 编译期仍是硬编码 `False`（`hf_compile.py:545`），
+  `photo-duotone`/`photo-local-crop`/`ken-burns-in` 全部拒编 —— 没有版式能选到它们。
+- `check_preconditions` 的 `has_asset` 形参与 asset 分支仍在。
+- 版式 emit 不读 `record["grade"]`，示意标注、纹理化、落位禁令还没接。
+
+也就是说，**即使现在给 spec 一个 `image` 键也不会真的把图放进画面**。这个"接了线但
+没通电"的状态是设计 §10 分片顺序的中间站，不是缺陷。切片 3 迁 `asset→CALLSITE` +
+把 `image-gate-ready` 换成 `capability_ok()` 运行时判定时才通电；那才是"图进画面"
+的开关。
+
+自检计数：P2 收官 141 → 切片 1 加 6 条 P3 检测器 → 切片 2 加 7 条 P3 合成/接线/预检 =
+**154/154 全绿**。
 
 ---
 

@@ -19,9 +19,10 @@ G1/G2 的场景可推断性本轮不可测，交给作者声明（设计 §3）�
    ``detect_faces`` 入口把缩略图归一到 ``MIN_SHORT_EDGE=720``（对齐
    ``commons_media.MIN_SHORT_EDGE``）再检 —— 产线和探针共用这一个常数。
 
-失效口径（设计 §6.5 硬规则 3）：**cv2 装不上 / cascade 加载不出，一律当"检测器
-不可用"** —— 由调用方（``path_b_build`` 的 grade 合成）把这一档抬到 G0。
-本模块只报事实（``detector_available=False``），不做保守合成。
+失效口径（设计 §6.5 硬规则 3）：**cv2 装不上 / cascade 加载不出 / 图字节读不出，
+一律当"检测器不可用"（`detector_available=False`）** —— 由调用方（`compose_grade`）
+把这一档抬到 G0。本模块只提供判据事实，不做保守合成；`compose_grade` 是同模块的
+纯函数合成层，产线与探针都走它，不各写一份。
 """
 
 from __future__ import annotations
@@ -229,3 +230,43 @@ def crop_and_recheck(image_path: str | Path, faces: tuple[Box, ...]) -> bool:
 def digest_bytes(path: str | Path) -> str:
     """测试图字节摘要，进 evidence 记录 —— 同 sha 同档是判据 4a 的静态锚。"""
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()[:16]
+
+
+# ---------------------------------------------------------------- 档合成（设计 §3）
+
+#: 序 G0 > G1 > G2（**越靠左越受限**），合成用 `max(…，key=档位)`。
+GRADE_ORDER = ("G2", "G1", "G0")
+#: 作者合同 `imageGrade` 的取值 → 内部档字符串。作者**不能**声明 G0（那是机器事实）。
+AUTHOR_GRADE_TO_CODE = {"scene": "G1", "material": "G2"}
+#: 未声明时的默认档。设计 §3："作者没写 imageGrade → 默认 G1，不是 G0"。
+#: 默认 G0 会让"作者漏标一次就永久丢图"，过苛；G1 仍强制裁切+压色去识别，安全且可用。
+DEFAULT_AUTHOR_GRADE = "scene"
+
+
+def synth_grade(author_grade: str | None, detector: GradeResult) -> str:
+    """`final = max(author_grade, detector_floor)`，序 G0 > G1 > G2。
+
+    - ``author_grade`` 只认 ``"scene"|"material"``；``None`` → ``"scene"``（G1 默认）。
+      传别的字符串**抛 ValueError** —— 静默默认会让拼错的作者合同被当成"没写"，
+      判据 P3-4 的"未声明→G1"就变成"任何非 scene/material 输入→G1"。
+    - ``detector.detector_available=False`` → floor 硬抬到 G0（§6.5 硬规则 3：
+      检测器坏 = 不能相信"没测到脸"，按最坏当可指认）。
+    - ``detector.floor`` 是 ``"G0"`` 或 ``None``（True/False 的语义在 §2 定死），
+      None 表示"检不出脸，floor 不参与合成"。
+    """
+    key = (author_grade if author_grade is not None else DEFAULT_AUTHOR_GRADE)
+    if not isinstance(key, str) or key not in AUTHOR_GRADE_TO_CODE:
+        raise ValueError(
+            f"作者档只能是 'scene'/'material'/None（未声明），收到 {author_grade!r} —— "
+            "G0 是机器事实不是作者选项，拼错静默回落会把合同缺陷藏成生产数据")
+    author_code = AUTHOR_GRADE_TO_CODE[key]
+    if not detector.detector_available:
+        floor_code = "G0"
+    elif detector.floor is None:
+        floor_code = None
+    else:
+        floor_code = detector.floor
+    if floor_code is None:
+        return author_code
+    return max((author_code, floor_code), key=GRADE_ORDER.index)
+

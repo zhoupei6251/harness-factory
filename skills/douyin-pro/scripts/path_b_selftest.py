@@ -3281,6 +3281,150 @@ def t_p3_detector_is_deterministic_on_same_bytes():
         "同图两次 detect_faces 结果不一致 —— 检测器引入了状态或时间，判据 4a 会破。")
 
 
+# ---- P3 grade 合成（设计 §3）判据 P3-4 / P3-5 --------------------------------
+
+def _gr(designator: str) -> ig.GradeResult:
+    """构造一个 GradeResult 只用于合成测试 —— 不跑检测器。"""
+    if designator == "face":
+        return ig.GradeResult(detector_available=True,
+                              faces=(ig.Box(0, 0, 100, 100),), floor="G0")
+    if designator == "clean":
+        return ig.GradeResult(detector_available=True, faces=(), floor=None)
+    if designator == "unavailable":
+        return ig.GradeResult(detector_available=False, faces=(), floor=None)
+    raise ValueError(designator)
+
+
+def t_p3_synth_grade_matrix_four_combinations():
+    """P3-4：`max(author, floor)` 四组合全对（序 G0>G1>G2）。"""
+    # 作者 G2 + 检出脸 → G0（机器抬）
+    assert ig.synth_grade("material", _gr("face")) == "G0"
+    # 作者 G1 + 无脸 → G1（作者声明就是终档）
+    assert ig.synth_grade("scene", _gr("clean")) == "G1"
+    # 作者 G2 + 无脸 → G2
+    assert ig.synth_grade("material", _gr("clean")) == "G2"
+    # 未声明 + 无脸 → G1（默认 scene，不是 G0；避免"漏标一次永久丢图"）
+    assert ig.synth_grade(None, _gr("clean")) == "G1"
+
+
+def t_p3_synth_grade_refuses_author_g0_and_typos():
+    """作者不能声明 G0，也不能拼错 —— 静默回落会把合同缺陷藏成生产数据。"""
+    for bad in ("G0", "g0", "scene-typo", "",  # 空串（未声明应用 None）
+                "material ", "person"):
+        try:
+            ig.synth_grade(bad, _gr("clean"))
+        except ValueError:
+            continue
+        raise AssertionError(f"imageGrade={bad!r} 应抛 ValueError，实际静默通过")
+
+
+def t_p3_synth_grade_unavailable_detector_bumps_to_g0():
+    """P3-5：检测器不可用 → 保守 G0 —— 与"作者档"无关（作者 G2 也抬到 G0）。
+
+    §6.5 硬规则 3：不能相信"没测到脸"。测得用齿轮图（作者声明 material，检测器坏）
+    → 仍 G0，证明保守来自"失效"而不是"内容"，也证明 synth_grade 不读图字节。
+    """
+    assert ig.synth_grade("material", _gr("unavailable")) == "G0"
+    assert ig.synth_grade("scene", _gr("unavailable")) == "G0"
+    assert ig.synth_grade(None, _gr("unavailable")) == "G0"
+
+
+def t_p3_synth_grade_g0_is_only_from_face_or_unavailable():
+    """G0 只有两种来源：检出脸 或 检测器失效。作者声明永远拿不到 G0。"""
+    # 反证：三种作者档 × "clean" 全不产生 G0
+    for author in (None, "scene", "material"):
+        assert ig.synth_grade(author, _gr("clean")) != "G0", (
+            f"author={author!r}+clean 却出了 G0 —— G0 泄漏到作者合同，"
+            "会让'作者漏标一次就永久丢图'变成设计事实")
+    # 只有 face / unavailable 能给 G0
+    assert ig.synth_grade("material", _gr("face")) == "G0"
+    assert ig.synth_grade("material", _gr("unavailable")) == "G0"
+
+
+def t_p3_resolve_shot_image_writes_grade_record():
+    """`_resolve_shot_image` 取图成功后必须把 `{grade, detector_available, faces, person, namedSubject}` 落到 record —— 设计 §3 的单点事实源。"""
+    face_fixture = _P3_FIXTURE_DIR / "face-01.jpg"
+    assert face_fixture.is_file()
+
+    # 打桩：cm.resolve_shot_image 直接返回一个指向 fixture 的假 record（无网络）。
+    original = cm.resolve_shot_image
+    def fake(query, dest, log=None):
+        import shutil
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(face_fixture, dest)
+        return {"local_path": str(dest), "title": "fake", "width": 1280, "height": 1742,
+                "license": "CC BY 3.0", "artist": "test", "thumb_url": None,
+                "image_url": None, "source_url": None, "license_reason": None,
+                "relevance": 1, "bytes": dest.stat().st_size, "query": query}
+    cm.resolve_shot_image = fake
+    try:
+        with tempfile.TemporaryDirectory() as work:
+            scene = {"image": "test-face", "imageGrade": "material",
+                     "person": True, "namedSubject": False}
+            rec = pb._resolve_shot_image(work, 1, scene, {})
+    finally:
+        cm.resolve_shot_image = original
+    assert rec is not None, "打桩后 _resolve_shot_image 不该返回 None"
+    # face-01 检出脸 → 即使作者声明 material，floor 抬 G0
+    assert rec["grade"] == "G0", f"face fixture + author=material 应合成 G0，实际 {rec['grade']}"
+    assert rec["detector_available"] is True
+    assert len(rec["faces"]) >= 1, "face-01 该有命中"
+    assert rec["person"] is True and rec["namedSubject"] is False, "作者 flag 必须原样进 record"
+    assert rec["local_path"].startswith("media/") or "\\" not in rec["local_path"], \
+        f"local_path 应 work_dir 相对正斜杠，实际 {rec['local_path']}"
+
+
+def t_p3_resolve_shot_image_refuses_bad_author_grade():
+    """作者把 imageGrade 拼成 'G0' / 'g1' / 空串 —— `_resolve_shot_image` 抛 ValueError 而不是静默。"""
+    face_fixture = _P3_FIXTURE_DIR / "face-01.jpg"
+    original = cm.resolve_shot_image
+    def fake(query, dest, log=None):
+        import shutil
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(face_fixture, dest)
+        return {"local_path": str(dest), "title": "fake", "width": 1280, "height": 1742,
+                "license": "CC BY 3.0", "artist": "test", "thumb_url": None,
+                "image_url": None, "source_url": None, "license_reason": None,
+                "relevance": 1, "bytes": dest.stat().st_size, "query": query}
+    cm.resolve_shot_image = fake
+    try:
+        with tempfile.TemporaryDirectory() as work:
+            for bad in ("G0", "g1", "", "person"):
+                scene = {"image": "x", "imageGrade": bad}
+                try:
+                    pb._resolve_shot_image(work, 1, scene, {})
+                except ValueError:
+                    continue
+                raise AssertionError(f"imageGrade={bad!r} 应抛 ValueError")
+    finally:
+        cm.resolve_shot_image = original
+
+
+def t_p3_scene_contract_preflight_catches_bad_author_fields():
+    """P3 §3 作者合同的预检必须提前抓 —— 别等到 `_resolve_shot_image` 才炸。"""
+    import sys
+    news_scripts = Path(__file__).resolve().parents[3] / "routes" / "news" / "scripts"
+    if str(news_scripts) not in sys.path:
+        sys.path.insert(0, str(news_scripts))
+    import check_scene_contract as csc
+    pack = pb.load_style_pack("news-coral")
+    lay = dict(pack["layouts"])["hook"]
+    lay["_name"] = "hook"
+    lay["_row_capacity"] = pb.row_capacity(lay)
+    bad_grade = csc.check_scene(
+        {"body": "有正文", "title": "有标题", "image": "x", "imageGrade": "G0"}, lay, 1)
+    assert any("imageGrade" in p for p in bad_grade), f"G0 应预检报错，实际 {bad_grade}"
+    bad_flag = csc.check_scene(
+        {"body": "有正文", "title": "有标题", "image": "x", "person": "true"}, lay, 1)
+    assert any("person" in p and "bool" in p for p in bad_flag), \
+        f"person 非 bool 应预检报错，实际 {bad_flag}"
+    clean = csc.check_scene(
+        {"body": "有正文", "title": "有标题", "image": "x", "imageGrade": "scene",
+         "person": True, "namedSubject": False}, lay, 1)
+    assert not any("imageGrade" in p or "namedSubject" in p for p in clean), \
+        f"合法合同不该误报：{clean}"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

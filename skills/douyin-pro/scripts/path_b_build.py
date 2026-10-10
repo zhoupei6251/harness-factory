@@ -67,6 +67,7 @@ from pathlib import Path
 import aigc_mode
 import layout_selfcheck
 import commons_media as cm
+import image_gate as ig  # noqa: E402  (P3 图片门禁：本地零网络人脸检测器 + 档合成)
 
 
 # ------------------------- 常量 (禁止魔法值) -------------------------
@@ -2112,8 +2113,17 @@ def _resolve_shot_image(work_dir: str, shot_index: int, scene: dict,
     record = cm.resolve_shot_image(query, dest, log=log)
     if record is None:
         return None
+    # P3 §3：图到手立刻定档，grade 写回 record，供 §5/§6/§7 只读一份事实。
+    # 检测器不可用 → synth_grade 抬到 G0（保守），不静默当"无脸"。
+    abs_path = record["local_path"]
+    detection = ig.detect_faces(abs_path)
+    record["detector_available"] = detection.detector_available
+    record["faces"] = [list(b.to_tuple()) for b in detection.faces]
+    record["grade"] = ig.synth_grade(scene.get("imageGrade"), detection)
+    record["person"] = bool(scene.get("person", False))
+    record["namedSubject"] = bool(scene.get("namedSubject", False))
     # 绝对路径转 work_dir 相对(正斜杠), HTML 引用方便
-    record["local_path"] = os.path.relpath(record["local_path"], work_dir).replace(os.sep, "/")
+    record["local_path"] = os.path.relpath(abs_path, work_dir).replace(os.sep, "/")
     return record
 
 # ------------------------- HTML 发射 -------------------------
@@ -3170,7 +3180,10 @@ def main():
                     rec = _resolve_shot_image(work, i, sc, ctx_base, log=log)
                     image_records.append(rec)
                     if rec is not None:
-                        log(f"  镜{i} 图: {rec['title']} ({rec['width']}x{rec['height']}, {rec['license']})")
+                        log(f"  镜{i} 图: {rec['title']} ({rec['width']}x{rec['height']}, "
+                            f"{rec['license']}) 档={rec['grade']} "
+                            f"(检测器{'ok' if rec['detector_available'] else '失效→保守 G0'}, "
+                            f"脸={len(rec['faces'])})")
                     else:
                         log(f"  镜{i} 图: 降级为无图")
         with timed("emit"):

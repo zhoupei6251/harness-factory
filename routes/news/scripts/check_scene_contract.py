@@ -78,6 +78,22 @@ def check_scene(scene: dict, layout: dict, index: int) -> list[str]:
     if not (isinstance(body, str) and body.strip()):
         problems.append(f"镜{index}: body 为空 —— 配音会直接停机（无话可配）")
 
+    # 6) P3 §3 作者合同：imageGrade / person / namedSubject 的合法形状。
+    #    image 缺省/False 时不查（无图，这几条无意义）；imageGrade 只能 scene|material，
+    #    写 G0 或拼错都会到 `_resolve_shot_image` 里抛 ValueError——预检提前说。
+    if scene.get("image") not in (None, False, ""):
+        grade = scene.get("imageGrade")
+        if grade is not None and grade not in ("scene", "material"):
+            problems.append(
+                f"镜{index}: imageGrade={grade!r} 不在 'scene'/'material'/缺省三选一里 —— "
+                "G0 只能由检测器给，作者不能声明；渲染会在 `_resolve_shot_image` 抛 ValueError")
+        for flag in ("person", "namedSubject"):
+            v = scene.get(flag)
+            if v is not None and not isinstance(v, bool):
+                problems.append(
+                    f"镜{index}: {flag}={v!r} 不是 bool —— 落位禁令(§7)按 `is True` 判，"
+                    "非 bool 会被 Python 视为真值或忽略，语义就漂了")
+
     return problems
 
 
