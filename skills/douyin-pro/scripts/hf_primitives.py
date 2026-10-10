@@ -573,7 +573,11 @@ P0_NAMES = tuple(PRIMITIVES)
 GATED_REQUIRES = frozenset({"image-gate-ready"})
 
 #: 检查器能直接判的前置条件（入参就是判据所需的事实）。
-CHECKED_REQUIRES = ("solid-ground", "asset", "image-gate-ready", "accent-allows-large-text")
+#: `asset` **不在这里** —— 编译期拿不到"这一镜最终取不取到图"（构建期 Commons 抖动会
+#: 让同稿两跑一次有图一次无图）。留在 CHECKED 里就是个恒 False 的假接口（老形态：
+#: `hf_compile.py` 不传，`check_preconditions` 一律拒）。asset 迁到 CALLSITE_REQUIRES，
+#: 强制点在 pre_js 的"空路径塌槽"分支（`hf_primitives.py:474-478` 已实现）。
+CHECKED_REQUIRES = ("solid-ground", "image-gate-ready", "accent-allows-large-text")
 
 #: 由**调用点/别处的闸构造性满足**的前置条件：值集在这里列全，强制点在说明里点名。
 #: 不进 ``check_preconditions`` 的入参，是因为那两个事实它拿不到（色对角色要到取参数时
@@ -581,6 +585,9 @@ CHECKED_REQUIRES = ("solid-ground", "asset", "image-gate-ready", "accent-allows-
 CALLSITE_REQUIRES = {
     "paired-text-role": "Tok.pair()/face() 认不到就抛 KeyError 并列出全部可用角色",
     "container-not-clip": "结构闸 layout_selfcheck 的 gsap_animates_clip_element 拒补间挂在 .clip 挂载元素上",
+    "asset": "构建期 _resolve_shot_image 落 image_record；无图 → resolve_variable 的 "
+             "imagePath='' → photo-duotone/photo_local_crop 的 pre_js 空路径塌槽 "
+             "(hf_primitives.py:474-478)，版式退化为无图态。图存在与否不是编译期事实。",
 }
 
 #: ``solid-ground`` 的口径：地面必须是 spec 声明的实色面，不能是照片/纹理。
@@ -666,22 +673,23 @@ def fragment_violations(fragment: Fragment) -> list:
     return problems
 
 
-def check_preconditions(name: str, *, ground: str = "any", has_asset: bool = False,
+def check_preconditions(name: str, *, ground: str = "any",
                         accent_roles: tuple = (), image_gate_ready: bool = False) -> list:
     """编译器取原语前的前置条件检查（§6.2："声明前置条件而非只有参数"）。
 
     ``requires`` 里的每个名字都必须落到三条路之一：本函数能判（``CHECKED_REQUIRES``）、
     别处的闸强制（``CALLSITE_REQUIRES``），否则**报问题**。没有这条兜底，"前置条件"就会
     长成第二个 frame.md 色值表那种东西 —— 写着，但没人核。
+
+    ``image_gate_ready`` 的**来源**是 `image_gate.capability_ok()`（P3 §4：不是硬编码，
+    是运行时能力判定）。cv2 装不上或 cascade 缺失 → 门保持关，photo-* 一律拒编。
     """
     prim = PRIMITIVES.get(name)
     if prim is None:
         return [f"原语 {name!r} 不在 P0 清单里（可用: {', '.join(P0_NAMES)}）"]
     problems: list = []
     for require in prim.requires:
-        if require == "asset" and not has_asset:
-            problems.append(f"{name}: 需要图片 asset，本镜无图")
-        elif require == "image-gate-ready" and not image_gate_ready:
+        if require == "image-gate-ready" and not image_gate_ready:
             problems.append(f"{name}: 图片门禁（P3）未接入，产线现在不放图进版式")
         elif require == "solid-ground" and ground not in SOLID_GROUNDS:
             problems.append(f"{name}: 要实色地面（{list(SOLID_GROUNDS)}），读到 {ground!r} —— "

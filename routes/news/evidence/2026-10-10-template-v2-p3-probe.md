@@ -2,12 +2,13 @@
 
 > 上游：`docs/superpowers/specs/2026-10-10-news-p3-image-gate-design.md` §2/§3/§8
 > 覆盖判据：P3-1（分离度）· P3-2（黑名单非摆设）· P3-3（探针入库）
-> · P3-4（grade 合成四组合）· P3-5（检测器失效→G0）
+> · P3-4（grade 合成四组合）· P3-5（检测器失效→G0）· P3-6（开闸迁移，asset→CALLSITE）
 > 实现：`skills/douyin-pro/scripts/image_gate.py`（检测器 + 档合成）
 > 探针：`skills/douyin-pro/scripts/p3_probe.py`（跑同一份实现，把结论落 JSON）
 > 接线：`path_b_build._resolve_shot_image`（构建期单点定档，写进 image_record）
+> 开闸：`hf_compile._IMAGE_GATE_READY = capability_ok()`；`hf_primitives.CALLSITE_REQUIRES["asset"]`
 > 预检：`routes/news/scripts/check_scene_contract.py`（写稿期抓坏合同）
-> 自检：`path_b_selftest.py` 的 13 条 `t_p3_*`（共 154 项，全绿）
+> 自检：`path_b_selftest.py` 的 15 条 `t_p3_*` + 重写的 `t_hf_primitives_gate_*`（共 156 项，全绿）
 
 ## K17 检测器分离度 —— 一张真脸 + 一张真齿轮，四条通道并集分开
 
@@ -142,6 +143,42 @@ record["namedSubject"] = bool(scene.get("namedSubject", False))
 
 自检计数：P2 收官 141 → 切片 1 加 6 条 P3 检测器 → 切片 2 加 7 条 P3 合成/接线/预检 =
 **154/154 全绿**。
+
+## K26 开闸迁移：`image-gate-ready` = `capability_ok()`，`asset` 移到 CALLSITE
+
+切片 3 通了电。三处协同改动：
+
+1. **`hf_primitives.py:576` CHECKED_REQUIRES** 删掉 `asset`。留在 CHECKED 里 `asset` 就是
+   编译期一个恒 `False` 的假接口（`hf_compile.py:545` 不传 → `has_asset` 默认 False →
+   photo-* 一律拒编）。**`asset` 迁到 `CALLSITE_REQUIRES`**，说明点名"构建期
+   `_resolve_shot_image` 落 image_record；无图 → resolve_variable 的 imagePath='' →
+   pre_js 空路径塌槽（`hf_primitives.py:474-478`），版式退化为无图态"。
+2. **`check_preconditions` 签名**：`has_asset` 形参删除，`asset` 分支一并去掉。兜底
+   闭合规则不变：任何 requires 名字既不在 CHECKED 也不在 CALLSITE → 报"没有任何实现"。
+3. **`hf_compile.py:545` 调用点**：`image_gate_ready = _IMAGE_GATE_READY`，值来自
+   模块加载时的 `image_gate.capability_ok()`。cv2 装不上 / cascade 缺失 → False →
+   photo-* 拒编；本机装了 cv2 4.13 且两张 xml 都在 → True → 编译期放行，构建期
+   由 §3 的 record 决定实际用哪张图或塌槽。
+
+判据 P3-6 由两条测试钉住：
+- `t_p3_asset_migrated_to_callsite_bucket` —— 结构面：`asset ∉ CHECKED ∧ asset ∈ CALLSITE`；
+  `check_preconditions` 签名里 `has_asset` 已消失（用 `inspect.signature` 判，防止
+  "看起来删了但形参还在默认值里"这种漂移）。
+- `t_p3_capability_gate_open_when_cv2_ready` —— 端到端面：本机 `capability_ok()=True`
+  ⇒ `hf_compile._IMAGE_GATE_READY` 也是 True（同一个常量源）；反证：显式 `image_gate_ready=False`
+  时 photo-duotone/photo-local-crop/ken-burns-in 仍各报"图片门禁未接入"。
+
+老 P2 那条 `t_hf_primitives_gate_image_and_accent_preconditions` 也一起重写：过去它
+断"门禁接上但 `has_asset=False` 仍拒"，现在同一条断的是"门开就够；asset 属 CALLSITE，
+编译期不查"。这条测试**跟着闸门迁移同步换口径**，不是把老断言留着当装饰。
+
+现在 spec.toml 若声明 `[[recipe]] prim="photo-duotone"` 会被编到 pack 里；实际画面
+是不是有图，看构建期 `_resolve_shot_image` 有没有取到 + §3 的 grade 合成 —— 那是
+切片 4/5/6 的活。当前存量 spec（`news-editorial-warm`）没有 photo-* 配方，`hf_compile --check`
+全绿；不存在"改代码把老 pack 编出不同产物"的字节回归。
+
+自检计数：154 → 156（切片 3 加两条 P3-6 断言，老 P3-前置测试重写不加不减）。
+**156/156 全绿。**
 
 ---
 

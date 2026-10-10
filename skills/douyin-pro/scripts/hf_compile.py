@@ -38,6 +38,12 @@ import hf_primitives as hp  # noqa: E402
 import hf_style_spec as hs  # noqa: E402
 import layout_selfcheck as lsc  # noqa: E402
 
+try:
+    import image_gate as ig  # noqa: E402  P3 §4：capability_ok 是 image-gate-ready 的运行时源
+    _IMAGE_GATE_READY = ig.capability_ok()
+except ImportError:
+    _IMAGE_GATE_READY = False
+
 SCHEMA = "hf-compile/1"
 
 #: 产物根（裁决 14 双轨：path_b 存量、path_c 编译产物）
@@ -543,6 +549,7 @@ def composition_html(spec, tok: hp.Tok, layout: str) -> str:
     for step in steps:
         prim = hp.PRIMITIVES[step.prim]
         problems = hp.check_preconditions(step.prim, ground=ground,
+                                          image_gate_ready=_IMAGE_GATE_READY,
                                           accent_roles=tuple(a.get("role", "")
                                                              for a in tok.accents))
         if problems:

@@ -2119,9 +2119,12 @@ def t_hf_primitives_detector_rejects_every_death_mode():
 
 
 def t_hf_primitives_gate_image_and_accent_preconditions():
-    """P3 之前取图类原语必须**拒编**（裁决 3 的落地：图片只是纹理，门禁没接好就不许上片）。
+    """P3 之后：`image-gate-ready` 是唯一编译期闸门；`asset` 已迁到 CALLSITE。
 
-    同一条检查还要拦住"强调色当正文坐字上"，并且任何没人实现的 requires 名字也要拦。
+    裁决 3（P3 之前）：取图类原语一律拒编。P3 切片 3 之后：门由 `capability_ok()`
+    运行时决定；`asset`（本镜有没有图）编译期拿不到，交给构建期的"空路径塌槽"兜
+    （hf_primitives.py:474-478 的 `path_var` 分支）。同一条检查还要拦"强调色当正文
+    坐字上"，并且任何没人实现的 requires 名字也要拦。
     """
     gated = {name for name in hp.P0_NAMES
              if hp.GATED_REQUIRES & set(hp.PRIMITIVES[name].requires)}
@@ -2129,12 +2132,11 @@ def t_hf_primitives_gate_image_and_accent_preconditions():
         f"挂在图片门禁后的原语与预期不符: {sorted(gated)}")
     for name in sorted(gated):
         problems = hp.check_preconditions(name, ground="paper")
-        assert any("图片门禁" in p for p in problems), f"{name}: P3 未接入却放行 {problems}"
-    # 门禁接上但本镜无图，取图原语仍要拒（asset 与 image-gate-ready 是两条独立事实）
+        assert any("图片门禁" in p for p in problems), f"{name}: P3 门未开却放行 {problems}"
+    # 门开：只由 image_gate_ready 决定；asset 是 CALLSITE，编译期不查（P3 §4）
     assert hp.check_preconditions("photo-duotone", ground="paper",
-                                  image_gate_ready=True) != []
-    assert hp.check_preconditions("photo-duotone", ground="paper", has_asset=True,
-                                  image_gate_ready=True) == []
+                                  image_gate_ready=True) == [], (
+        "asset 迁到 CALLSITE 后，门开就够；这一支还被拦说明 asset 仍留在 CHECKED")
     assert hp.check_preconditions("ken-burns-in", ground="paper",
                                   image_gate_ready=True) == []
     # 形状类要实色地面：坐在图上（ground="photo"）时边缘对比不可算
@@ -3423,6 +3425,45 @@ def t_p3_scene_contract_preflight_catches_bad_author_fields():
          "person": True, "namedSubject": False}, lay, 1)
     assert not any("imageGrade" in p or "namedSubject" in p for p in clean), \
         f"合法合同不该误报：{clean}"
+
+
+# ---- P3 开闸迁移（设计 §4）判据 P3-6 ---------------------------------------
+
+def t_p3_asset_migrated_to_callsite_bucket():
+    """P3-6 结构性检查：asset 在 CALLSITE，不在 CHECKED；has_asset 形参已删。"""
+    assert "asset" not in hp.CHECKED_REQUIRES, \
+        f"asset 仍留在 CHECKED_REQUIRES={hp.CHECKED_REQUIRES}，编译期拿不到这个事实"
+    assert "asset" in hp.CALLSITE_REQUIRES, "asset 必须点名强制它的闸（空路径塌槽）"
+    # 兜底覆盖：requires 名字闭合规则仍然拦住"任何既不在 CHECKED 也不在 CALLSITE"的
+    # 假接口 —— asset 迁过去后由 CALLSITE 一侧接住，不会掉进"没有任何实现"分支。
+    import inspect
+    sig = inspect.signature(hp.check_preconditions)
+    assert "has_asset" not in sig.parameters, (
+        f"check_preconditions 仍有 has_asset 形参（{list(sig.parameters)}）—— "
+        "P3 §4 明确要求删；留着就是恒 False 的假接口，P3 之前那条评论")
+
+
+def t_p3_capability_gate_open_when_cv2_ready():
+    """P3-6 端到端开闸：`hf_compile._IMAGE_GATE_READY` 由 `image_gate.capability_ok()` 决定。
+
+    本机装了 cv2 + cascade → True；photo-* 在 `image_gate_ready=True` 下不再被
+    `check_preconditions` 拒。反证：模拟 `capability_ok=False` 时 photo-duotone 仍拒编。
+    """
+    assert ig.capability_ok() is True
+    assert hf_compile_image_gate_ready() is True, (
+        "hf_compile 的 _IMAGE_GATE_READY 应跟着 capability_ok 走；False 说明 import 失败或"
+        "常量没被刷新，photo-* 会被无端拒编")
+    # 反证：显式关闸（模拟 cv2 缺失环境）
+    for name in ("photo-duotone", "photo-local-crop", "ken-burns-in"):
+        problems = hp.check_preconditions(name, ground="paper", image_gate_ready=False)
+        assert any("图片门禁" in p for p in problems), f"{name} 关闸却不拒: {problems}"
+
+
+def hf_compile_image_gate_ready() -> bool:
+    """从 hf_compile 取运行时能力常量 —— 不在 selftest 里重跑 capability_ok 判断，
+    确保"编译入口用的值"和"检测器给的值"是同一份。"""
+    import hf_compile as _hc
+    return bool(_hc._IMAGE_GATE_READY)
 
 
 if __name__ == "__main__":
