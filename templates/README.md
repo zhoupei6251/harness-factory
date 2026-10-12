@@ -16,12 +16,20 @@
 
 ## 模板清单
 
+### install-into-project.ts 用的模板
+
 | 模板 | 目标文件 | 用途 |
 |---|---|---|
 | `target-CLAUDE.md` | `CLAUDE.md` | Claude Code 项目根加载 |
 | `target-AGENTS.md` | `AGENTS.md` | Codex / Qoder 项目根加载 |
 | `target-GEMINI.md` | `GEMINI.md` | Gemini 项目根加载 |
 | `project-birds-eye.template.md` | （占位文本） | 填入目标项目的项目鸟瞰 |
+
+### bootstrap.ts 用的模板（harness-factory 自身）
+
+| 模板 | 目标文件 | 用途 |
+|---|---|---|
+| `harness.template.md` | `CLAUDE.harness.md` / `AGENTS.harness.md` / `GEMINI.harness.md` | §1-§6 canonical harness 规则；5 个 `${PLATFORM_*}` 占位符被 `scripts/bootstrap.ts` 的 `HARNESS_DELTAS` 替换 |
 
 ## 占位符
 

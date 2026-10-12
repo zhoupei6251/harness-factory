@@ -56,6 +56,9 @@ const PAIRS: Pair[] = [
   { artifact: ".trae/rules/ENTRY.md", source: "platforms/trae/rules/ENTRY.md" },
   { artifact: ".codebuddy/AGENTS.md", source: "platforms/workbuddy/rules/ENTRY.md" },
   { artifact: ".qoder/AGENTS.md", source: "platforms/qoder/rules/ENTRY.md" },
+  { artifact: "CLAUDE.harness.md", source: "templates/harness.template.md", note: "Claude-side harness" },
+  { artifact: "AGENTS.harness.md", source: "templates/harness.template.md", note: "Codex / Qoder harness" },
+  { artifact: "GEMINI.harness.md", source: "templates/harness.template.md", note: "Gemini harness" },
 ];
 
 for (const p of PAIRS) {

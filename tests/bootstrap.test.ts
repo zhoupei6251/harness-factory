@@ -31,12 +31,16 @@ const BOOTSTRAP_INPUTS = [
   "platforms",
   "routes",
   "scripts",
+  "templates",
 ];
 
 /** Artifacts bootstrap must create — asserted inside the temporary root. */
 const EXPECTED = [
   "AGENTS.md",
   "CLAUDE.md",
+  "CLAUDE.harness.md",
+  "AGENTS.harness.md",
+  "GEMINI.harness.md",
   ".claude/rules/ENTRY.md",
   ".claude/rules/ROOT.md",
   ".codex/rules/ENTRY.md",
@@ -64,7 +68,11 @@ const EXPECTED = [
 const ROOT_MUST_SURVIVE = [
   "AGENTS.md",
   "CLAUDE.md",
+  "CLAUDE.harness.md",
+  "AGENTS.harness.md",
+  "GEMINI.harness.md",
   "MEMORY.md",
+  "templates",
   ".claude",
   ".codex",
   ".trae",
