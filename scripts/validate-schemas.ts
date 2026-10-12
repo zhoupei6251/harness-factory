@@ -43,7 +43,12 @@ async function validateEvidence(): Promise<void> {
   for (const p of docs) {
     const text = await readFile(join(ROOT, p), "utf-8");
     for (const m of text.match(EVIDENCE_PTR) ?? []) {
-      if (!tracked.has(m)) {
+      // Direct file match, or (when the pointer ends with `/`) a directory that
+      // contains at least one tracked file. git ls-files never lists directories
+      // themselves, so a bare directory pointer has to be resolved transitively.
+      const direct = tracked.has(m);
+      const dirHit = m.endsWith("/") && [...tracked].some((t) => t.startsWith(m));
+      if (!direct && !dirHit) {
         console.log(`[FAIL] ${p}: evidence pointer is not tracked -> ${m}`);
         bad++;
       }
