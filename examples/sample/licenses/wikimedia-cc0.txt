@@ -1,0 +1,35 @@
+Wikimedia Commons - CC0 1.0 Universal (Public Domain Dedication)
+
+适用: 本文件作为 sample data 真源化的 CC0 通用模板, 项目内套用。
+来源: https://creativecommons.org/publicdomain/zero/1.0/
+
+================================================================
+CREATIVE COMMONS COMMONS CORPORATION IS NOT A LAW FIRM AND DOES
+NOT PROVIDE LEGAL SERVICES. DISTRIBUTION OF THIS DOCUMENT DOES NOT
+CREATE AN ATTORNEY-CLIENT RELATIONSHIP. CREATIVE COMMONS PROVIDES
+THIS INFORMATION ON AN "AS-IS" BASIS. CREATIVE COMMONS MAKES NO
+WARRANTIES REGARDING TO THE INFORMATION PROVIDED, AND DISCLAIMS
+LIABILITY FOR DAMAGES RESULTING FROM A USE OF THIS DOCUMENT.
+================================================================
+
+官方文本（简短版）:
+
+No Copyright - The person who associated a work with this deed has
+dedicated the work to the public domain by waiving all of his or her
+rights to the work worldwide under copyright law, including all related
+and neighboring rights, to the extent allowed by law.
+
+You can copy, modify, distribute and perform the work, even for
+commercial purposes, all without asking permission.
+
+完整协议: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+
+================================================================
+项目内套用约定
+================================================================
+
+1. sample data 的 images[].license_spdx == "CC0-1.0" 时,
+   渲染时 media-credits.json 该行不强制署名 (bandit 无强制要求),
+   但建议保留 "Wikimedia Commons" 兜底说明。
+2. 视频简介 / 发布说明 不需保留 CC0 字样 (因为不构成额外约束)。
+3. 二次分发 / 商用 **不需要**保留版权声明 —— 但保留无害。

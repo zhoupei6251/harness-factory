@@ -1,0 +1,92 @@
+{
+  "schema_version": "1",
+  "id": "t001-coral",
+  "display_title": "湖南某地退休人员养老金发放情况",
+  "template": "news-coral",
+  "voice": "zh-CN-XiaoxiaoNeural",
+  "facts": [
+    {
+      "claim": "退休制度为劳动者退出工作岗位后的生活提供制度性安排",
+      "source_url": "https://en.wikipedia.org/wiki/Retirement",
+      "source_label": "维基百科 (英)",
+      "source_fingerprint_sha256": "4867cec849d009bafb12d8fb9bda4b94f439e5e2ee78e4636a8ee3303401dbf5"
+    },
+    {
+      "claim": "养老金按缴费年限与缴费基数计发, 由多个组成部分构成",
+      "source_url": "https://en.wikipedia.org/wiki/Pension",
+      "source_label": "维基百科 (英)",
+      "source_fingerprint_sha256": "7573747f091561b39cfcad241ed2239559e878d17cecd1ceed469a80d706c091"
+    },
+    {
+      "claim": "社会保障体系为退休人员提供稳定的资金来源",
+      "source_url": "https://en.wikipedia.org/wiki/Social_security",
+      "source_label": "维基百科 (英)",
+      "source_fingerprint_sha256": "b628ed9575b264b5df4807fb489bd6a2a67e1bc1dd401d508ffe5b46fca7bc62"
+    }
+  ],
+  "images": [
+    {
+      "scene_position": 2,
+      "wikimedia_url": "https://commons.wikimedia.org/wiki/File:Doorstep_disbursement_of_elderly_pension_as_part_of_social_security_welfare_schemes.jpg",
+      "license_spdx": "CC-BY-SA-4.0",
+      "credit": "Satyaviswakarma (Wikimedia Commons)",
+      "source_fingerprint_sha256": "514f734e9ea26d247b655c7e350cd6ae71cfdb16df5b55a8eebfdb2adb698923"
+    },
+    {
+      "scene_position": 3,
+      "wikimedia_url": "https://commons.wikimedia.org/wiki/File:Seniors_Rest_Home_In_Oppenheim.jpg",
+      "license_spdx": "PD",
+      "credit": "Ingolfson (Wikimedia Commons)",
+      "source_fingerprint_sha256": "4ad8de3481da02f0ea476b4ae8ec0435bfc106c009676f77c504f42c232efe62"
+    },
+    {
+      "scene_position": 5,
+      "wikimedia_url": "https://commons.wikimedia.org/wiki/File:Queen_Rose_Retirement_Home,_11_Jun_2026.jpg",
+      "license_spdx": "CC0-1.0",
+      "credit": "Andykatib (Wikimedia Commons)",
+      "source_fingerprint_sha256": "9308ffe5c5f0f3c9ec5c89b2424d24020b3d74c68a799e4d9d4900ee9b0a86fa"
+    }
+  ],
+  "scenes": [
+    {
+      "position": 1,
+      "layout": "hook",
+      "kicker": "今日关注",
+      "title": "湖南某地",
+      "body": "退休人员养老金发放情况",
+      "onscreen": "湖南某地｜退休人员"
+    },
+    {
+      "position": 2,
+      "layout": "story",
+      "kicker": "事件背景",
+      "title": "规范与覆盖",
+      "body": "中国基本养老保险制度覆盖范围持续扩大, 惠及广大退休人员群体",
+      "onscreen": "覆盖范围持续扩大"
+    },
+    {
+      "position": 3,
+      "layout": "stat",
+      "kicker": "数据看点",
+      "title": "发放金额",
+      "body": "养老金由基础养老金与个人账户养老金两部分组成, 多缴多得",
+      "onscreen": "基础+个人账户｜双层保障"
+    },
+    {
+      "position": 4,
+      "layout": "quote",
+      "kicker": "部门回应",
+      "title": "当地社保部门公开回应",
+      "body": "省级社保部门定期公开养老金发放规范与资金使用报告, 接受社会监督",
+      "onscreen": "公开透明｜定期报告"
+    },
+    {
+      "position": 5,
+      "layout": "closer",
+      "kicker": "持续关注",
+      "title": "完善保障",
+      "body": "社保体系不断完善, 让退休人员晚年生活更有保障",
+      "onscreen": "完善保障｜老有所养"
+    }
+  ]
+}
