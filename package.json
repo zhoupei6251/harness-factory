@@ -1,18 +1,20 @@
 {
   "name": "harness-factory",
   "version": "2.5.0",
-  "description": "多平台 AI harness 治理仓库：core 治理文档 + capabilities 语言规则 + 4 平台适配器（claude/codex/trae/workbuddy）+ code/novel/news 三路由 + skills 库。单一事实源，npm run bootstrap 渲染到各平台目录。",
+  "description": "多平台 AI harness 治理仓库：core 治理文档 + capabilities 语言规则 + 5 平台适配器（claude/codex/trae/workbuddy/qoder）+ code/novel/news 三路由 + skills 库。单一事实源，npm run bootstrap 渲染到各平台目录。",
   "private": true,
   "type": "module",
   "scripts": {
-    "doctor":     "tsx scripts/doctor.ts",
-    "bootstrap":  "tsx scripts/doctor.ts && tsx scripts/bootstrap.ts",
-    "validate":  "tsx tests/validate-schemas.ts",
-    "index":     "tsx tests/build-index.ts",
-    "skills:install": "tsx scripts/install-skills.ts",
-    "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
-    "stats":     "tsx scripts/stats.ts",
-    "test":      "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts"
+    "doctor":          "tsx scripts/doctor.ts",
+    "bootstrap":       "tsx scripts/doctor.ts && tsx scripts/bootstrap.ts",
+    "validate":        "tsx scripts/validate-schemas.ts",
+    "index":           "tsx scripts/build-index.ts",
+    "stats":           "tsx scripts/stats.ts",
+    "check-bootstrap": "tsx scripts/check-bootstrap.ts",
+    "skills:audit":    "tsx scripts/skills-audit.ts",
+    "skills:install":  "tsx scripts/install-skills.ts",
+    "typecheck":       "node node_modules/typescript/lib/tsc.js --noEmit",
+    "test":            "npm run validate && npm run typecheck && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
