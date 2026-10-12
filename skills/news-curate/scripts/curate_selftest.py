@@ -723,6 +723,74 @@ def t_ledger_check_detects_id_collision():
     assert not led.check_ids(good), f"同一事件的多行共用主键是合法的: {led.check_ids(good)}"
 
 
+# ── 28-33 · LSH MinHash L2 (2026-10-12, DESIGN-lsh.md) ─────────
+
+def t_l2_minhash_detects_real_same_event():
+    """71岁老人...3700元养老金 vs 拾荒老人...3700元养老金 (原 t001 案例)
+    → Jaccard on char trigram ≈ 0.25 → 标 medium needs_review (阈值 0.20).
+
+    替代旧 entity-weighted 1.174 score 判据; 现 0~1 Jaccard ≥ 0.20 同性.
+    **校准仅** (DESIGN-lsh.md §2.3): 中文短标题 char trigram 稀疏, 真实同事件配对
+    实算 Jaccard ≈ 0.25 (MinHash 估计在 ±0.06 内抖动).
+    """
+    sim = cu.similarity(
+        "71岁老人不知自己每月有3700元养老金",
+        "拾荒老人每月3700元养老金",
+    )
+    assert sim >= 0.20, f"真同事件配对漏判: {sim}"
+    assert cu.review_level(sim) == "medium", f"medium 区间未标: {sim}"
+
+
+def t_l2_minhash_drops_unrelated():
+    """暴雨已致3人死亡 vs 某地暴雨 (不同事件) → Jaccard ≈ 0 → 不标 needs_review.
+
+    安全边验证 —— 真无关配对 Jaccard 应远低于阈值 0.20.
+    """
+    sim = cu.similarity("暴雨已致3人死亡", "某地暴雨")
+    assert sim < 0.20, f"无关不该滤: {sim}"
+    assert cu.review_level(sim) is None, sim
+
+
+def t_l2_lsh_threshold_consistent():
+    """常量 L2_REVIEW_LOW/HIGH 在 curate 与 lsh_dedup 共享同一来源.
+
+    **单源真值**闸 (DESIGN-lsh.md §3.2.2): 防止 curate.py 与 lsh_dedup.py
+    阈值各自手抄漂移.
+    """
+    from lsh_dedup import REVIEW_LOW, REVIEW_HIGH
+    assert cu.L2_REVIEW_LOW == REVIEW_LOW, (
+        f"curate.L2_REVIEW_LOW {cu.L2_REVIEW_LOW} != lsh_dedup.REVIEW_LOW {REVIEW_LOW}")
+    assert cu.L2_REVIEW_HIGH == REVIEW_HIGH, (
+        f"curate.L2_REVIEW_HIGH {cu.L2_REVIEW_HIGH} != lsh_dedup.REVIEW_HIGH {REVIEW_HIGH}")
+    assert cu.L2_REVIEW_HIGH > cu.L2_REVIEW_LOW, "高风险阈值必须高于提示区下限"
+
+
+def t_l2_lsh_build_handles_empty():
+    """空台账建索引不崩 (R6)."""
+    from lsh_dedup import build_index
+    lsh, mh = build_index([])
+    assert lsh is not None
+    assert mh == {}, f"空台账应返回空 dict: {mh}"
+
+
+def t_l2_lsh_query_handles_empty_title():
+    """候选空标题查询不崩 (R6), 返回空 hits."""
+    from lsh_dedup import build_index, find_l2_hits
+    entries = [{"id": "n0001", "norm_key": "甲", "title": "甲"}]
+    lsh, _ = build_index(entries)
+    hits = find_l2_hits("", lsh, entries, exclude_norm="")
+    assert hits == [], f"空标题不该有命中: {hits}"
+
+
+def t_l2_lsh_excludes_self_norm():
+    """同 norm_key 不参与 L2 自比 (curate.py:460 复刻)."""
+    from lsh_dedup import build_index, find_l2_hits
+    entries = [{"id": "n0001", "norm_key": "同标题", "title": "同标题"}]
+    lsh, _ = build_index(entries)
+    hits = find_l2_hits("同标题", lsh, entries, exclude_norm="同标题")
+    assert hits == [], f"自比进了结果: {hits}"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

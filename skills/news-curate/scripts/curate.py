@@ -20,12 +20,16 @@ import re
 import sys
 from pathlib import Path
 
+# L2 MinHash LSH (Tier 1, 2026-10-12; DESIGN-lsh.md)
+# 单源真值: L2 阈值常量从 lsh_dedup 取, 0~1 Jaccard 范围
+from lsh_dedup import REVIEW_LOW as L2_REVIEW_LOW, REVIEW_HIGH as L2_REVIEW_HIGH  # noqa: E402
+from lsh_dedup import build_index as _lsh_build, find_l2_hits as _lsh_query  # noqa: E402
+
 # ── 常量：阈值全部具名，禁散落字面量（设计 §5 / 测试 8 依赖这一点） ──
 
-#: L2 相似度低于此值 → 不提示（实测 0.167 / 0.083 属此区）
-L2_REVIEW_LOW = 0.30
-#: L2 相似度高于此值 → needs_review: high（实测 1.174 / 2.435 属此区）
-L2_REVIEW_HIGH = 0.60
+#: L2 相似度低于此值 → 不提示。**单源真值** = lsh_dedup.REVIEW_LOW
+#: (2026-10-12 起替代旧实体加权 0~N 范围, 现 0~1 Jaccard)
+#: L2 相似度高于此值 → needs_review: high. **单源真值** = lsh_dedup.REVIEW_HIGH
 #: 榜内名次权重上限（rank 越靠前得分越高）
 RANK_SCORE_MAX = 6.0
 #: **只有这些源的 rank 是热度**。RSS 的 rank 只是 feed 内条目序号，不是热度 ——
@@ -126,16 +130,13 @@ def fingerprint(title: str, cap: int = 12) -> list[str]:
 
 
 def similarity(a: str, b: str) -> float:
-    """加权覆盖度: (3*实体命中 + bigram命中) / min(两侧特征数)。0~N, 越大越像。"""
-    fa, fb = set(fingerprint(a)), set(fingerprint(b))
-    if not fa or not fb:
-        return 0.0
-    inter = fa & fb
-    if not inter:
-        return 0.0
-    ent = {x for x in inter if x.startswith("E")}
-    bg = inter - ent
-    return (3 * len(ent) + len(bg)) / min(len(fa), len(fb))
+    """MinHash-on-CharTrigram Jaccard. 范围 [0, 1].
+
+    2026-10-12 起替代旧实体加权（DESIGN-dedup.md §5 承认的天花板）;
+    实现见 lsh_dedup.jaccard.
+    """
+    from lsh_dedup import jaccard as _lsh_jaccard
+    return _lsh_jaccard(a, b)
 
 
 def review_level(score: float) -> str | None:
@@ -390,6 +391,10 @@ def curate(hotboard, ledger, history_dir=None, suggest_pack=None) -> dict:
         if k:
             by_norm[k] = e          # 后写覆盖前写 = 最后一行胜出
 
+    # 2026-10-12: LSH 索引建一次, 全批候选共用 (DESIGN-lsh.md §3.2.3).
+    # entries 是全台账行（含 status 重复行）, 按 by_norm 去重只索引唯一 norm_key.
+    lsh_index, _ = _lsh_build(list(by_norm.values()))
+
     hist = _load_history(Path(history_dir)) if history_dir else {}
     today = doc.get("date", "")
 
@@ -450,24 +455,21 @@ def curate(hotboard, ledger, history_dir=None, suggest_pack=None) -> dict:
         )
 
         # ── L2：只提示，永不剔除（D2） ──
+        # 2026-10-12: LSH 预滤 + Jaccard 精确比对 (lsh_dedup.py),
+        # 替代旧 O(N) 全台账扫描; 同主键台账行不参与自比 (exclude_norm=key).
         # 比对对象是**台账里最相似的那一条**，不是"L1 撞上的那一条"。
         # 绑在 L1 结果上会漏掉真正该提示的情况：归一化键不同 → led 为 None →
         # 整段跳过，而那正是 L2 唯一存在的场景（同一事件、不同表述）。
         if not led and entries:
-            best_id, best_sim = None, 0.0
-            for e in entries:
-                ek = e.get("norm_key")
-                if not ek or ek == key:
-                    continue
-                sim = similarity(title, e.get("title") or ek)
-                if sim > best_sim:
-                    best_id, best_sim = e.get("id"), sim
-            lvl = review_level(best_sim)
-            if lvl and best_id:
-                cand["needs_review"] = lvl
-                cand["review_matched_id"] = best_id
-                cand["review_similarity"] = round(best_sim, 3)
-                cand["review_level_kind"] = "L2_similarity"
+            hits = _lsh_query(title, lsh_index, entries, exclude_norm=key)
+            if hits:
+                best_id, best_sim = hits[0]   # 已按 sim 降序
+                lvl = review_level(best_sim)
+                if lvl and best_id:
+                    cand["needs_review"] = lvl
+                    cand["review_matched_id"] = best_id
+                    cand["review_similarity"] = round(best_sim, 3)
+                    cand["review_level_kind"] = "L2_lsh_minhash"
 
         candidates.append(cand)
         seen_norms.add(key)
