@@ -4,7 +4,7 @@ Clean skeleton for shipping harness rules to 5 AI platforms (Claude / Codex / Tr
 
 ## Why
 
-`harness-foundry` (1290 files) was too heavy. `harness-kit` (skeleton only) lacked platform adapters. `harness-factory` is the middle ground: ~270 source files, TypeScript only, no placeholders for things that aren't governance, bootstrap, or skills.
+`harness-foundry` (1290 files) was too heavy. `harness-kit` (skeleton only) lacked platform adapters. `harness-factory` is the middle ground: ~870 source files across `.ts` / `.md` / `.json` / `.py` / `.html`, no placeholders for things that aren't governance, bootstrap, or skills. Live counts: `npm run stats`.
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for the design rationale.
 
@@ -76,6 +76,7 @@ Skills are split into two tiers:
 - `npm run skills:install` — symlink active skills into `~/.codex/skills/` and `~/.claude/skills/` so each platform can discover them
 - `npm run doctor` — hard gate for required external tooling (Node >=20.9, `codebase-memory-mcp`, its Codex/Claude wiring, `ponytail`); `bootstrap` refuses to run when it fails
 - `npm run typecheck` — TypeScript 7 native type check (via `lib/tsc.js` for Node 20 compat)
+- `npm run stats` — print live counts (source files / skills / scripts) for the ARCHITECTURE table
 - `npm test` — runs validate + typecheck + bootstrap smoke test
 
 ## Tooling

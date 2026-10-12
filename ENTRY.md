@@ -56,3 +56,12 @@ tags: [Rules, Runbook]
 |------|---------|-----------|---------|
 | codebase-memory-mcp | R1 | 改代码前用 `analyze-impact` / `get-callers` / `query-symbol` 拿图谱证据 | 根 `.mcp.json` 或 `references/tooling.md` |
 | ponytail | R2 / R8 | 生成前走七级决策阶梯（不写→复用→库→原生→依赖→一行→最小实现） | `references/tooling.md` |
+
+## Workflow (this repository only)
+
+> **This section describes how `harness-factory` itself is developed. It is NOT a rule for downstream projects** — they should follow `git-xywh` and the per-platform branching guidelines they receive via bootstrap.
+
+- **Main-only Git workflow.** Since 2026-09-29 the harness-factory repo commits directly to `main`; no `task/*` / `feature/*` branches, no worktrees held open between sessions. Rationale: this repo is a *rule distribution* artifact, not a product codebase — every commit is a self-contained, easily-revertable ruleset change; merge conflicts are rare because most edits are in different subtrees. `git-xywh`'s three-trunk / five-branch model is **not relaxed for downstream projects**.
+- **`push` requires explicit ask.** Even on `main`, `git push` is the user's call — don't push after commit unless the user said so.
+- **Backups never committed.** `*.bak-*.md` is git-ignored; `npm run install-into-project` is the supported way to roll back a target project's harness install.
+- **Hygiene gates before commit.** `git status` should show only files you intentionally touched; stray `*.bak-*` / `timing.json` / runtime dumps must be cleaned up. See `.gitignore` for the runtime pattern list.

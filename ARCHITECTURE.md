@@ -6,17 +6,20 @@
 
 ## Current state
 
+> **Live table** — re-run `npm run stats` for the actual numbers (script: [`scripts/stats.ts`](scripts/stats.ts)). Snapshot at last edit:
+
 | Metric | Count |
 |---|---|
-| Source files (excl `.git` + `node_modules`) | 441 |
+| Source files (excl `.git` + `node_modules` + runtime dirs) | 871 |
+|  · `.ts` / `.md` / `.json` / `.py` / `.html` / other | 21 / 335 / 127 / 53 / 267 / 68 |
 | Core governance docs | 8 |
 | Platform adapters | 5 (claude, codex, trae, workbuddy, qoder) — codex + qoder share the `AGENTS.md` native entry, merged by bootstrap |
 | Routes | 3 (code, novel, news) — all with MEMORY templates |
-| Skills | 97 (46 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
+| Skills | 100 (49 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
 | MCP servers | 1 (codebase-memory only; wired via committed root `.mcp.json` + `mcp-config/` snippet — see `references/tooling.md`) |
 | Capability verticals (in `capabilities/rules/`) | 3 (java, typescript, common) |
 | Schemas | 3 |
-| npm scripts | 5 (bootstrap, validate, index, typecheck, test) |
+| npm scripts | 8 (bootstrap, validate, index, typecheck, stats, test, doctor, skills:install) |
 
 ## The 5 layers
 
@@ -24,7 +27,7 @@
 2. **Capabilities**: `capabilities/rules/{java,typescript,common}/` — per-language rules. Other capability verticals (eval, intelligence, memory, etc.) were removed in phase-5 as empty placeholders.
 3. **Platforms**: `platforms/<name>/rules/ENTRY.md` — 4 thin adapters. Per-platform deltas.
 4. **Routes**: `routes/<name>/MEMORY.md` — 3 vertical templates (code, novel, news). Per-domain state.
-5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 46 active; 51 unused live in `skills/archive/` (same structure, restore via `git mv`).
+5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 49 active; 51 unused live in `skills/archive/` (same structure, restore via `git mv`).
 
 ## How a session works
 
