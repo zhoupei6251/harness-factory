@@ -37,6 +37,7 @@ import hf_primitives as hp  # noqa: E402  (v2 原语库：spec → 片段文本�
 import hf_style_spec as hs  # noqa: E402  (v2 风格 spec：结构校验 + 编译前判据 3/5)
 import image_gate as ig  # noqa: E402  (P3 图片门禁：本地零网络人脸检测器)
 import pack_theme  # noqa: E402  (frame.md 色板表 → theme.toml：Vue 路的主题真源抽取器)
+import pack_layouts as pkl  # noqa: E402  (compositions/*.html 版式元数据 → layouts.toml：P3 换源目标)
 
 FAILURES: list[tuple[str, str]] = []
 
@@ -4450,6 +4451,26 @@ def t_section_scoping_loses_no_palette_rows():
                 f"要么真实色板被小节作用域挡在门外，要么多了一张同形状的非色板表，去看一眼"
             )
     assert not problems, "小节作用域丢掉了色板行:\n  " + "\n  ".join(problems)
+
+
+def t_layouts_toml_roundtrip_keeps_loader_fields():
+    # 用 tempfile 而不是 live["dir"]：测试往真 pack 目录写 layouts.toml，
+    # 会把未审的产物留在工作树里，git status 当场不干净（AGENTS.md 的 hygiene gate）。
+    for style in ("news-coral", "news-alert"):
+        live = pb.load_style_pack(style)
+        with tempfile.TemporaryDirectory() as tmp:
+            pkl.write_layouts(tmp, live)
+            got = pkl.load_layouts(tmp)
+            assert set(got) == set(live["layouts"]), (
+                f"{style}: 版式名集合不一致 {set(got) ^ set(live['layouts'])}")
+            for role, rec in got.items():
+                want = live["layouts"][role]
+                assert rec["composition_id"] == want["composition_id"], f"{style}/{role} id 漂"
+                assert rec["ground_hex"] == want["ground_hex"], f"{style}/{role} 地面色漂"
+                assert rec["ground_tone"] == want["ground_tone"], f"{style}/{role} 明暗漂"
+                assert rec["variable_ids"] == [v["id"] for v in want["variables"]], (
+                    f"{style}/{role} 变量表漂")
+            assert pkl.verify_pack(tmp, live) == [], f"{style}: round-trip 应零问题"
 
 
 if __name__ == "__main__":
