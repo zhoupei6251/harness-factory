@@ -218,6 +218,24 @@ for (const name of entryNames) {
   });
 }
 
+check("渲染依赖版本已钉死（spec §7 风险 7：caret 范围让产物字节取决于 lock）", () => {
+  const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
+  const deps = { ...pkg.dependencies, ...pkg.devDependencies };
+  const lock = JSON.parse(readFileSync(resolve(ROOT, "package-lock.json"), "utf8"));
+  for (const name of ["gsap", "vue"]) {
+    const declared: string = deps[name];
+    assert(
+      /^\d+\.\d+\.\d+$/.test(declared),
+      `${name} 声明为 ${declared}，不是精确版本 —— Vite 打进 bundle 的字节会随 lock 解析漂`
+    );
+    const resolved = lock.packages?.["node_modules/" + name]?.version;
+    assert(
+      resolved === declared,
+      `${name} 声明 ${declared} 但 lock 解析 ${resolved} —— 两者必须一致`
+    );
+  }
+});
+
 for (const name of entryNames) {
   check(`${name}: .vue 的 <style> 编译出 dist/vue/assets/${name}-*.css（发射器靠它发 <link>）`, () => {
     const assetDir = resolve(DIST, "vue", "assets");
