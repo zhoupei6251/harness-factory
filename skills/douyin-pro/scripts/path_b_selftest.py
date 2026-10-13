@@ -4435,23 +4435,47 @@ def t_section_scoping_loses_no_palette_rows():
     限定**的同形状扫描当绊线，把「任意标题行都结束作用域」这个决定钉在盘上现实。
     将来谁把真实色板行挪到 `###` 子小节下（或新增一张同形状的非色板表），松散计数就会
     超过 theme.toml 的 token 数，这里会大声失败并要求人工看一眼，而不是静默放行。
+
+    另附**总数快照 398**：逐包相等对「作用域放宽收进不该收的行」零敏感（两侧同步增长），
+    总数快照专门闭那一侧，见循环后面的注释。
     """
     loose_re = re.compile(
         r"^\|\s*`[A-Za-z0-9][A-Za-z0-9_-]*`\s*\|\s*`#[0-9a-fA-F]{3,8}`\s*\|",
         re.MULTILINE,
     )
     problems = []
+    per_pack = {}
     for style in pb.ALL_TEMPLATES:
         pack_dir = os.path.join(pb.TEMPLATE_ROOT, style)
         frame_text = Path(pack_dir, "frame.md").read_text(encoding="utf-8")
         loose = len(loose_re.findall(frame_text))
         strict = len(pack_theme.load_theme(pack_dir))
+        per_pack[style] = (loose, strict)
         if loose != strict:
             problems.append(
                 f"{style}: 松散扫到 {loose} 行同形状表，theme.toml 只有 {strict} 个 token —— "
                 f"要么真实色板被小节作用域挡在门外，要么多了一张同形状的非色板表，去看一眼"
             )
     assert not problems, "小节作用域丢掉了色板行:\n  " + "\n  ".join(problems)
+
+    # 总数快照（终审「串色闸自参照」专项补救，M-2 必修）：上面那条只闭了「收窄丢行」一侧。
+    # 若色板作用域判宽 —— 新加一张形状相同的表、且它的小节标题恰好含「色板」子串
+    # （`_PALETTE_KEYWORD` 是子串判定，「示意（色板参考）」这类标题也会开域）——
+    # loose 与 strict 会**同步增长**，逐包相等照样成立，错收的 token 全程无闸。
+    # 398 = 31 包 token 总数（spec §2 的实测值，也是本闸入库那天的盘面）。
+    #
+    # **这是一条有意设计的绊线，不是待修的过时数字。** 它变红只有两种原因：
+    #   ① 真的增删了 pack / 改了 frame.md 色板 → 按流程重生成 theme.toml，
+    #      人工确认新总数后把这里的 398 一起改掉，并在提交信息里写明为什么变；
+    #   ② 色板作用域收进了不该收的行（串色风险） → 这就是它存在的意义，别改数字，改解析器。
+    # 不要为了让套件变绿而删掉这条断言。
+    snapshot = 398  # 入库那天（2026-10-13）实测的 31 包 token 总数
+    total = sum(strict for _, strict in per_pack.values())
+    assert total == snapshot, (
+        f"31 包 token 总数 = {total}，快照期望 {snapshot} —— 逐包 (松散行数, token 数): "
+        + ", ".join(f"{s}={l}/{v}" for s, (l, v) in sorted(per_pack.items()))
+        + "；总数漂了先分清是盘面真改了（重校准并改这里）还是作用域错收了行（修解析器）"
+    )
 
 
 def t_layouts_toml_roundtrip_keeps_loader_fields():
