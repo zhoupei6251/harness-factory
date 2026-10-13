@@ -84,6 +84,10 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
 > P1 步骤 0 之后加一道**探针（判据 0）**：一个最小 .vue，`fromTo(el, {color:'var(--x)'}, {color:'var(--y)'})`
 > 与 `{color:'#hex'}` 各 seek 一次截图对比。探针若证伪（变量能补间），B 方案可省掉「GSAP 取字面量」这条，
 > 只留 CSS 变量；若证实，按 B 执行。**这条不得当成既定事实写进组件**。
+> **2026-10-13 实测（判据 0b 闭，gsap 3.15.0，真 Chrome）：t0=`rgb(255,0,0)` / t0.5=`rgba(0, 0, 191, 0.75)` /
+> t1=`rgb(0,0,255)`——中间帧红通道丢失、端点仅靠浏览器解析原样回写的 `var()` ⇒ 先验判断**证实**，
+> B 方案内部「GSAP 从 theme JSON 取 hex 字面量」这条**必须保留**（证据：
+> `routes/news/evidence/2026-10-13-gsap-var-interpolation.md`）。**
 
 取 **B 方案**（探针结果不影响 A/B 的选择，只影响 B 内部要不要那层解析）：
 
