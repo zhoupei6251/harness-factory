@@ -1,0 +1,44 @@
+# 编译产物：由 pack_layouts.write_layouts 从 compositions/*.html 抽出，勿手改。
+schema = "news-layouts/1"
+
+[layouts.catalog]
+composition_id = "nc-blast-s-catalog"
+ground_hex = "#0c0c14"
+ground_tone = "dark"
+variable_ids = ["kicker", "title", "step1Label", "step1Body", "step2Label", "step2Body", "step3Label", "step3Body", "imagePath", "imageCredit", "slotSeconds"]
+
+[layouts.closer]
+composition_id = "nc-blast-s-closer"
+ground_hex = "#0c0c14"
+ground_tone = "dark"
+variable_ids = ["kicker", "cta", "ctaAccent", "channel", "imagePath", "imageCredit", "slotSeconds"]
+
+[layouts.hook]
+composition_id = "nc-night-hook"
+ground_hex = "#0a0a0d"
+ground_tone = "dark"
+variable_ids = ["kicker", "headTop", "headBottomLead", "headAccent", "support", "imagePath", "imageCredit", "slotSeconds"]
+
+[layouts.quote]
+composition_id = "nc-night-quote"
+ground_hex = "#e8e0d4"
+ground_tone = "light"
+variable_ids = ["kicker", "quoteBody", "attribution", "imagePath", "imageCredit", "slotSeconds"]
+
+[layouts.rail]
+composition_id = "nc-blast-s-rail"
+ground_hex = "#f0fdf4"
+ground_tone = "light"
+variable_ids = ["kicker", "title", "ordinal", "item1Label", "item1Value", "item2Label", "item2Value", "item3Label", "item3Value", "imagePath", "imageCredit", "slotSeconds"]
+
+[layouts.stat]
+composition_id = "nc-blast-s-stat"
+ground_hex = "#f0fdf4"
+ground_tone = "light"
+variable_ids = ["kicker", "ordinal", "value", "unit", "label", "compareValue", "compareUnit", "compareLabel", "imagePath", "imageCredit", "slotSeconds"]
+
+[layouts.story]
+composition_id = "nc-night-story"
+ground_hex = "#ece8df"
+ground_tone = "light"
+variable_ids = ["kicker", "ordinal", "tone", "title", "onscreen", "imagePath", "imageCredit", "slotSeconds"]

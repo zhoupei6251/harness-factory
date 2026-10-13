@@ -4473,6 +4473,41 @@ def t_layouts_toml_roundtrip_keeps_loader_fields():
             assert pkl.verify_pack(tmp, live) == [], f"{style}: round-trip 应零问题"
 
 
+def t_layouts_equivalence_gate_covers_all_217_layouts():
+    """layouts.toml 是**提交物**，本闸只拿它比 live HTML。
+    若在断言前先 write_layouts 重刷一遍，committed 文件与 HTML 分家会被当场覆盖掉——
+    那等于把闸删了。生成动作只属于本任务的 Step 3 命令行。"""
+    problems, total = [], 0
+    for style in pb.ALL_TEMPLATES:
+        live = pb.load_style_pack(style)
+        problems += pkl.verify_pack(live["dir"], live)
+        total += len(live["layouts"])
+    assert not problems, "等价闸失败:\n  " + "\n  ".join(problems)
+    assert total == 217, f"版式总数应为 7 × {len(pb.ALL_TEMPLATES)} = {7 * len(pb.ALL_TEMPLATES)}，实得 {total}"
+
+
+#: 发射器给变量填值的三条来源。今天实测 1943 条变量 = 1571 条 DERIVERS 命中
+#: + 372 条 INDEXED 语法 + imagePath/imageCredit 硬分支，无来源者 0 条。
+IMAGE_SOURCED_IDS = {"imagePath", "imageCredit"}   # resolve_variable 里写死的取图分支
+
+
+def t_every_layout_variable_id_has_a_source():
+    unknown = []
+    for style in pb.ALL_TEMPLATES:
+        for role, layout in pb.load_style_pack(style)["layouts"].items():
+            for var in layout["variables"]:
+                var_id = var["id"]
+                if var_id in pb.DERIVERS:
+                    continue
+                if pb.INDEXED_VAR_RE.match(var_id):
+                    continue
+                if var_id in IMAGE_SOURCED_IDS:
+                    continue
+                unknown.append(f"{style}/{role}: {var_id}")
+    assert not unknown, ("这些变量 id 三条来源都不沾，抽取出来也填不进: "
+                         + ", ".join(sorted(set(unknown))[:12]))
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]
