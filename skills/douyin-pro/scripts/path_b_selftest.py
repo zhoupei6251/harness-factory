@@ -4486,8 +4486,8 @@ def t_layouts_equivalence_gate_covers_all_217_layouts():
     assert total == 217, f"版式总数应为 7 × {len(pb.ALL_TEMPLATES)} = {7 * len(pb.ALL_TEMPLATES)}，实得 {total}"
 
 
-#: 发射器给变量填值的三条来源。今天实测 1943 条变量 = 1571 条 DERIVERS 命中
-#: + 372 条 INDEXED 语法 + imagePath/imageCredit 硬分支，无来源者 0 条。
+#: 发射器给变量填值的三条来源。今天实测 1943 条变量 = 1147 条 DERIVERS 命中
+#: + 372 条 INDEXED 语法 + 424 条 imagePath/imageCredit 硬分支，无来源者 0 条。
 IMAGE_SOURCED_IDS = {"imagePath", "imageCredit"}   # resolve_variable 里写死的取图分支
 
 
