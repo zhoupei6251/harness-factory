@@ -34,15 +34,17 @@
 | 加占位壳 | 227（10 份 `placeholder.html`） | 同上；占位壳不是版式（`load_style_pack` docstring 引 D7） |
 | 总行数 | 55,071 | `cat */compositions/*.html \| wc -l` |
 | **跨 pack 重复度** | `hook.html` 有 **30/31 份字节相同**，只有 `news-policy` 不同 | 逐 pack md5 分组 |
-| **结构变体数** | 归一化（去硬编码色值、`data-composition-id` 字面量、行尾空白）后**每个角色 2 个变体** | 同上口径，7 角色各自 `sort -u` = 2 |
+| **结构变体数** | 判据 0a **逐行实测**（不再是 md5 抽样）：7 个角色**各自 2 簇**，簇规模一律 `[30, 1]`，孤簇一律 `news-policy` | 归一化口径 = 去硬编码色值 / `rgba()` / `data-composition-id` 字面量 / `__timelines` 键名 / 逐行首尾空白后聚 md5；产出 `routes/news/evidence/2026-10-13-pack-variant-clusters.md`（由 `pack_variants.report()` 生成，与现跑输出逐字符相等），闸 `t_variant_clusters_hook_has_the_measured_two_shapes` + `t_normalization_actually_collapses_stat` |
 | 主题的真实形态 | 约 3 行硬编码 hex（`#f5f0e8` vs `#fff7ed`、`#e85d5d` vs `#f2c94c`） | `diff news-coral/stat.html news-alert/stat.html` |
-| token 源 | 31/31 的 `frame.md` 色板表**可机器解析**，合计 **398 条**（每包 6–16 条，无空包、无同名不同值） | 正则 `^\| \`[a-z0-9-]+\` \| \`#[0-9A-Fa-f]{3,8}\`` 命中 31/31；逐包计数实测 |
+| token 源 | 31/31 的 `frame.md` 色板表**可机器解析**，合计 **398 条**（每包 6–16 条，无空包、无同名不同值）；该总数已被串色闸的快照断言钉住（`t_section_scoping_loses_no_palette_rows`，`== 398`，增删 pack 或作用域错收行都会让它变红并要求人工重校准） | 正则 `^\| \`[a-z0-9-]+\` \| \`#[0-9A-Fa-f]{3,8}\`` 命中 31/31；逐包计数实测 |
 | token 词汇表 | **不统一**：全并集 68 个名（`coral` / `alert` / `cobalt` / `navy` / `accent`…），最高频 `accent` 只 21 次 | 31 份 frame.md 汇总 |
 | `host.html` | 每 pack 59 行、31 份互不相同、只含 **1 个色值**、**31/31** 带 CDN `<script>` 引 `gsap@3.14.2` | 实测；版本冲突见 §7 风险 6 |
 | 现有 Vue 覆盖 | **1 / 217**（`nc-night-hook` → `news-coral-hook`） | `VUE_COMPOSITIONS`（:471） |
 | 单镜移植体量 | 静态 `hook.html` 256 行 → `NewsCoralHook.vue` 250 行 | `wc -l` |
 
 **结论**：「227 份要移植」是假工作量。真实交付物 = 14 个组件 + 31 份 theme + 一张版式登记表。
+其中 **14 是「一簇一组件」这条设计政策下的取值**（= 7 角色 × 各自 2 簇），不是数学下界：
+`stat` / `quote` 的第二簇只差个位数行动画参数，若作参数化处理可以只要 12 个组件（见 §7 风险 5）。
 
 ---
 
@@ -94,10 +96,20 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
 | | 做法 | 产物数 | 确定性 |
 |---|---|---|---|
 | A 编译期烤死 | 31×14 份 CSS 全 bake 字面量（同 `hf_compile` 口径） | ~434 | 最强，但把 217 的重复搬进构建 |
-| **B 采用** | theme 随 bundle stage；静态样式走 `var()`，**GSAP 补间从 theme JSON 取 hex 字面量** | **14 + 31** | theme 文件是固定输入，可入哈希，逐字节可复现 |
+| **B 采用** | theme 随 bundle stage；静态样式走 `var()`，**GSAP 补间从 theme JSON 取 hex 字面量** | **14 + 31** | theme 文件是固定输入，可入哈希；**「逐字节可复现」是有范围的**（已钉 / 未钉的输入见下方注与 §7 风险 7） |
 
-> B 那格「逐字节可复现」有前提：`gsap` 现在声明为 `^3.15.0`（`package.json:27`），产物字节取决于 lock 而非声明。
-> P0 顺带把 `gsap` / `vue` 钉成精确版本并加断言，否则这条承诺不成立（§7 风险 7）。
+> **P0 已执行（2026-10-13）**：`gsap` 与 `vue` 从 caret 钉成精确版本（`package.json` devDependencies
+> `gsap = 3.15.0`、`vue = 3.5.43`），`tests/web/vue-build.test.ts` 有两条断言：
+> ①「声明 == lock 解析」，②「**bundle 内** GSAP 版本 == 声明版本」（按产物里的 `version="x.y.z"` 标记取，防陈旧 dist）。
+>
+> **仍未钉的输入（所以「逐字节」不是无条件承诺）**：`vite = ^6.4.4`、`@vitejs/plugin-vue = ^5.2.4`
+> 还是 caret 范围。打包器的版本同样决定 bundle 字节（plugin-vue 内含 `@vue/compiler-sfc`，
+> 模板编译产物的形态、CSS 作用域处理、helper 命名都会随它漂）。⇒ 本行「逐字节可复现」的准确口径是
+> **「同一 vite / plugin-vue 版本下，GSAP 与 theme 已固定 ⇒ 字节可复现」**；跨 vite 小版本重构建，
+> 新片字节仍可能变。Phase 1 把哈希入档之前必须二选一：钉死这两个（或 lockfile-only 安装 +
+> 记录哈希基线时的工具链版本），或把哈希口径显式写成「同工具链版本内可比」。
+> 本轮（Phase 0 修复波次）**没有**动这两个范围——它是决策而不是补断言，交给用户拍。
+> （§7 风险 7 同口径。）
 
 ---
 
@@ -108,9 +120,12 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
 1. `scripts/extract_pack_theme.py`：`frame.md` 色板表 → `theme.toml` × 31。
 2. `scripts/extract_pack_layouts.py`：`compositions/*.html` → `layouts.toml`（217 条），
    并按 §2 的归一化口径给每 (pack, role) 标 `variant`（1/2）。
-3. 把 `gsap` / `vue` 从 caret 范围钉成精确版本（`package.json:27` 现在是 `^3.15.0`），并在
+3. 把 `gsap` / `vue` 从 caret 范围钉成精确版本（写这条时 `package.json:27` 是 `^3.15.0`），并在
    `tests/web/vue-build.test.ts` 加「bundle 内 GSAP 版本 == 声明版本」断言——否则 §4 那格
    「逐字节可复现」不成立（§7 风险 7）。
+   **P0 交付状态（2026-10-13 实测）**：devDependencies 现为精确 `gsap = "3.15.0"` / `vue = "3.5.43"`；
+   断言两条并存 —— ①声明 == lock 解析，②读 `dist/vue/news-coral-hook.js` 里的 GSAP
+   `version="x.y.z"` 标记（实测全文恰好 1 处）并要求其值 == 声明版本，陈旧 dist 会让②变红。
 4. **门 G0（三条全量闸）**：
    - `theme.toml` 与它所属 pack 的 `frame.md` 色板表**逐条相等**（串色闸，31/31 全跑）。
    - `layouts.toml` 与 `load_style_pack()` 当次读出的 `composition_id / variables / ground_hex / ground_tone` **逐字段相等**（等价闸，217/217 全跑）。
@@ -199,12 +214,12 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
 |---|---|---|---|
 | 1 | 配音仍被服务端拒（`edge-tts` 403，四条证据见 `verifications/2026-10-13-hyperframes-vue-poc-verification-lite.md` §10.b） | 外部，与本迁移无关 | 所有门只要求**画面轨**；整片 `final.mp4` 不在本次判据内 |
 | 2 | 串色：token 名不统一导致某 pack 的地面/强调错位 | 分层方案新引入的**质量**风险（可全量机检） | 判据 1 全量 + 判据 5 抽样兜底 |
-| 3 | `news-world` / `news-world-globe` 这类变体对说明 31 套的真实分歧度不止于颜色 | 度量口径边界 | 判据 0a 把它变成逐行证据后再定组件数；**14 是下界**（见风险 5） |
+| 3 | `news-world` / `news-world-globe` 这类变体对说明 31 套的真实分歧度不止于颜色 | 度量口径边界 | 判据 0a 已把它变成逐行证据；**14 是「一簇一组件」政策下的取值，不是下界**（见风险 5） |
 | 4 | `layout_selfcheck` / 三道闸 / `image_gate` 现在吃 HTML 文本 | 删静态后失去输入 | P3 第 1 步同批改源到 `layouts.toml`，改不动的那条闸随静态留到最后 |
-| 5 | ~~14 个组件是下界，不是上界~~ **已由判据 0a 逐行实证关闭**（Phase 0）：7 角色全部 2 簇 `[30, 1]`，孤簇一律 `news-policy` ⇒ 组件下界确为 **14**。但实证同时把风险从「数量」挪到**分量**：孤簇与主流簇的归一化 diff 行数分两档——`stat` 4 行、`quote` 7 行（只差动画参数，近同构）vs `hook` 283 / `rail` 250 / `catalog` 259 / `story` 242 / `closer` 276 行（真不同构） | 数量风险已闭；**工作量口径**改为按角色分档，14 不等于 14 份等力工 | Phase 1 排期按角色分档估，`stat`/`quote` 的第二变体可作参数化处理；其余 5 个按独立组件算 |
-| 6 | **两条路的 GSAP 不是同一份字节**（实测）：31/31 份 `host.html:5` 引 `cdn.jsdelivr.net/npm/gsap@**3.14.2**/dist/gsap.min.js`；Vue bundle 打的是 npm `gsap@**3.15.0**`（`package.json:27` 写 `^3.15.0`，lock 解析 3.15.0） | ~~需用户拍~~ **已拍②**（2026-10-13）：台账只承诺**结构一致**，不承诺逐字节 ⇒ P3 步骤 3 解锁 | 定义见 §5-P3「结构一致」四条断言；判据 7 按此改写 |
+| 5 | ~~14 个组件是下界，不是上界~~ **已由判据 0a 逐行实证**（Phase 0）：7 角色全部 2 簇 `[30, 1]`，孤簇一律 `news-policy` ⇒ 「一簇一组件」政策下的组件数 = **14**。⚠ 14 **不是数学下界**，它和处置栏「`stat`/`quote` 可参数化处理」是同一个政策的两个取值：按政策 14 个，把这两条近同构簇参数化合并则 **12** 个。实证把风险从「数量」挪到**分量**：孤簇与主流簇的归一化 diff 行数分两档——`stat` 4 行、`quote` 7 行（只差动画参数，近同构）vs `hook` 283 / `rail` 250 / `catalog` 259 / `story` 242 / `closer` 276 行（真不同构） | 数量风险的真实形态是**政策选择**（14 或 12），不是盘上事实；**工作量口径**按角色分档，14 不等于 14 份等力工 | Phase 1 排期按角色分档估，`stat`/`quote` 的第二变体可作参数化处理（那样总组件数 12）；其余 5 个按独立组件算 |
+| 6 | **两条路的 GSAP 不是同一份字节**（实测）：31/31 份 `host.html:5` 引 `cdn.jsdelivr.net/npm/gsap@**3.14.2**/dist/gsap.min.js`；Vue bundle 打的是 npm `gsap@**3.15.0**`（P0 已把声明从 `^3.15.0` 钉成精确 `3.15.0`，lock 同值，产物侧另有断言） | ~~需用户拍~~ **已拍②**（2026-10-13）：台账只承诺**结构一致**，不承诺逐字节 ⇒ P3 步骤 3 解锁 | 定义见 §5-P3「结构一致」四条断言；判据 7 按此改写 |
 | 6b | **删 CDN 不违反法则 10**（我先前把这条写成「法则 10 断掉」，是误用）：仓内 `法则 10` 只在 `hf_compile.py:21` / `:1135` 出现，指的是**编译期确定性**（同 pack 编译两次字节相同 + 无运行时随机），讲的是 path_c 编译产物，与「旧成片重渲字节一致」不是同一件事 | 表述纠正 | 台账的字节可复现**从来没有被机检过**（实测：`routes/news/*.md` 里 `逐字节\|字节一致\|deterministic` 零命中）——所以选②没有拆掉任何现存闸门，只是把这条未成文的历史假设正式关掉 |
-| 7 | Vue 侧依赖面自己也在漂：`gsap` 是 caret 范围，产物字节取决于 lock 而非声明 | 可复现性隐患（这条威胁的是**新片**，与 6 同源但方向相反） | P0 顺带把 `gsap` 与 `vue` 的精确版本钉进 `package.json`（去掉 caret），并在 `vue-build.test.ts` 加一条「bundle 内 GSAP 版本 == 声明版本」的断言 |
+| 7 | Vue 侧依赖面自己也在漂：产物字节取决于 lock 而非声明，凡是 caret 范围的依赖都可能带漂 | 可复现性隐患（这条威胁的是**新片**，与 6 同源但方向相反） | **P0 已封口一半**（2026-10-13 实测）：已钉精确版本的是 `gsap = 3.15.0`、`vue = 3.5.43`，`vue-build.test.ts` 断言 ①声明 == lock 解析 ②bundle 内 GSAP 版本标记 == 声明版本。**仍未封口**：`vite = ^6.4.4`、`@vitejs/plugin-vue = ^5.2.4` 留在 caret，而 plugin-vue 内含的 `@vue/compiler-sfc` 同样决定 bundle 字节 ⇒ 「逐字节可复现」按 §4 注的范围读，不是无条件结论。Phase 1 哈希入档前补一条封口任务（钉这两个，或把哈希口径限定为「同工具链版本内」） |
 | 8 | **`composition_id` 不区分包**（Phase 0 实跑测出）：217 条镜只有 **130 个不同 id**；31 个 pack 的 `hook` 有 **30 个共用 `nc-night-hook`**（唯一例外 `news-policy` 的 `np-hook`），`stat` 才是一包一号 | 分层方案的**路由级串色**：与风险 2 同族、机制不同 | L3 路由键必须是 `(pack, role)`。现行 `VUE_COMPOSITIONS` 按 `composition_id` 命中，若照它登记 hook，会**一次性翻 30 个包**，而 bundle 里烤的是 coral 色板 ⇒ 29 包整块错色。P2「从 id 升级为 (pack, role)」是开工前提，不是优化 |
 
 ---
