@@ -36,6 +36,7 @@ import hf_compile as hc  # noqa: E402  (P1-3c 编译器：spec → 宿主 + 7 �
 import hf_primitives as hp  # noqa: E402  (v2 原语库：spec → 片段文本，法则 7/8/10 的可执行面)
 import hf_style_spec as hs  # noqa: E402  (v2 风格 spec：结构校验 + 编译前判据 3/5)
 import image_gate as ig  # noqa: E402  (P3 图片门禁：本地零网络人脸检测器)
+import pack_theme  # noqa: E402  (frame.md 色板表 → theme.toml：Vue 路的主题真源抽取器)
 
 FAILURES: list[tuple[str, str]] = []
 
@@ -4329,6 +4330,34 @@ def t_emit_host_skips_vue_loader_when_no_vue_mount():
     filled = pb.emit_host(path_c_pack, [], [], 0.0, 1080, 1920)
     assert 'vue.runtime.global.prod.js' not in filled, \
         "无 Vue mount 时不该注入 Vue runtime 引用"
+
+
+def t_parse_frame_md_palette_reads_named_hex_rows():
+    text = (
+        "## 1. 色板\n\n"
+        "| token | 值 | 用途 |\n|---|---|---|\n"
+        "| `coral` | `#E85D5D` | 主强调 |\n"
+        "| `ink` | `#1A1A1A` | 墨底 |\n"
+    )
+    got = pack_theme.parse_frame_md_palette(text)
+    assert got == {"coral": "#e85d5d", "ink": "#1a1a1a"}, f"读到 {got}"
+
+
+def t_parse_frame_md_palette_ignores_unnamed_rows():
+    text = "| 说明 | `#fff` | 不是 token 行 |\n| `a-b` | `red` | 值不是 hex |\n"
+    assert pack_theme.parse_frame_md_palette(text) == {}, "非 token 行被收进来了"
+
+
+def t_parse_frame_md_palette_only_reads_palette_sections():
+    # 盘上实测 31 包的 398 行色板全落在标题含「色板」的小节内；
+    # 不带这个限定的全文扫，将来任何一张 `| \`x\` | \`#hex\` |` 形状的非色板表都会被误收成 token。
+    text = (
+        "## 3. 字幕禁入区\n\n"
+        "| `top` | `#000000` | 这不是色板 |\n"
+        "\n## 1. 色板\n\n"
+        "| `coral` | `#E85D5D` | 主强调 |\n"
+    )
+    assert pack_theme.parse_frame_md_palette(text) == {"coral": "#e85d5d"}, "色板以外的小节被读进来了"
 
 
 if __name__ == "__main__":
