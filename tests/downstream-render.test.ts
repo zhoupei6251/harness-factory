@@ -24,10 +24,11 @@
  */
 import { existsSync } from "node:fs";
 import { cp, mkdtemp, readFile, rm, stat, writeFile, mkdir } from "node:fs/promises";
-import { join, resolve, dirname } from "node:path";
+import { join, resolve, dirname, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { GENERATED_FILES, isBootstrapOwned } from "../scripts/bootstrap-contract.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
@@ -35,7 +36,6 @@ const NODE = process.execPath;
 const TSX = resolve(ROOT, "node_modules", "tsx", "dist", "cli.mjs");
 const SIBLING = resolve(ROOT, "..", "aigc_platfrom_back");
 const INSTALL = resolve(ROOT, "scripts", "install-into-project.ts");
-const BOOTSTRAP = resolve(ROOT, "scripts", "bootstrap.ts");
 
 let fail = 0;
 const ok = (m: string): void => console.log(`[ok]   ${m}`);
@@ -44,6 +44,37 @@ const info = (m: string): void => console.log(`[info] ${m}`);
 
 async function isFile(p: string): Promise<boolean> {
   try { return (await stat(p)).isFile(); } catch { return false; }
+}
+
+/**
+ * Copy the harness-factory repo the way a fresh clone looks: sources only.
+ * Dropping the generated artifacts matters — with them in the copy, every
+ * "bootstrap produced X" assertion below is satisfied by the copy, not by the
+ * generator (measured 2026-10-12: the copy made the test pass while bootstrap
+ * wrote to this repository instead of the installed copy).
+ */
+function relFromRoot(src: string): string {
+  // On Windows fs.cp hands the filter `\\?\`-prefixed extended-length paths, which
+  // path.relative cannot resolve against a plain root — without stripping the
+  // prefix every entry looks like it is outside the repo and nothing is excluded.
+  const plain = src.replace(/^\\\\\?\\\//, "").replace(/^\\\\\?\\/, "");
+  return relative(ROOT, plain).replaceAll("\\", "/");
+}
+
+function isCloneNoise(src: string): boolean {
+  const rel = relFromRoot(src);
+  if (rel === "" || rel.startsWith("..")) return false;
+  const top = rel.split("/")[0];
+  return top === ".git" || top === "node_modules" || isBootstrapOwned(rel);
+}
+
+/** mtimeMs of every generated artifact at the real repo root — the leak tripwire. */
+async function rootArtifactMtimes(): Promise<string> {
+  const lines: string[] = [];
+  for (const rel of GENERATED_FILES) {
+    lines.push(`${rel} ${(await stat(resolve(ROOT, rel)).catch(() => null))?.mtimeMs ?? "absent"}`);
+  }
+  return lines.join("\n");
 }
 
 async function setupMock(): Promise<string> {
@@ -101,16 +132,26 @@ async function main(): Promise<void> {
     //    user is expected to clone it alongside. Mimic that by copying our own
     //    root into target/harness-factory/ so bootstrap has sources to project.
     const installedHarness = join(target, "harness-factory");
-    await cp(ROOT, installedHarness, {
-      recursive: true,
-      // Skip the .git dir of the harness itself (the target already has its own
-      // .git; nesting .git dirs confuses git).
-      filter: (src) => !src.includes(`${ROOT.replaceAll("\\", "/")}/.git`),
-    });
+    await cp(ROOT, installedHarness, { recursive: true, filter: (src) => !isCloneNoise(src) });
     ok(`copied harness-factory source into ${installedHarness}`);
 
-    // 4. Run bootstrap from the installed copy
-    const bootResult = spawnSync(NODE, [TSX, BOOTSTRAP, "--platform", "all", "--route", "code"], {
+    // The copy must carry no generated artifact, otherwise step 5 proves nothing.
+    const leaked = [];
+    for (const rel of GENERATED_FILES) {
+      if (await isFile(join(installedHarness, rel))) leaked.push(rel);
+    }
+    if (leaked.length === 0) {
+      ok(`installed copy is source-only (${GENERATED_FILES.length} generated paths absent)`);
+    } else {
+      bad(`${leaked.length} generated artifact(s) copied into the installed copy: ${leaked.join(", ")}`);
+    }
+
+    // 4. Run bootstrap from the installed copy. The SCRIPT PATH must be the copy's
+    //    own: bootstrap.ts derives its ROOT from import.meta.url, so pointing at
+    //    ROOT/scripts/bootstrap.ts would project into this repository and leave the
+    //    installed copy untouched.
+    const rootBefore = await rootArtifactMtimes();
+    const bootResult = spawnSync(NODE, [TSX, resolve(installedHarness, "scripts", "bootstrap.ts"), "--platform", "all", "--route", "code"], {
       encoding: "utf-8",
       cwd: installedHarness,
     });
@@ -119,6 +160,12 @@ async function main(): Promise<void> {
       return;
     }
     ok("bootstrap --platform all --route code succeeded in installed copy");
+
+    if ((await rootArtifactMtimes()) === rootBefore) {
+      ok("this repository's generated artifacts untouched by the downstream run");
+    } else {
+      bad("bootstrap wrote into this repository root — the run was not isolated to the installed copy");
+    }
 
     // 5. Assert the bootstrap output. Two distinct output classes:
     //    (a) platform projection under PLATFORM_DIR[plat]/rules/ → ENTRY.md + ROOT.md

@@ -23,41 +23,19 @@ async function exists(path: string): Promise<boolean> {
 /**
  * Inputs scripts/bootstrap.ts reads, copied into the temporary repo root so the
  * smoke test can exercise bootstrap without writing to the real repository.
+ * Artifacts it must create, plus the runtime dirs for the default (code) route.
+ * Both lists come from scripts/bootstrap-contract.ts so the guards cannot drift
+ * away from the generator they protect.
  */
-const BOOTSTRAP_INPUTS = [
-  "ENTRY.md",
-  "package.json",
-  "core",
-  "platforms",
-  "routes",
-  "scripts",
-  "templates",
-];
+import { BOOTSTRAP_INPUTS, GENERATED_FILES, ROUTE_MEMORY } from "../scripts/bootstrap-contract.ts";
 
-/** Artifacts bootstrap must create — asserted inside the temporary root. */
 const EXPECTED = [
-  "AGENTS.md",
-  "CLAUDE.md",
-  "CLAUDE.harness.md",
-  "AGENTS.harness.md",
-  "GEMINI.harness.md",
-  ".claude/rules/ENTRY.md",
-  ".claude/rules/ROOT.md",
-  ".codex/rules/ENTRY.md",
-  ".codex/rules/ROOT.md",
-  ".trae/rules/project_rules.md",
-  ".trae/rules/ENTRY.md",
-  ".trae/rules/ROOT.md",
-  ".codebuddy/rules/project_rules.md",
-  ".codebuddy/rules/ENTRY.md",
-  ".codebuddy/rules/ROOT.md",
-  ".qoder/rules/ENTRY.md",
-  ".qoder/rules/ROOT.md",
+  ...GENERATED_FILES,
+  ROUTE_MEMORY,
   ".ai-runtime-artifacts/specs",
   ".ai-runtime-artifacts/plans",
   ".ai-runtime-artifacts/decisions",
   ".ai-runtime-artifacts/verifications",
-  "MEMORY.md",
 ];
 
 /**

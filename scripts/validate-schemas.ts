@@ -30,9 +30,14 @@ async function validateRuntimeDirs(): Promise<void> {
 }
 
 // Evidence pointers are live: a tracked doc naming an evidence file is a promise
-// that file ships with the repo. Template paths (`<date>-…`) can't match this
-// pattern at all, because `<` is outside the allowed charset — no special case.
+// that file ships with the repo. Angle-bracket templates (`<date>-…`) can't match
+// EVIDENCE_PTR at all, `<` being outside the allowed charset. Glob placeholders
+// (`…/2026-10-12-*-verification.md`) do match, but only up to the `*` — and a path
+// whose name is still unwritten is a TODO, not a delivery promise.
+// A metacharacter counts as a placeholder only when the path *continues* after it,
+// so a markdown-bolded live pointer (`**…/x.md**`, `*` then `*` then EOL) stays checked.
 const EVIDENCE_PTR = /routes\/[a-z0-9-]+\/evidence\/[A-Za-z0-9._\-/]+/g;
+const GLOB_MID_PATH = /^[*?\[][A-Za-z0-9._\-/]/;
 const OLD_EVIDENCE_HOME = ".harness-news-runtime/verifications/";
 
 async function validateEvidence(): Promise<void> {
@@ -40,16 +45,21 @@ async function validateEvidence(): Promise<void> {
   // docs/superpowers/** is the historical record; its prose may name retired paths.
   const docs = [...tracked].filter((p) => /\.(md|jsonl)$/.test(p) && !p.startsWith("docs/superpowers/"));
   let bad = 0;
+  let placeholders = 0;
   for (const p of docs) {
     const text = await readFile(join(ROOT, p), "utf-8");
-    for (const m of text.match(EVIDENCE_PTR) ?? []) {
+    for (const m of text.matchAll(EVIDENCE_PTR)) {
+      if (GLOB_MID_PATH.test(text.slice(m.index + m[0].length))) {
+        placeholders++;
+        continue;
+      }
       // Direct file match, or (when the pointer ends with `/`) a directory that
       // contains at least one tracked file. git ls-files never lists directories
       // themselves, so a bare directory pointer has to be resolved transitively.
-      const direct = tracked.has(m);
-      const dirHit = m.endsWith("/") && [...tracked].some((t) => t.startsWith(m));
+      const direct = tracked.has(m[0]);
+      const dirHit = m[0].endsWith("/") && [...tracked].some((t) => t.startsWith(m[0]));
       if (!direct && !dirHit) {
-        console.log(`[FAIL] ${p}: evidence pointer is not tracked -> ${m}`);
+        console.log(`[FAIL] ${p}: evidence pointer is not tracked -> ${m[0]}`);
         bad++;
       }
     }
@@ -59,7 +69,7 @@ async function validateEvidence(): Promise<void> {
     }
   }
   if (bad === 0) {
-    console.log(`[ok]   evidence pointers resolve; no live pointer in a runtime dir (${docs.length} tracked docs scanned)`);
+    console.log(`[ok]   evidence pointers resolve; no live pointer in a runtime dir (${docs.length} tracked docs scanned, ${placeholders} glob placeholder(s) skipped)`);
   } else {
     fail = 1;
   }

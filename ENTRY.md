@@ -63,5 +63,5 @@ tags: [Rules, Runbook]
 
 - **Main-only Git workflow.** Since 2026-09-29 the harness-factory repo commits directly to `main`; no `task/*` / `feature/*` branches, no worktrees held open between sessions. Rationale: this repo is a *rule distribution* artifact, not a product codebase — every commit is a self-contained, easily-revertable ruleset change; merge conflicts are rare because most edits are in different subtrees. `git-xywh`'s three-trunk / five-branch model is **not relaxed for downstream projects**.
 - **`push` requires explicit ask.** Even on `main`, `git push` is the user's call — don't push after commit unless the user said so.
-- **Backups never committed.** `*.bak-*.md` is git-ignored; `npm run install-into-project` is the supported way to roll back a target project's harness install.
+- **Backups never committed.** `*.bak-*.md` is git-ignored; `npx tsx scripts/install-into-project.ts --target <path>` is the supported way to roll back a target project's harness install.
 - **Hygiene gates before commit.** `git status` should show only files you intentionally touched; stray `*.bak-*` / `timing.json` / runtime dumps must be cleaned up. See `.gitignore` for the runtime pattern list.

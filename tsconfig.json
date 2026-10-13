@@ -16,11 +16,8 @@
     "erasableSyntaxOnly": true
   },
   "include": [
-    "engine/**/*",
     "core/**/*",
-    "router/**/*",
     "scripts/**/*",
-    "tests/**/*",
-    "compiler/**/*"
+    "tests/**/*"
   ]
 }
