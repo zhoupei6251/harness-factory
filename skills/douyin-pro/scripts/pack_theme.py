@@ -8,6 +8,8 @@ Vite 读的。真源仍是 frame.md：本模块每次抽取都以 frame.md 为�
 只认标题含「色板」的小节：实测 31 包的 398 行色板全在这类小节里，
 而 `| \`名字\` | \`#hex\` |` 这个表格形状并不为色板独有——不限定小节，
 将来任何一张同形状的表都会被误当成 token 源。
+任意标题行（`#`、`##`、`###`…）都结束当前小节：色板 `##` 下的 `###` 子小节
+（如 news-alert 的 `### 2.1 对比度`）里有的是同形状表，不属于 token 源。
 """
 from __future__ import annotations
 
@@ -33,8 +35,10 @@ def parse_frame_md_palette(text: str) -> dict[str, str]:
     palette: dict[str, str] = {}
     in_palette = False
     for line in text.splitlines():
-        if line.startswith("## "):
-            in_palette = _PALETTE_KEYWORD in line
+        if line.startswith("#"):
+            # 任意标题行都是小节边界：`### 2.1 对比度` 这类子小节不能留在色板作用域里，
+            # 否则它下面的同形状表会被当成 token 源（表格行都以 `|` 开头，不会被误判）。
+            in_palette = line.startswith("## ") and _PALETTE_KEYWORD in line
             continue
         if not in_palette:
             continue

@@ -4344,8 +4344,62 @@ def t_parse_frame_md_palette_reads_named_hex_rows():
 
 
 def t_parse_frame_md_palette_ignores_unnamed_rows():
-    text = "| 说明 | `#fff` | 不是 token 行 |\n| `a-b` | `red` | 值不是 hex |\n"
+    # 必须在色板小节内：否则 in_palette 全程 False，这两行根本进不到 _ROW_RE，
+    # 测试就退化成「返回 {} 的桩」，正则放松到收下 `#fff` 也照样绿。
+    text = (
+        "## 1. 色板\n\n"
+        "| 说明 | `#fff` | 不是 token 行 |\n"
+        "| `a-b` | `red` | 值不是 hex |\n"
+    )
     assert pack_theme.parse_frame_md_palette(text) == {}, "非 token 行被收进来了"
+
+
+def t_parse_frame_md_palette_subsection_closes_scope():
+    # 盘上形状：news-alert/frame.md L21 `## 2. 色板` 下 L34 就是 `### 2.1 对比度`。
+    # 子小节里的表一旦撞上 `| \`名字\` | \`#hex\` |` 形状，全文续用色板作用域就会误收；
+    # 任意 `#` 开头的行都当边界才是「当前所在小节」的语义。
+    text = (
+        "## 2. 色板\n\n"
+        "| token | 值 | 用途 |\n|---|---|---|\n"
+        "| `black` | `#0E0E0E` | 主底 80% |\n"
+        "| `white` | `#F8F4EA` | 主文字 |\n"
+        "\n### 2.1 对比度\n\n"
+        "| 组合 | 比值 | 判定 |\n|---|---|---|\n"
+        "| `bg-ref` | `#000000` | 这一行是对比度表的基准色，不是 token |\n"
+    )
+    got = pack_theme.parse_frame_md_palette(text)
+    assert got == {"black": "#0e0e0e", "white": "#f8f4ea"}, f"`###` 子小节没关掉色板作用域: {got}"
+
+
+def t_write_theme_then_load_theme_round_trips():
+    # 只往临时目录写，绝不碰真实 pack 目录。
+    frame = (
+        "## 2. 色板\n\n"
+        "| token | 值 | 用途 |\n|---|---|---|\n"
+        "| `coral` | `#E85D5D` | 主强调 |\n"
+        "| `ink` | `#1A1A1A` | 墨底 |\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "frame.md").write_text(frame, encoding="utf-8")
+        out = pack_theme.write_theme(tmp)
+        assert out == str(Path(tmp) / pack_theme.THEME_FILENAME), f"产物路径不对: {out}"
+        back = pack_theme.load_theme(tmp)
+        assert back == {"coral": "#e85d5d", "ink": "#1a1a1a"}, f"往返后变了: {back}"
+        assert list(back) == ["coral", "ink"], f"保序丢了: {list(back)}"
+
+
+def t_write_theme_refuses_a_pack_without_palette_rows():
+    with tempfile.TemporaryDirectory() as tmp:
+        (Path(tmp) / "frame.md").write_text(
+            "## 1. 概述\n\n这份 frame.md 没列色板表。\n", encoding="utf-8"
+        )
+        try:
+            wrote = pack_theme.write_theme(tmp)
+        except ValueError as exc:
+            assert "色板" in str(exc), f"报错没说明原因: {exc}"
+        else:
+            raise AssertionError(f"空色板必须拒写，实际写了 {wrote}")
+        assert not (Path(tmp) / pack_theme.THEME_FILENAME).exists(), "拒写时不该留下产物"
 
 
 def t_parse_frame_md_palette_only_reads_palette_sections():
