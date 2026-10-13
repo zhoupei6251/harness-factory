@@ -4469,15 +4469,25 @@ def t_layouts_toml_roundtrip_keeps_loader_fields():
                 assert rec["composition_id"] == want["composition_id"], f"{style}/{role} id 漂"
                 assert rec["ground_hex"] == want["ground_hex"], f"{style}/{role} 地面色漂"
                 assert rec["ground_tone"] == want["ground_tone"], f"{style}/{role} 明暗漂"
-                assert rec["variable_ids"] == [v["id"] for v in want["variables"]], (
-                    f"{style}/{role} 变量表漂")
+                # 登记表把整条变量契约都落进去（I-2），所以往返必须整条等值——
+                # 不只 id，type/label/default/min 也得原样回来，否则 P3 换源供不出契约。
+                assert [v["id"] for v in rec["variables"]] == [v["id"] for v in want["variables"]], (
+                    f"{style}/{role} 变量 id 序列漂")
+                assert rec["variables"] == want["variables"], (
+                    f"{style}/{role} 变量契约漂：登记表={rec['variables'][:2]}… "
+                    f"HTML={want['variables'][:2]}…")
             assert pkl.verify_pack(tmp, live) == [], f"{style}: round-trip 应零问题"
 
 
 def t_layouts_equivalence_gate_covers_all_217_layouts():
     """layouts.toml 是**提交物**，本闸只拿它比 live HTML。
     若在断言前先 write_layouts 重刷一遍，committed 文件与 HTML 分家会被当场覆盖掉——
-    那等于把闸删了。生成动作只属于本任务的 Step 3 命令行。"""
+    那等于把闸删了。生成动作只属于本任务的 Step 3 命令行。
+
+    比对口径（终审 I-2）：版式级三字段 + **整条变量契约逐字段**（id/type/label/default，
+    number 型还带 min）；不是只比 id 序列。发射器实读 type（path_b_build.py:1937）与
+    default（:2154-2155），HTML 里这两样漂了必须在这里红，否则 P3 换源时登记表供不出来。
+    """
     problems, total = [], 0
     for style in pb.ALL_TEMPLATES:
         live = pb.load_style_pack(style)
