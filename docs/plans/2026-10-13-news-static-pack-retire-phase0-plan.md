@@ -507,8 +507,8 @@ def t_layouts_equivalence_gate_covers_all_217_layouts():
 - [ ] **Step 1b: 变量 id 必须都有取值来源（词表 = 三条并集，不是 `DERIVERS` 一条）**
 
 ```python
-#: 发射器给变量填值的三条来源。今天实测 1943 条变量 = 1571 条 DERIVERS 命中
-#: + 372 条 INDEXED 语法 + imagePath/imageCredit 硬分支，无来源者 0 条。
+#: 发射器给变量填值的三条来源。今天实测 1943 条变量 = 1147 条 DERIVERS 命中
+#: + 372 条 INDEXED 语法 + 424 条 imagePath/imageCredit 硬分支，无来源者 0 条。
 IMAGE_SOURCED_IDS = {"imagePath", "imageCredit"}   # resolve_variable 里写死的取图分支
 
 
@@ -860,7 +860,7 @@ Expected: `exit=0`（探针不在 `entries/` 下，删掉后构建产物应与 T
 
 | # | 缺陷 | 后果 | 修法 |
 |---|---|---|---|
-| 1 | 判据 3 写成「变量 id ⊆ `DERIVERS`」 | 今天 1943 条变量里 **796 条会红**——`item*/step*` 由 `INDEXED_VAR_RE` 语法在运行时挂表，`imagePath/imageCredit` 走 `resolve_variable` 硬分支，都不在 `DERIVERS` 字面键里 | 词表改成三条并集，并按真实分布写死预期（1571 + 372 + 图片位，无来源 0 条）；spec §5/§6 同步改 |
+| 1 | 判据 3 写成「变量 id ⊆ `DERIVERS`」 | 今天 1943 条变量里 **796 条会红**——`item*/step*` 由 `INDEXED_VAR_RE` 语法在运行时挂表，`imagePath/imageCredit` 走 `resolve_variable` 硬分支，都不在 `DERIVERS` 字面键里 | 词表改成三条并集，并按真实分布写死预期（1147 DERIVERS + 372 索引 + 424 取图，无来源 0 条）；spec §5/§6 同步改。**注**：我第一版把拆分写成「1571 + 372 + 图片位」，是把取图那 424 条错并进 DERIVERS 命中算的；Task 5 实现者按逐字实现时发现并对账，实跑复核为 1147/372/424。 |
 | 2 | Task 5 的等价闸在断言前 `write_layouts` 重刷提交物 | committed 文件与 HTML 一旦分家会被当场覆盖 ⇒ **闸自己把自己关掉** | 生成只留 Step 3 命令行；测试只读比对 |
 | 3 | Task 4 的 round-trip 测试往真 pack 目录写 `layouts.toml` | 工作树留下未审产物，撞 AGENTS.md 的 hygiene gate | 改 `tempfile.TemporaryDirectory()` |
 | 4 | Task 2 的抽取器扫全文 | 别处任何一张 `| \`x\` | \`#hex\` |` 形状的表都会被误收成 token | 限定小节标题含「色板」；实测 31 包的 398 行色板恰好全在这类小节内（`1. 色板` / `1. 色板（本包真实用色）` / `2. 色板` 三种写法），限定不丢行 |

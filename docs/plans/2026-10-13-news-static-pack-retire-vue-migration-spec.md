@@ -111,7 +111,7 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
    - `theme.toml` 与它所属 pack 的 `frame.md` 色板表**逐条相等**（串色闸，31/31 全跑）。
    - `layouts.toml` 与 `load_style_pack()` 当次读出的 `composition_id / variables / ground_hex / ground_tone` **逐字段相等**（等价闸，217/217 全跑）。
    - 变量 id 都有取值来源 —— 词表是**三条并集**：`DERIVERS`（:2160）、`INDEXED_VAR_RE`（:2188，`itemN*/stepN*`）、
-     `imagePath`/`imageCredit` 硬分支（`resolve_variable` :1905）。今天实测 1943 条变量 = 1571 + 372 + 图片位，无来源 0 条。
+     `imagePath`/`imageCredit` 硬分支（`resolve_variable` :1905）。今天实测 1943 条变量 = 1147 条 DERIVERS 命中 + 372 条 INDEXED 语法 + 424 条取图硬分支，无来源 0 条。
      ⚠ 判据原文「⊆ `DERIVERS`」是错的（今天会红 796 条）；且**不许**用 `register_indexed_derivers` 先把 id 灌进 `DERIVERS` 再判——
      那函数是运行时改全局字典，会让断言取决于跑测顺序。
 
@@ -143,6 +143,9 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
 「(pack, role) 查 L3」，命中即 Vue，未命中 ⇒ **报错而不是回落静态**（并存期靠 §5-P1 把 217 条登记填满，不留未覆盖镜）。
 
 **门 G2**：`path_b_selftest.py` 全绿 + 31 个 pack 各出一次画面轨且结构闸过。
+
+> 为什么这步不可省（Phase 0 实测）：217 条镜只有 130 个不同 `composition_id`，30 个 pack 的 hook 同名 `nc-night-hook`
+> （见 §7 风险 8）。按 id 路由的白名单一旦登记 hook，等于同时把 29 个别主题的包也翻成 coral 版式。
 
 ### P3 删静态（唯一不可逆动作，单独一次提交）
 
@@ -198,6 +201,7 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
 | 6 | **两条路的 GSAP 不是同一份字节**（实测）：31/31 份 `host.html:5` 引 `cdn.jsdelivr.net/npm/gsap@**3.14.2**/dist/gsap.min.js`；Vue bundle 打的是 npm `gsap@**3.15.0**`（`package.json:27` 写 `^3.15.0`，lock 解析 3.15.0） | ~~需用户拍~~ **已拍②**（2026-10-13）：台账只承诺**结构一致**，不承诺逐字节 ⇒ P3 步骤 3 解锁 | 定义见 §5-P3「结构一致」四条断言；判据 7 按此改写 |
 | 6b | **删 CDN 不违反法则 10**（我先前把这条写成「法则 10 断掉」，是误用）：仓内 `法则 10` 只在 `hf_compile.py:21` / `:1135` 出现，指的是**编译期确定性**（同 pack 编译两次字节相同 + 无运行时随机），讲的是 path_c 编译产物，与「旧成片重渲字节一致」不是同一件事 | 表述纠正 | 台账的字节可复现**从来没有被机检过**（实测：`routes/news/*.md` 里 `逐字节\|字节一致\|deterministic` 零命中）——所以选②没有拆掉任何现存闸门，只是把这条未成文的历史假设正式关掉 |
 | 7 | Vue 侧依赖面自己也在漂：`gsap` 是 caret 范围，产物字节取决于 lock 而非声明 | 可复现性隐患（这条威胁的是**新片**，与 6 同源但方向相反） | P0 顺带把 `gsap` 与 `vue` 的精确版本钉进 `package.json`（去掉 caret），并在 `vue-build.test.ts` 加一条「bundle 内 GSAP 版本 == 声明版本」的断言 |
+| 8 | **`composition_id` 不区分包**（Phase 0 实跑测出）：217 条镜只有 **130 个不同 id**；31 个 pack 的 `hook` 有 **30 个共用 `nc-night-hook`**（唯一例外 `news-policy` 的 `np-hook`），`stat` 才是一包一号 | 分层方案的**路由级串色**：与风险 2 同族、机制不同 | L3 路由键必须是 `(pack, role)`。现行 `VUE_COMPOSITIONS` 按 `composition_id` 命中，若照它登记 hook，会**一次性翻 30 个包**，而 bundle 里烤的是 coral 色板 ⇒ 29 包整块错色。P2「从 id 升级为 (pack, role)」是开工前提，不是优化 |
 
 ---
 
