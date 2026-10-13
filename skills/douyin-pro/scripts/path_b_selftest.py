@@ -38,6 +38,7 @@ import hf_style_spec as hs  # noqa: E402  (v2 风格 spec：结构校验 + 编�
 import image_gate as ig  # noqa: E402  (P3 图片门禁：本地零网络人脸检测器)
 import pack_theme  # noqa: E402  (frame.md 色板表 → theme.toml：Vue 路的主题真源抽取器)
 import pack_layouts as pkl  # noqa: E402  (compositions/*.html 版式元数据 → layouts.toml：P3 换源目标)
+import pack_variants as pkv  # noqa: E402  (判据 0a：每角色归一化后的真实结构变体簇)
 
 FAILURES: list[tuple[str, str]] = []
 
@@ -4531,6 +4532,19 @@ def t_every_layout_variable_id_has_a_source():
         f"实测 {got[0]}/{got[1]}/{got[2]}/{got[3]}（总 {seen}）"
         f" != 期望 {want[0]}/{want[1]}/{want[2]}/{want[3]}（总 {sum(want)}）"
         " —— 对比四数，哪一格变了就去查那一条来源")
+
+
+def t_variant_clusters_hook_has_the_measured_two_shapes():
+    clusters = pkv.cluster_role("hook")
+    assert len(clusters) == 2, f"hook 归一化后应 2 簇，实得 {len(clusters)}: {list(clusters)}"
+    sizes = sorted(len(v) for v in clusters.values())
+    assert sizes == [1, 30], f"hook 簇规模应为 [1, 30]（news-policy 独一份），实得 {sizes}"
+
+
+def t_normalize_strips_colors_ids_and_whitespace():
+    a = '<div id="root" data-composition-id="nc-a" style="color:#E85D5D">\n  x  \n</div>'
+    b = '<div id="root" data-composition-id="zz-z" style="color:#000000">\nx\n</div>'
+    assert pkv.normalize(a) == pkv.normalize(b), "去色/去 id/去空白后两条应等值"
 
 
 if __name__ == "__main__":
