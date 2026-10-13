@@ -4486,26 +4486,42 @@ def t_layouts_equivalence_gate_covers_all_217_layouts():
     assert total == 217, f"版式总数应为 7 × {len(pb.ALL_TEMPLATES)} = {7 * len(pb.ALL_TEMPLATES)}，实得 {total}"
 
 
-#: 发射器给变量填值的三条来源。今天实测 1943 条变量 = 1147 条 DERIVERS 命中
-#: + 372 条 INDEXED 语法 + 424 条 imagePath/imageCredit 硬分支，无来源者 0 条。
+#: 发射器给变量填值的三条来源。词表本身就是三条并集，逐条都被行使；
+#: 各类的**实际条数**由 `t_every_layout_variable_id_has_a_source` 末尾的断言机器校验，
+#: 所以这里不再抄写数字——抄来的副本会腐烂（这条注释已经错过一次）。
 IMAGE_SOURCED_IDS = {"imagePath", "imageCredit"}   # resolve_variable 里写死的取图分支
 
 
 def t_every_layout_variable_id_has_a_source():
     unknown = []
+    n_derivers = n_indexed = n_image = 0
     for style in pb.ALL_TEMPLATES:
         for role, layout in pb.load_style_pack(style)["layouts"].items():
             for var in layout["variables"]:
                 var_id = var["id"]
                 if var_id in pb.DERIVERS:
+                    n_derivers += 1
                     continue
                 if pb.INDEXED_VAR_RE.match(var_id):
+                    n_indexed += 1
                     continue
                 if var_id in IMAGE_SOURCED_IDS:
+                    n_image += 1
                     continue
                 unknown.append(f"{style}/{role}: {var_id}")
     assert not unknown, ("这些变量 id 三条来源都不沾，抽取出来也填不进: "
                          + ", ".join(sorted(set(unknown))[:12]))
+    # 四桶计数 + 总数一起断言：某条来源退化（比如 load_style_pack 抽 variables 抽成空表、
+    # 或 DERIVERS 少了条目被 INDEXED/取图桶顶位）都会在这里红，而不是靠 unknown 为空蒙过。
+    # 不许调用 pb.register_indexed_derivers()：那会改全局 DERIVERS，让计数随跑测顺序变。
+    seen = n_derivers + n_indexed + n_image + len(unknown)
+    got = (n_derivers, n_indexed, n_image, len(unknown))
+    want = (1147, 372, 424, 0)
+    assert got == want and seen == sum(want), (
+        "变量取值来源分布漂移（DERIVERS / INDEXED 语法 / imagePath+imageCredit / 无来源）："
+        f"实测 {got[0]}/{got[1]}/{got[2]}/{got[3]}（总 {seen}）"
+        f" != 期望 {want[0]}/{want[1]}/{want[2]}/{want[3]}（总 {sum(want)}）"
+        " —— 对比四数，哪一格变了就去查那一条来源")
 
 
 if __name__ == "__main__":
