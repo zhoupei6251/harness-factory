@@ -236,6 +236,35 @@ check("渲染依赖版本已钉死（spec §7 风险 7：caret 范围让产物�
   }
 });
 
+check("bundle 内 GSAP 版本 == 声明版本（spec §5-P0 判据 3 的原文口径）", () => {
+  // 上一条只比「package.json 声明 == package-lock 解析」，管的是**依赖怎么装**；
+  // spec §5-P0 第 3 条要的是「**bundle 内** GSAP 版本 == 声明版本」，管的是**产物是不是这次的**。
+  // 两者不等价：声明/锁一致但 dist/ 是旧 GSAP 编出来的陈旧产物时，只有这条会红。
+  //
+  // 锚点实测（dist/vue/news-coral-hook.js，gsap 3.15.0 + vue 3.5.43）：
+  // GSAP 在产物里写 `…version=…version=…version="3.15.0"`，全文 `version\s*=\s*"\d+\.\d+\.\d+"`
+  // 这种「版本赋值标记」**恰好命中 1 次**，且值就是 gsap 版本；vue 的 3.5.43 不以该形态出现。
+  // 所以先要求「标记存在」（GSAP 换了产物形态时必须人工重锚，不许放宽），再要求「标记值 == 声明值」。
+  const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
+  // gsap/vue 现在都声明在 devDependencies（与被测产物同口径：合并两块，与上一条检查一致）
+  const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
+  const declared: string = deps["gsap"] as string;
+  assert(
+    typeof declared === "string" && /^\d+\.\d+\.\d+$/.test(declared),
+    `package.json 的 gsap 声明 ${declared} 不是精确版本，无法拿去比 bundle`
+  );
+  const js = readFileSync(DIST_ENTRY_JS, "utf8");
+  assert(
+    /version\s*=\s*"\d+\.\d+\.\d+"/.test(js),
+    `dist/vue/${HOOK}.js 里找不到 version="x.y.z" 形态的 GSAP 版本标记 —— ` +
+      "GSAP/Vite 换了产物写法，这条锚需要人工重新对齐（别改成放宽断言）"
+  );
+  assert(
+    new RegExp(`version\\s*=\\s*"${declared.replace(/\./g, "\\.")}"`).test(js),
+    `bundle 内的 GSAP 版本标记不是声明值 ${declared} —— dist 是陈旧产物或打了别的 GSAP`
+  );
+});
+
 for (const name of entryNames) {
   check(`${name}: .vue 的 <style> 编译出 dist/vue/assets/${name}-*.css（发射器靠它发 <link>）`, () => {
     const assetDir = resolve(DIST, "vue", "assets");
