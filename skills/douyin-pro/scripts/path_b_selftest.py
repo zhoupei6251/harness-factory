@@ -4499,11 +4499,19 @@ def t_every_layout_variable_id_has_a_source():
         for role, layout in pb.load_style_pack(style)["layouts"].items():
             for var in layout["variables"]:
                 var_id = var["id"]
-                if var_id in pb.DERIVERS:
-                    n_derivers += 1
-                    continue
+                # 先判 INDEXED_VAR_RE 这条**语法**，再查 DERIVERS 那张**可变字典**——顺序不能反过来。
+                # 发射路径（path_b_build.py:2246 / :2277 / :3605）会调 pb.register_indexed_derivers()，
+                # 它 `DERIVERS.setdefault(var_id, deriver)` 把 itemN*/stepN* 永久挂上全局表、直到进程结束。
+                # 若先查 DERIVERS，同一批 id 就会从 INDEXED 桶搬进 DERIVERS 桶（实测 186 条），
+                # 四数变成 1333/186/424/0 —— 断言绿不绿就取决于本闸前面跑没跑过发射类测试，
+                # 那是跑测顺序的巧合（harness 按名字排序，本闸恰好排在第 45 项），不是性质。
+                # 语法是常量模式：正则匹配到的 id 按构造必是索引类，分类永不随进程状态漂移；
+                # DERIVERS 只在运行时增项，静态声明的基项 id 不会被它夺走。
                 if pb.INDEXED_VAR_RE.match(var_id):
                     n_indexed += 1
+                    continue
+                if var_id in pb.DERIVERS:
+                    n_derivers += 1
                     continue
                 if var_id in IMAGE_SOURCED_IDS:
                     n_image += 1
@@ -4513,7 +4521,8 @@ def t_every_layout_variable_id_has_a_source():
                          + ", ".join(sorted(set(unknown))[:12]))
     # 四桶计数 + 总数一起断言：某条来源退化（比如 load_style_pack 抽 variables 抽成空表、
     # 或 DERIVERS 少了条目被 INDEXED/取图桶顶位）都会在这里红，而不是靠 unknown 为空蒙过。
-    # 不许调用 pb.register_indexed_derivers()：那会改全局 DERIVERS，让计数随跑测顺序变。
+    # 不许调用 pb.register_indexed_derivers()：那会改全局 DERIVERS。上面的优先级已让四数与
+    # DERIVERS 是否被发射路径灌过无关，本断言因此在干净/污染两种进程状态下都该是同一组数。
     seen = n_derivers + n_indexed + n_image + len(unknown)
     got = (n_derivers, n_indexed, n_image, len(unknown))
     want = (1147, 372, 424, 0)
