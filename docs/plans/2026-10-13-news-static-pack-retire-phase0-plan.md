@@ -12,6 +12,12 @@
 
 ## Global Constraints
 
+- **两个证据文件已作为桩存在并入库**：`routes/news/evidence/2026-10-13-pack-variant-clusters.md`
+  与 `routes/news/evidence/2026-10-13-gsap-var-interpolation.md`。原因：`npm run validate`
+  要求已跟踪文档里的 evidence pointer 必须指向已跟踪文件，而计划必须先给出确定文件名。
+  桩文件顶部自标「未实测，桩文件」，**Task 6 Step 5 / Task 7 Step 3 是覆盖写入**，不是新建。
+  执行时不要把桩内容当证据引用。
+
 - 只动 `path_b` 手抄包；**不碰** `hf_compile.py` / `hf_primitives.py` / `hf_style_spec.py` / `hyperframes_path_c`（spec §1-4）。
 - 本 Phase 不删任何文件、不改渲染路径、不改 `ALL_TEMPLATES` / `decide_pack.PACK_BUCKETS`。
 - 每个任务结束时 `python skills/douyin-pro/scripts/path_b_selftest.py` 必须全绿，`npm test` 必须 exit 0。
