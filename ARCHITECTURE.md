@@ -2,32 +2,39 @@
 
 ## Why this exists
 
-`harness-factory` is the lean replacement for `harness-foundry` (1290 files) and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: 441 source files (vs 669 in harness-foundry), TypeScript only, no empty placeholders.
+`harness-factory` is the lean replacement for `harness-foundry` and `harness-kit` (skeleton only). It keeps the bones of harness-kit and the multi-platform intent of harness-foundry, but on a strict diet: the meta toolchain (`scripts/` + `tests/`) is TypeScript only, and there are no empty placeholders.
 
 ## Current state
 
-> **Live table** — re-run `npm run stats` for the actual numbers (script: [`scripts/stats.ts`](scripts/stats.ts)). Snapshot at last edit:
+No counts live in this file. `npm run stats` prints them (source files by extension, tracked files, skills active/archived, schemas, npm scripts, git state, runtime dir sizes) — every number written down by hand here has gone stale within a day, three times over.
 
-| Metric | Count |
-|---|---|
-| Source files (excl `.git` + `node_modules` + runtime dirs) | 871 |
-|  · `.ts` / `.md` / `.json` / `.py` / `.html` / other | 21 / 335 / 127 / 53 / 267 / 68 |
-| Core governance docs | 8 |
-| Platform adapters | 5 (claude, codex, trae, workbuddy, qoder) — codex + qoder share the `AGENTS.md` native entry, merged by bootstrap |
-| Routes | 3 (code, novel, news) — all with MEMORY templates |
-| Skills | 100 (49 active in `skills/` + 51 archived in `skills/archive/`, all restorable) |
-| MCP servers | 1 (codebase-memory only; wired via committed root `.mcp.json` + `mcp-config/` snippet — see `references/tooling.md`) |
-| Capability verticals (in `capabilities/rules/`) | 3 (java, typescript, common) |
-| Schemas | 3 |
-| npm scripts | 8 (bootstrap, validate, index, typecheck, stats, test, doctor, skills:install) |
+What the counts are *of*:
 
-## The 5 layers
+- **Platform adapters**: claude, codex, trae, workbuddy, qoder. Codex + Qoder share the `AGENTS.md` native entry, merged by bootstrap.
+- **Routes**: code, novel, news — each with a `MEMORY.md` template.
+- **Capability verticals**: java, typescript, common.
+- **MCP servers**: codebase-memory only, wired via the committed root `.mcp.json` plus the `mcp-config/` snippet (see `references/tooling.md`).
+- **Web templates**: `src/web/` — Vue compositions for the news route, built by `vite build` into `dist/`, consumed by `skills/douyin-pro/scripts/path_b_build.py`. Which compositions actually go through Vue is decided by the `VUE_COMPOSITIONS` table in that script — the single source; no count is recorded here.
 
-1. **Foundation**: `core/` — 8 governance docs. Mandatory, no variation.
+## The 6 layers
+
+1. **Foundation**: `core/` — governance docs. Mandatory, no variation.
 2. **Capabilities**: `capabilities/rules/{java,typescript,common}/` — per-language rules. Other capability verticals (eval, intelligence, memory, etc.) were removed in phase-5 as empty placeholders.
-3. **Platforms**: `platforms/<name>/rules/ENTRY.md` — 4 thin adapters. Per-platform deltas.
-4. **Routes**: `routes/<name>/MEMORY.md` — 3 vertical templates (code, novel, news). Per-domain state.
-5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — 49 active; 51 unused live in `skills/archive/` (same structure, restore via `git mv`).
+3. **Platforms**: `platforms/<name>/rules/ENTRY.md` — thin adapters. Per-platform deltas.
+4. **Routes**: `routes/<name>/MEMORY.md` — vertical templates (code, novel, news). Per-domain state.
+5. **Skills**: `skills/<name>/SKILL.md` + `_meta.json` — active skills live in `skills/`, unused ones in `skills/archive/` (same structure, restore via `git mv`).
+6. **Web templates**: `src/web/` — the only layer with a build step and a second toolchain (Vue 3 + Vite + GSAP). It is *not* a governance layer: `bootstrap` never reads it, `BOOTSTRAP_INPUTS` deliberately excludes it, and nothing in `dist/` is tracked.
+
+### Why the Vue layer sits at the repo root, not under `skills/douyin-pro/`
+
+Ruled on 2026-10-13, against the intuitive "put it next to the renderer":
+
+- `scripts/install-skills.ts:67` junctions the **whole** skill directory into `~/.qoder/skills/` (and `~/.codex/`, `~/.claude/`). A Vite project inside `skills/douyin-pro/` would be published to every platform session on the machine, `dist/` and all.
+- `src/web/lib/` (`gsap-runtime`, `hyperframes-bridge`, `data.contract`, `tokens/`) is shared across packs, while the skill boundary is one self-contained directory per skill.
+- Vite wants a single `root`, one `node_modules`, and one `dist/`; multi-entry is expressed by `rollupOptions.input`, not by N projects.
+- The Python side only *consumes* `dist/` — it has no reason to own the source.
+
+`skills/douyin-pro/` therefore keeps the scripts and the `host.html` templates; the Vue source lives in `src/web/entries/<name>/`.
 
 ## How a session works
 
@@ -60,7 +67,7 @@ session end
 | 7 skill-meta scripts | harness-foundry | manual frontmatter | 1 script when 3+ skill editors needed |
 | 4 test layers (L1/L2/L3-eval/L3-intelligence) | harness-foundry | platform drift | 1 layer per platform when added |
 | 694 md files | harness-foundry | doc bloat | write on demand |
-| bash + python | harness-foundry | dual toolchain | TS only |
+| bash + python | harness-foundry | dual toolchain | meta toolchain (`scripts/` + `tests/`) is TS only; Python lives in skill/route payload code; the one second toolchain (Vue + Vite + GSAP) is confined to `src/web/` |
 | 23 top-level dirs | harness-foundry | navigation cost | 10 top-level items |
 | 15+ unused MCP servers | harness-foundry's mcp-servers.json | none (placeholders never filled) | add when actually used |
 | 5 harness-foundry leftover files in skills/ | `_layer.yaml`, `categories.yaml`, `INDEX.md`, `README.md` | none (auto-gen script gone) | replace with new `skills/INDEX.md` (phase-5) |
@@ -72,6 +79,7 @@ session end
 - **Platform**: see `skills/add-platform/SKILL.md`
 - **Route**: see `skills/add-route/SKILL.md`
 - **Language rule**: add file under `capabilities/rules/<lang>/` (e.g., `python/hooks.md`)
+- **Vue composition**: add `src/web/entries/<name>/` (`main.ts` + `<Name>.vue`, `main.html` optional), then add its `composition_id` to `VUE_COMPOSITIONS` in `skills/douyin-pro/scripts/path_b_build.py`. `vite.config.ts` needs no edit — it enumerates `src/web/entries/*/main.ts` and generates the rollup input and HTML-flatten plugin per directory. Registering in `VUE_COMPOSITIONS` is what actually switches a shot over — a built-but-unregistered bundle renders nothing.
 
 ## Bootstrap contract
 

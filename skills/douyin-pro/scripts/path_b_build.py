@@ -464,6 +464,51 @@ MOUNT_TPL = (
     ' data-start="{start}" data-duration="{dur}" data-track-index="1"'
     ' data-width="{w}" data-height="{h}"></div>'
 )
+
+#: Tier 3 POC: 哪些 composition 走 Vue 版（composition_id -> vue bundle 文件名）。
+#: Vue bundle 在 work_dir/vue/<bundle>.js（path_b 拷贝自 dist/vue/<bundle>.js）。
+#: 任何不在此表里的 composition 仍走 MOUNT_TPL 的 data-composition-src HTML 形态。
+VUE_COMPOSITIONS: dict[str, str] = {
+    "nc-night-hook": "news-coral-hook",
+}
+
+#: Vue 版 mount 模板：不引 data-composition-src（hyperframes 引擎不识别 Vue mount），
+#: 含 data-vue-mount 标记，host.html 的 loader script 异步 import 对应 bundle。
+VUE_MOUNT_TPL = (
+    '      <div id="{mount_id}" class="clip"'
+    ' data-composition-id="{composition_id}"'
+    ' data-vue-mount="1"'
+    ' data-vue-bundle="{bundle_name}"'
+    ' data-variable-values="{values}"'
+    ' data-start="{start}" data-duration="{dur}" data-track-index="1"'
+    ' data-width="{w}" data-height="{h}">'
+    '        <div id="vue-target-{composition_id}"></div>'
+    '      </div>'
+)
+
+#: 注入到 host.html </head> 前的 Vue runtime + 样式 + loader script（仅当任意 mount 是 Vue 版时）。
+#: 注意这是脚本字符串 —— {{VUE_INJECTION}} 占位符在 emit_host 里替换，路径是相对 host.html 的。
+#: loader 用 ES module dynamic import 调 mod.mount(target, compId)。
+#: {{VUE_CSS_LINKS}} 由 emit_host 按 work_dir/vue/assets/ 里**实际存在**的 CSS 逐个填
+#: `<link>`：.vue 的 <style> 被 Vite 拆成内容哈希名的独立资产（news-coral-hook-<hash>.css），
+#: 名字不可预测 ⇒ 只能在发射时扫盘。Vue 版没有 compositions/<layout>.html 这一层
+#: （hyperframes 只认 data-composition-src，不认 Vue mount），样式是它唯一的来路 ——
+#: 实测漏发 <link> 时第 1 镜的 @font-face HF CJK 与 #root 定位规则整块丢失。
+VUE_HOST_INJECTION = """\
+{{VUE_CSS_LINKS}}    <script src="vue/vue.runtime.global.prod.js"></script>
+    <script type="module">
+      (async () => {
+        for (const clip of document.querySelectorAll('[data-vue-mount]')) {
+          const compId = clip.dataset.compositionId;
+          const bundle = clip.dataset.vueBundle;
+          const target = document.getElementById('vue-target-' + compId);
+          if (!target) continue;
+          const mod = await import('./vue/' + bundle + '.js');
+          mod.mount(target, compId);
+        }
+      })();
+    </script>
+"""
 #: 画面走 1 轨 (MOUNT_TPL 里写死), 配音单独走 0 轨: 两条轨互不遮挡,
 #: 时间轴上配音与画面**同一起点**就是"这句话配这一镜"; 终点各留一点余量,
 #: 见 AUDIO_MOUNT_HEADROOM_SECONDS。
@@ -2286,12 +2331,25 @@ def _resolve_shot_image(work_dir: str, shot_index: int, scene: dict,
 
 # ------------------------- HTML 发射 -------------------------
 def emit_host(pack: dict, mounts: list[str], audios: list[str], total: float,
-              w: int, h: int) -> str:
-    """填 host.html 的占位符; 占位符少了或多写都算包与脚本不一致 → 停机。"""
+              w: int, h: int, vue_css: list[str] | None = None) -> str:
+    """填 host.html 的占位符; 占位符少了或多写都算包与脚本不一致 → 停机。
+
+    `vue_css` 是 `stage_vue_assets` 扫出来的 work_dir 相对 CSS 路径（Vue 版样式的唯一来路）。
+    """
     host = pack["host"]
+    # Tier 3: {{VUE_INJECTION}} 是可选占位符 —— 只有用 Vue 版 mount 的 host.html 才有
     for token in HOST_PLACEHOLDERS:
         if token not in host:
             raise EmitterError(f"host.html 缺少占位符 {token}")
+    has_vue_placeholder = "{{VUE_INJECTION}}" in host
+    # Tier 3: 检查 mounts 里是否有 Vue 版 mount
+    has_vue = any('data-vue-mount="1"' in m for m in mounts)
+    vue_injection = ""
+    if has_vue:
+        links = "".join(
+            f'    <link rel="stylesheet" href="{css}">\n' for css in (vue_css or [])
+        )
+        vue_injection = VUE_HOST_INJECTION.replace("{{VUE_CSS_LINKS}}", links)
     filled = (
         host.replace("{{COMPOSITION_ID}}", HOST_COMPOSITION_ID)
         .replace("{{W}}", str(w))
@@ -2300,13 +2358,17 @@ def emit_host(pack: dict, mounts: list[str], audios: list[str], total: float,
         .replace("{{SCENES}}", "\n".join(mounts))
         .replace("{{AUDIOS}}", "\n".join(audios))
     )
+    if has_vue_placeholder:
+        filled = filled.replace("{{VUE_INJECTION}}", vue_injection)
     leftover = re.findall(r"\{\{[A-Z_]+\}\}", filled)
     if leftover:
         raise EmitterError(f"host.html 里有未填充的占位符: {leftover}")
     # 占位符被 replace 全局替换, 注释里写一遍就会把挂载复制进样式表 (实测踩过):
     # 数一遍成品里的标记数量, 不等于挂载条数就停机, 别把重复片段留给渲染。
+    # Tier 3: Vue 版 mount 不含 data-composition-src —— 按 HTML 版 mount 数 count
+    html_mounts = [m for m in mounts if 'data-composition-src=' in m]
     for marker, count, what in (
-        ('data-composition-src="compositions/', len(mounts), "画面挂载"),
+        ('data-composition-src="compositions/', len(html_mounts), "HTML 版画面挂载"),
         ('<audio id="voice-', len(audios), "配音挂载"),
     ):
         found = filled.count(marker)
@@ -2319,22 +2381,80 @@ def emit_host(pack: dict, mounts: list[str], audios: list[str], total: float,
     return filled
 
 
+def stage_vue_assets(work_dir: str, pack: dict) -> list[str]:
+    """把 Vue 产物落到 `work_dir/vue/`，交出该包用到的 CSS（work_dir 相对路径）。
+
+    返回空表 = 这个包一个 Vue 版 mount 都没有，emit_host 也就不注入 loader 块。
+    CSS 按 `<bundle>*.css` 过滤而不是整目录全发：一个包混用 HTML 版与 Vue 版时，
+    把别的 composition 的样式挂进来会互相盖住版面（`.hk-*`/`<bundle>-*` 都是全局类名）。
+    """
+    bundles = sorted({VUE_COMPOSITIONS[layout["composition_id"]]
+                      for layout in pack["layouts"].values()
+                      if layout["composition_id"] in VUE_COMPOSITIONS})
+    if not bundles:
+        return []
+    vue_dst = os.path.join(work_dir, "vue")
+    os.makedirs(vue_dst, exist_ok=True)
+    # 仓库根：path_b_build.py 在 skills/douyin-pro/scripts/, 上溯 3 级到 harness-factory/
+    repo_root = Path(os.path.dirname(os.path.abspath(__file__))).resolve().parent.parent.parent
+
+    # 拷 Vite build 产物（dist/vue/<bundle>.js 与 assets/<bundle>.css）到 work_dir/vue/
+    # 用递归遍历 —— dist/vue/assets/ 是子目录, shutil.copyfile 不接受目录源
+    def _copy_tree(src_dir: Path, dst_dir: str) -> None:
+        for entry in src_dir.iterdir():
+            target = os.path.join(dst_dir, entry.name)
+            if entry.is_dir():
+                os.makedirs(target, exist_ok=True)
+                _copy_tree(entry, target)
+            else:
+                shutil.copyfile(str(entry), target)
+
+    vue_src = repo_root / "dist" / "vue"
+    if vue_src.is_dir():
+        _copy_tree(vue_src, vue_dst)
+    else:
+        log(f"  ⚠ dist/vue 不存在 —— Vue bundle 没拷: {vue_src}（先跑 npm run build:templates）")
+    # Vue runtime：从仓库 node_modules/vue 拷到 work_dir/vue/
+    # (path_b 是 Python 发射器, 用 Node 包目录布局定位 vue.runtime.global.prod.js)
+    vue_runtime_src = repo_root / "node_modules" / "vue" / "dist" / "vue.runtime.global.prod.js"
+    if vue_runtime_src.is_file():
+        shutil.copyfile(str(vue_runtime_src),
+                        os.path.join(vue_dst, "vue.runtime.global.prod.js"))
+    else:
+        log(f"  ⚠ vue.runtime.global.prod.js 不在 {vue_runtime_src}（loader script 引用会 404）")
+
+    assets = Path(vue_dst) / "assets"
+    css: list[str] = []
+    for bundle in bundles:
+        found = sorted(assets.glob(f"{bundle}*.css")) if assets.is_dir() else []
+        if not found:
+            log(f"  ⚠ Vue bundle {bundle} 没有 CSS 资产 —— .vue 的 <style> 会整块丢失"
+                f"（检查 dist/vue/assets/ 与 npm run build:templates）")
+            continue
+        css.extend(os.path.relpath(p, work_dir).replace(os.sep, "/") for p in found)
+    return css
+
+
 def emit_mount(mount_index: int, layout: dict, values: dict, start: float,
                dur: float, w: int, h: int) -> str:
     """一镜一个 clip: 时序 = 配音时长, 内容 = 按契约填好的变量。"""
     payload = dict(values)
     payload["slotSeconds"] = round(dur, 3)
     encoded = html.escape(json.dumps(payload, ensure_ascii=False), quote=True)
-    return MOUNT_TPL.format(
+    common = dict(
         mount_id=f"shot-{mount_index}",
         composition_id=layout["composition_id"],
-        file_name=layout["file_name"],
         values=encoded,
         start=fmt_secs(start),
-        dur=fmt_secs(dur),
+        dur=dur,
         w=w,
         h=h,
     )
+    # Tier 3: Vue 版 composition 走 VUE_MOUNT_TPL（不含 data-composition-src）
+    if layout["composition_id"] in VUE_COMPOSITIONS:
+        bundle = VUE_COMPOSITIONS[layout["composition_id"]]
+        return VUE_MOUNT_TPL.format(bundle_name=bundle, **common)
+    return MOUNT_TPL.format(file_name=layout["file_name"], **common)
 
 
 def audio_slot_duration(dur: float) -> float:
@@ -2712,8 +2832,11 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
             log(f"  ⚠ 分镜{i} 的标题行没有落点: {layout_name} 没有标题位, 而标题行不进配音 ⇒ "
                 f"这句作者的话既不上屏也不出声。并进正文, 或点名带 title 的版式(rail/catalog/story/hook)")
         start += dur
+    # Tier 3: Vue bundle 必须先落进 work_dir —— emit_host 要扫 work_dir/vue/assets/
+    # 才知道该给哪几个 CSS 发 <link>（哈希名不可预测），顺序反了就等于漏样式。
+    vue_css = stage_vue_assets(work_dir, pack)
     write_text(os.path.join(work_dir, "index.html"),
-               emit_host(pack, mounts, audios, start, w, h))
+               emit_host(pack, mounts, audios, start, w, h, vue_css))
     dest_dir = os.path.join(work_dir, "compositions")
     os.makedirs(dest_dir, exist_ok=True)
     for layout in pack["layouts"].values():

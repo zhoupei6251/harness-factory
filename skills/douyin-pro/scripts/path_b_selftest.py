@@ -4224,6 +4224,113 @@ def t_p3_emitter_photo_flow_is_deterministic():
         shutil.rmtree(d, ignore_errors=True)
 
 
+# ---------------- Tier 3: Vue 版 mount 协议 ----------------
+def t_vue_compose_hook_uses_vue_mount_tpl():
+    """VUE_COMPOSITIONS 里的 hook 走 VUE_MOUNT_TPL（不含 data-composition-src）。
+
+    Tier 3 接入：host.html 的 loader script 通过 [data-vue-mount="1"] 识别 Vue 版
+    composition，异步 import 对应 Vue bundle。HTML 版 mount 的 data-composition-src
+    是 hyperframes 引擎加载 composition 文件的凭据 —— Vue 版不引，引擎不会去 fetch
+    不存在的文件。
+    """
+    layout = PACK["layouts"]["hook"]
+    ctx = base_ctx(is_first=True)
+    values = pb.fill_variables(layout, pb.parse_input(HOOK_BEAT)[0], ctx)
+    out = pb.emit_mount(1, layout, values, 0.0, 4.0, 1080, 1920)
+    assert layout["composition_id"] in pb.VUE_COMPOSITIONS, \
+        f"hook 应在 VUE_COMPOSITIONS 表里，实际不在"
+    assert 'data-vue-mount="1"' in out, \
+        f"Vue 版 mount 必须含 data-vue-mount: {out}"
+    assert 'data-composition-src=' not in out, \
+        f"Vue 版 mount 不该含 data-composition-src: {out}"
+    assert 'data-vue-bundle="news-coral-hook"' in out, \
+        f"bundle name 必须对应 VUE_COMPOSITIONS 表: {out}"
+    assert 'id="vue-target-nc-night-hook"' in out, \
+        f"Vue 应用 mount target 子元素必须存在: {out}"
+
+
+def t_non_vue_layouts_keep_composition_src_html():
+    """非 VUE_COMPOSITIONS 里的 layout 仍走 MOUNT_TPL（HTML 版，不动现有协议）。"""
+    layout = PACK["layouts"]["stat"]
+    # emit_mount 不验证 values 完整性（fill_variables 才校验契约）—— 直接 mock
+    out = pb.emit_mount(1, layout, {"kicker": "X", "slotSeconds": 4}, 0.0, 4.0, 1080, 1920)
+    assert layout["composition_id"] not in pb.VUE_COMPOSITIONS, \
+        f"stat 不应在 VUE_COMPOSITIONS 表里"
+    assert 'data-composition-src="compositions/stat.html"' in out, \
+        f"HTML 版 mount 必须含 data-composition-src: {out}"
+    assert 'data-vue-mount' not in out, \
+        f"HTML 版 mount 不该含 data-vue-mount: {out}"
+
+
+def t_emit_host_injects_vue_loader_when_any_vue_mount():
+    """emit_host 检测到 mounts 里有 Vue 版 mount 时，注入 VUE_HOST_INJECTION 块。
+
+    host.html 加 {{VUE_INJECTION}} 占位符（path_b 包共 31 个），被 emit_host 替换；
+    path_c/news-editorial-warm 是 P1 编译产物，不含此占位符（保持兼容）。
+    """
+    layout = PACK["layouts"]["hook"]
+    ctx = base_ctx(is_first=True)
+    values = pb.fill_variables(layout, pb.parse_input(HOOK_BEAT)[0], ctx)
+    vue_mount = pb.emit_mount(1, layout, values, 0.0, 4.0, 1080, 1920)
+    audios = ['<audio id="voice-1"></audio>']
+    filled = pb.emit_host(PACK, [vue_mount], audios, 4.0, 1080, 1920)
+    assert 'data-vue-mount="1"' in filled, "Vue 版 mount 必须在 host.html 里"
+    # loader script 必须含 Vue runtime 引用与 dynamic import
+    assert 'vue.runtime.global.prod.js' in filled, \
+        f"Vue loader 必须引用 Vue runtime: {filled[:500]}"
+    assert "import('./vue/" in filled, \
+        f"Vue loader 必须 dynamic import Vue bundle: {filled[:500]}"
+
+
+def t_emit_host_links_vue_css_before_runtime():
+    """Vue 版样式必须由 emit_host 发 `<link>` —— 真渲染实测漏发即整块无样式。
+
+    .vue 的 `<style>` 被 Vite 拆成 `assets/<bundle>-<hash>.css`：哈希名不可预测，
+    只能在发射时按 work_dir/vue/assets/ 扫盘（`stage_vue_assets` 交出路径）。
+    Vue 版没有 `compositions/<layout>.html` 那一层（hyperframes 不认 Vue mount），
+    这支 `<link>` 是它唯一的样式来路 —— 缺了 `@font-face HF CJK` 与 `#root` 定位全丢。
+    """
+    layout = PACK["layouts"]["hook"]
+    values = pb.fill_variables(layout, pb.parse_input(HOOK_BEAT)[0], base_ctx(is_first=True))
+    vue_mount = pb.emit_mount(1, layout, values, 0.0, 4.0, 1080, 1920)
+    css = "vue/assets/news-coral-hook-Br_VAm7t.css"
+    filled = pb.emit_host(PACK, [vue_mount], [], 4.0, 1080, 1920, [css])
+    link = f'<link rel="stylesheet" href="{css}">'
+    assert link in filled, f"emit_host 没为 Vue 样式发 <link>: {css}"
+    assert filled.index(link) < filled.index("vue.runtime.global.prod.js"), \
+        "<link> 必须排在 runtime script 前（样式先于挂载）"
+    assert "{{VUE_CSS_LINKS}}" not in filled, "占位符没被替换"
+    # 不传 css 时不留占位符残余，也不凭空造 link
+    bare = pb.emit_host(PACK, [vue_mount], [], 4.0, 1080, 1920)
+    assert "{{VUE_CSS_LINKS}}" not in bare and 'href="vue/assets/' not in bare
+
+
+def t_stage_vue_assets_returns_nothing_for_html_only_pack():
+    """非 Vue 包一个资产都不拷：混用形态时不得把 Vue runtime 挂进纯 HTML 片。"""
+    import tempfile
+    html_only = {"layouts": {}}
+    with tempfile.TemporaryDirectory() as work:
+        assert pb.stage_vue_assets(work, html_only) == []
+        assert not os.path.exists(os.path.join(work, "vue"))
+
+
+def t_emit_host_skips_vue_loader_when_no_vue_mount():
+    """无 Vue 版 mount 时，emit_host 不注入 Vue loader。
+
+    path_c 包（news-editorial-warm）的 host.html 不含 {{VUE_INJECTION}} 占位符，
+    必须保持不引入 Vue loader —— 否则等于把 P1 编译包绑定到 Tier 3 协议。
+    """
+    # 模拟 path_c 包：用临时 pack dict，host 是 path_c 的 host.html
+    path_c_pack = {
+        "name": "news-editorial-warm",
+        "host": Path(os.path.join(pb.PATH_C_ROOT, "news-editorial-warm", "host.html")).read_text(encoding="utf-8"),
+        "layouts": {},
+    }
+    filled = pb.emit_host(path_c_pack, [], [], 0.0, 1080, 1920)
+    assert 'vue.runtime.global.prod.js' not in filled, \
+        "无 Vue mount 时不该注入 Vue runtime 引用"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]
