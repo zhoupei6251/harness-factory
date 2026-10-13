@@ -3,7 +3,9 @@
 
 今天用 md5 抽样量到「每角色 2 变体」，但那是抽样结论。本脚本把它变成逐行证据：
 去掉硬编码色值、data-composition-id 字面量、__timelines 键名与首尾空白后聚类，
-簇数 = Phase 1 需要的组件数下界。簇数 > 2 的角色照实报，不压缩。
+簇数 = 「一簇一组件」政策下 Phase 1 需要的组件数。簇数 > 2 的角色照实报，不压缩。
+注意这个数不是**数学下界**：归一化后同簇的可以一个组件多主题，近同构的异簇（diff 只有
+个位行数的 `stat` / `quote`）若作参数化处理还能更少——组件数是设计政策的取值。
 """
 from __future__ import annotations
 
@@ -107,7 +109,8 @@ def report() -> str:
         total += len(buckets)
         gaps = ", ".join(f"{n} 包: {d} 行" for n, d in minority_diff_lines(role)) or "—"
         lines.append(f"| `{role}` | {sum(sizes)} | {len(buckets)} | {sizes} | {gaps} |")
-    lines += ["", f"**组件数下界 = {total}**（spec 里写的 14 是抽样推定，以本表为准）。", ""]
+    lines += ["", f"**组件数 = {total}**（「一簇一组件」政策下的观测值，不是数学下界；"
+                  "把近同构的异簇参数化处理可以更少。spec 里写的 14 是抽样推定，以本表为准）。", ""]
     for role in ROLE_ORDER:
         # 列的是**少数簇**（结构偏离主流的那些包）。
         # 不能按 `len(styles) == len(ALL_TEMPLATES)` 判主流：实测每角色都是 [30, 1]，
