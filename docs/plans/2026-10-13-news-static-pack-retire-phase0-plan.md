@@ -864,3 +864,38 @@ Expected: `exit=0`（探针不在 `entries/` 下，删掉后构建产物应与 T
 | 2 | Task 5 的等价闸在断言前 `write_layouts` 重刷提交物 | committed 文件与 HTML 一旦分家会被当场覆盖 ⇒ **闸自己把自己关掉** | 生成只留 Step 3 命令行；测试只读比对 |
 | 3 | Task 4 的 round-trip 测试往真 pack 目录写 `layouts.toml` | 工作树留下未审产物，撞 AGENTS.md 的 hygiene gate | 改 `tempfile.TemporaryDirectory()` |
 | 4 | Task 2 的抽取器扫全文 | 别处任何一张 `| \`x\` | \`#hex\` |` 形状的表都会被误收成 token | 限定小节标题含「色板」；实测 31 包的 398 行色板恰好全在这类小节内（`1. 色板` / `1. 色板（本包真实用色）` / `2. 色板` 三种写法），限定不丢行 |
+
+
+---
+
+## Phase 0 交付后的遗留（终审分诊，Phase 1 立项时必须逐条处置）
+
+终审判定「可合并」，同时把遗留分成两档。以下是**带下来的**，不是已解决的。
+
+### Phase 1 前必须处理（终审列为必修，本轮已一并做完的标注）
+
+| # | 事项 | 状态 |
+|---|---|---|
+| 1 | bundle 侧版本断言缺失（spec §5-P0 要的是「bundle 内版本==声明」，实现只有「声明==lock」） | **已修** `tests/web/vue-build.test.ts:239-267` |
+| 2 | 等价闸只比 `variable_ids`，而发射器消费 `type`/`default`（`path_b_build.py:1937`/`:2154-2155`） | **已修** `pack_layouts.VAR_FIELDS`，schema 升 `news-layouts/2` |
+| 3 | 串色闸自参照只闭「收窄丢行」一侧 | **已修** 398 总数快照 `path_b_selftest.py:4461-4479` |
+| 4 | 「14 是数学下界」与「stat/quote 可参数化」互斥 | **已修** 统一为「一簇一组件政策取值，参数化可至 12」 |
+| 5 | `vite` / `@vitejs/plugin-vue` 仍是 caret，编译器版本同样决定 bundle 字节 | **未修（决策而非代码）**：已在 spec §4/§7-7 写明钉了哪些、没钉哪些。Phase 1 若把产物哈希入档，必须先钉 |
+
+### 可携带（终审逐条判过，不阻塞合并）
+
+- T1：版本断言的正则 `^\d+\.\d+\.\d+$` 会拒预发布/四段版本（brief 逐字规定的写法）。
+- T2：`_PALETTE_KEYWORD` 用子串判定（标题写「不适用色板」也会开域）；hex `{3,8}` 容非法长度；`load_theme` 缺 `[tokens]` 静默返回 `{}`；`frame.md` 文件名硬编码。
+- T3：绊线的 loose_re 逐字复制 `_ROW_RE` 行形状（双处维护易失真）；只对同形状丢行有效。
+- T4：`_toml_str` 不转义控制字符；含 `.` 的版式名会错误嵌套（实测 8 个角色名全纯小写，今日不触发）；`verify_pack` set 迭代致消息顺序不稳定；缺字段走 KeyError 崩 harness 而非 FAIL 行。
+- T5：`verify_pack` 不校验 `schema` 键本身（内容契约已由逐字段闸强制）；217 条镜只有 130 个不同 `composition_id`（见 spec §7 风险 8）。
+- T6：断言③④ 写死 `ID` 字面量，第五条替换若吞引号会连带红但不指认是第五条；docstring 说「五条」而 `_SUBS` 实为 4 条 + strip；`report()` 每角色读盘 3 次；`[30,1]`/398/217 等盘上快照写死，增删 pack 必红（有意绊线）。
+- T7：判据 0b 的原始三色值不可重放（探针已删，仅证据内部自洽 + 同页快照）。
+- 文档漂移：spec §4/§5-P0 仍写 `variant(1/2)` 字段与 `extract_pack_*.py` 文件名，与落地实现（`pack_layouts` 的簇判定、实际模块名）不一致 —— Phase 1 立项时一并校准。
+
+### Phase 0 的净产出（供 Phase 1 直接依赖）
+
+- `pack_theme.py` / `pack_layouts.py` / `pack_variants.py` 三个模块；31 份 `theme.toml` + 31 份 `layouts.toml`（schema 2）入库。
+- selftest 断言 187 → **202**；web 断言 15 → **17**。
+- 判据 0a：**7 角色全部 2 簇 `[30,1]`，孤簇一律 `news-policy`**；diff 行数分档（stat 4 / quote 7 vs hook 283 / rail 250 / catalog 259 / story 242 / closer 276）。
+- 判据 0b：**GSAP 不能补间 `var(--x)`**（t0.5 = `rgba(0,0,191,0.75)`，中间帧丢红通道；端点纯色是 `var()` 原样回写的假象）⇒ B 方案「GSAP 取 hex 字面量」保留。
