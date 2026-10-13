@@ -4547,6 +4547,52 @@ def t_normalize_strips_colors_ids_and_whitespace():
     assert pkv.normalize(a) == pkv.normalize(b), "去色/去 id/去空白后两条应等值"
 
 
+def t_normalization_actually_collapses_stat():
+    """归一化确实在塌东西：stat 原始 md5 31 簇 → 归一化 2 簇，差值必须钉死。
+
+    F1 补闸：`t_variant_clusters_hook` 对口径零敏感（hook 原始字节就是 2 簇，
+    _SUBS 清空它照样绿），31→2 的承重塌方此前没有任何测试守着。这条把
+    「未归一化 vs 已归一化」的簇数差变成被检事实——口径被放宽（加第五条替换
+    塌成 1 簇）或被摘松（塌不动、回到 31 簇）都会在这里变红，而不是让
+    证据文件静默改数。
+    """
+    raw = pkv.cluster_role_raw("stat")
+    norm = pkv.cluster_role("stat")
+    assert len(raw) == 31, f"stat 未归一化应 31 簇（每包字节都不同），实得 {len(raw)}"
+    assert len(norm) == 2, f"stat 归一化后应塌到 2 簇，实得 {len(norm)}"
+    sizes = sorted(len(v) for v in norm.values())
+    assert sizes == [1, 30], f"stat 归一化后簇规模应为 [1, 30]，实得 {sizes}"
+
+
+def t_normalize_applies_each_documented_substitution():
+    """_SUBS 五条口径逐条锚定：每条单独摘掉必须在这里变红。
+
+    既有锚测试的输入不含 rgba / __timelines（报告 §5 已披露这两条无测试锚定），
+    这条补齐：hex 色值、rgba()、data-composition-id、__timelines 键名、
+    逐行首尾空白各喂一条针对性样本。口径本体一字未动，只是把它变成可机检的。
+    """
+    # ① 硬编码 hex 色值 → 整串删除
+    assert pkv.normalize("color: #E85D5D;") == "color: ;", "hex 色值必须被去掉"
+    # ② rgba()/rgb() → 整串删除（此前无任何测试锚定）
+    assert pkv.normalize("box-shadow: rgba(0, 0, 0, 0.4);") == "box-shadow: ;", (
+        "rgba() 必须被去掉")
+    assert pkv.normalize("background: rgb(245, 240, 232)") == "background:", (
+        "rgb() 必须被去掉")
+    # ③ data-composition-id 字面量 → 统一为 ID
+    assert pkv.normalize('<div data-composition-id="nc-stat">') == (
+        '<div data-composition-id="ID">'), "composition id 必须归一为 ID 字面量"
+    # ④ __timelines["…"] 键名 → 统一为 ID（此前无任何测试锚定）
+    assert pkv.normalize('window.__timelines["nc-closer"] = tl;') == (
+        'window.__timelines["ID"] = tl;'), "__timelines 键名必须归一为 ID"
+    # ⑤ 逐行首尾空白被 strip，但空行保留（有结构的空白，不是噪声）
+    assert pkv.normalize("  <div>\n\t x \t\n\n</div>  ") == "<div>\nx\n\n</div>", (
+        "行首尾空白必须去掉、空行必须保留")
+    # 跨类合并：两条只差 ①②④ 三类内容时归一化后必须等值
+    a = '<div style="color:#E85D5D" data-composition-id="nc-a">\n__timelines["nc-a"] = gsap.timeline();\n</div>'
+    b = '  <div style="color:#000000" data-composition-id="zz-z">\n__timelines["zz-z"] = gsap.timeline();\n  </div>'
+    assert pkv.normalize(a) == pkv.normalize(b), "色值/id/timelines 三重差异必须整体塌掉"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]
