@@ -1,0 +1,15 @@
+# 编译产物：由 pack_theme.write_theme 从 frame.md 色板表生成，勿手改。
+schema = "news-theme/1"
+
+[tokens]
+ink = "#0e0e0e"
+ink-soft = "#1a1a1a"
+cream = "#f5efe3"
+cream-dark = "#e8dfcb"
+rule = "#2a2a2a"
+rule-cream = "#c9c0aa"
+text-light = "#e8e2d2"
+text-mute = "#9a9a9a"
+text-ink = "#1a1a1a"
+text-ink-mute = "#6b6b6b"
+accent = "#c9a24a"

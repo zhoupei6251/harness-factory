@@ -1,0 +1,13 @@
+# 编译产物：由 pack_theme.write_theme 从 frame.md 色板表生成，勿手改。
+schema = "news-theme/1"
+
+[tokens]
+paper = "#f5efe3"
+paper-dark = "#e8dfcb"
+cobalt = "#1f3a68"
+cobalt-dark = "#142b4f"
+ink = "#1a1a1a"
+gray = "#6b6b6b"
+rule = "#c9c0aa"
+gold = "#b8923e"
+crimson = "#c0392b"

@@ -70,3 +70,25 @@ def load_theme(pack_dir: str) -> dict[str, str]:
     with path.open("rb") as fh:
         raw = tomllib.load(fh)
     return {str(k): str(v).lower() for k, v in raw.get("tokens", {}).items()}
+
+
+def verify_pack(pack_dir: str) -> list[str]:
+    """theme.toml 必须与同目录 frame.md 色板表逐条相等（串色闸）。"""
+    pack = Path(pack_dir)
+    expected = parse_frame_md_palette((pack / "frame.md").read_text(encoding="utf-8"))
+    if not expected:
+        return [f"{pack.name}: frame.md 色板表解析为空 —— 闸等于没设"]
+    if not (pack / THEME_FILENAME).exists():
+        return [f"{pack.name}: 缺 {THEME_FILENAME}"]
+    actual = load_theme(str(pack))
+    problems = []
+    for name, hex_value in expected.items():
+        got = actual.get(name)
+        if got is None:
+            problems.append(f"{pack.name}: frame.md 有 `{name}`={hex_value} 但 theme.toml 缺")
+        elif got != hex_value:
+            problems.append(f"{pack.name}: `{name}` theme.toml={got} != frame.md={hex_value}")
+    for name in actual:
+        if name not in expected:
+            problems.append(f"{pack.name}: theme.toml 有 `{name}` 但 frame.md 色板表里没有（凭空多出的 token）")
+    return problems

@@ -1,0 +1,14 @@
+# 编译产物：由 pack_theme.write_theme 从 frame.md 色板表生成，勿手改。
+schema = "news-theme/1"
+
+[tokens]
+pitch = "#2d6a4f"
+pitch-dark = "#1b4332"
+pitch-line = "#52b788"
+white = "#f8f9fa"
+gray = "#b0b0b0"
+score = "#c0392b"
+opp-score = "#ffffff"
+gold = "#b8923e"
+crimson = "#9a0c24"
+pitch-ground = "#1a0808"

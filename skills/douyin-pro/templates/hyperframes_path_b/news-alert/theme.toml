@@ -1,0 +1,12 @@
+# 编译产物：由 pack_theme.write_theme 从 frame.md 色板表生成，勿手改。
+schema = "news-theme/1"
+
+[tokens]
+black = "#0e0e0e"
+black-soft = "#1a1a1a"
+white = "#f8f4ea"
+gray = "#9a9a9a"
+alert = "#d7263d"
+alert-dark = "#a11d2e"
+warn = "#f2c94c"
+ok = "#3fa34d"

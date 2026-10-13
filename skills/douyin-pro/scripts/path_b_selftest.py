@@ -4414,6 +4414,44 @@ def t_parse_frame_md_palette_only_reads_palette_sections():
     assert pack_theme.parse_frame_md_palette(text) == {"coral": "#e85d5d"}, "色板以外的小节被读进来了"
 
 
+def t_theme_matches_frame_md_for_every_path_b_pack():
+    # 串色闸（判据 1）：theme.toml 必须与同目录 frame.md 色板表逐条相等。
+    problems = []
+    for style in pb.ALL_TEMPLATES:
+        pack_dir = os.path.join(pb.TEMPLATE_ROOT, style)
+        if not os.path.isfile(os.path.join(pack_dir, pack_theme.THEME_FILENAME)):
+            problems.append(f"{style}: 没有 theme.toml")
+            continue
+        problems += pack_theme.verify_pack(pack_dir)
+    assert not problems, "串色闸失败:\n  " + "\n  ".join(problems)
+
+
+def t_section_scoping_loses_no_palette_rows():
+    """色板作用域收窄没有吃掉真实 token：整文件松散扫的行数 == theme.toml 的 token 数。
+
+    串色闸两侧都走 `parse_frame_md_palette`，解析器悄悄丢行照样全绿；这条用**不受小节
+    限定**的同形状扫描当绊线，把「任意标题行都结束作用域」这个决定钉在盘上现实。
+    将来谁把真实色板行挪到 `###` 子小节下（或新增一张同形状的非色板表），松散计数就会
+    超过 theme.toml 的 token 数，这里会大声失败并要求人工看一眼，而不是静默放行。
+    """
+    loose_re = re.compile(
+        r"^\|\s*`[A-Za-z0-9][A-Za-z0-9_-]*`\s*\|\s*`#[0-9a-fA-F]{3,8}`\s*\|",
+        re.MULTILINE,
+    )
+    problems = []
+    for style in pb.ALL_TEMPLATES:
+        pack_dir = os.path.join(pb.TEMPLATE_ROOT, style)
+        frame_text = Path(pack_dir, "frame.md").read_text(encoding="utf-8")
+        loose = len(loose_re.findall(frame_text))
+        strict = len(pack_theme.load_theme(pack_dir))
+        if loose != strict:
+            problems.append(
+                f"{style}: 松散扫到 {loose} 行同形状表，theme.toml 只有 {strict} 个 token —— "
+                f"要么真实色板被小节作用域挡在门外，要么多了一张同形状的非色板表，去看一眼"
+            )
+    assert not problems, "小节作用域丢掉了色板行:\n  " + "\n  ".join(problems)
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

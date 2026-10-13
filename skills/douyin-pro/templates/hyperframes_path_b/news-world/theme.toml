@@ -1,0 +1,13 @@
+# 编译产物：由 pack_theme.write_theme 从 frame.md 色板表生成，勿手改。
+schema = "news-theme/1"
+
+[tokens]
+navy = "#0e1b36"
+navy-soft = "#152544"
+paper = "#f0f4f8"
+paper-dark = "#d9e0e8"
+lat = "#4a6e9e"
+crimson = "#c0392b"
+gold = "#b8923e"
+cool-gray = "#7a8a9e"
+navy-ground = "#0a1018"

@@ -1,0 +1,12 @@
+# 编译产物：由 pack_theme.write_theme 从 frame.md 色板表生成，勿手改。
+schema = "news-theme/1"
+
+[tokens]
+coral = "#e85d5d"
+coral-dark = "#d44a4a"
+cream = "#f5f0e8"
+cream-dark = "#e8e0d4"
+ink = "#1a1a1a"
+gray = "#6b6b6b"
+light-gray = "#b0b0b0"
+white = "#ffffff"
