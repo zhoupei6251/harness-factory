@@ -39,6 +39,7 @@ import image_gate as ig  # noqa: E402  (P3 图片门禁：本地零网络人脸�
 import pack_theme  # noqa: E402  (frame.md 色板表 → theme.toml：Vue 路的主题真源抽取器)
 import pack_layouts as pkl  # noqa: E402  (compositions/*.html 版式元数据 → layouts.toml：P3 换源目标)
 import pack_variants as pkv  # noqa: E402  (判据 0a：每角色归一化后的真实结构变体簇)
+import pack_slots as pks  # noqa: E402  (Phase 1 地基：有序色位槽 + 逐字节无损还原闸)
 
 FAILURES: list[tuple[str, str]] = []
 
@@ -4625,6 +4626,33 @@ def t_normalize_applies_each_documented_substitution():
     a = '<div style="color:#E85D5D" data-composition-id="nc-a">\n__timelines["nc-a"] = gsap.timeline();\n</div>'
     b = '  <div style="color:#000000" data-composition-id="zz-z">\n__timelines["zz-z"] = gsap.timeline();\n  </div>'
     assert pkv.normalize(a) == pkv.normalize(b), "色值/id/timelines 三重差异必须整体塌掉"
+
+
+def t_slots_reconstruct_every_pack_byte_exact():
+    """Phase 0 证据 §2 量到 7 角色 × 30 包逐字节还原成功。
+    本闸把它从「一次性脚本结论」变成仓内持续断言：
+    还原失败 = 该角色存在色位/id 之外的差异 = 分层方案前提破了，当场停。"""
+    problems = []
+    for role in pkv.ROLE_ORDER:
+        base = pks.mainstream_base(role)
+        packs = [s for s in pb.ALL_TEMPLATES if pks.variant_of(s, role) == "a"]
+        problems += pks.verify_pack_role(base, role, packs)
+    assert not problems, "槽位无损还原失败:\n  " + "\n  ".join(problems)
+
+
+def t_variant_b_is_exactly_news_policy():
+    """第二簇今天只有一族：news-policy。盘上若长出第三簇，本闸点名，不许静默按 a 处理。"""
+    for role in pkv.ROLE_ORDER:
+        b = [s for s in pb.ALL_TEMPLATES if pks.variant_of(s, role) == "b"]
+        assert b in ([], ["news-policy"]), f"{role} 的第二簇不是 news-policy: {b}"
+
+
+def t_slot_count_matches_evidence():
+    """Phase 0 证据 §2 表里的色位槽数：写死做绊线，改了版式必须显式承认。"""
+    want = {"hook": 11, "stat": 12, "rail": 8, "quote": 8,
+            "catalog": 8, "story": 9, "closer": 9}
+    got = {r: len(pks.template_of(pks.mainstream_base(r), r)[1]) for r in want}
+    assert got == want, f"色位槽数漂移: {got} != {want}"
 
 
 if __name__ == "__main__":
