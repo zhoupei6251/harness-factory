@@ -302,6 +302,12 @@ in_progress:
     `routes/news/evidence/2026-10-09-render-speedup-verification.md`；批量出片用
     `python routes/news/scripts/batch_render.py --manifest <清单.json> --jobs 3`（清单每条必带 source/aigc-producer）；
     前置：Node ≥22（本机跑前先把 nvm 的 v23.11.1 以 PATH 前缀注入，默认 20.9.0 过不了 hyperframes 门禁）
+  - pack_census: 31 个 pack 的画面轨真渲染普查（回答「这些模板到底都能跑通吗」）：
+    `HF_NODE22_DIR=<node22 目录> python routes/news/scripts/pack_render_census.py` → 产物落
+    `.harness-news-runtime/tmp/render-census/<pack>/`，汇总 `_summary.md`。五条判据全绿才算通过。
+    2026-10-14 首跑 **31/31 通过**（1309 帧 / 零 WARN / 零配音），证据与「静态版式可无损槽位化」的证明见
+    `routes/news/evidence/2026-10-14-render-census-and-lossless-theme-slots.md`。不走 `batch_render.py`：
+    它的 `build_command` 不支持 `--skip-render`，每条任务必走配音，而配音正卡在 edge-tts 403 上（这是它的一个真空隙）。
   - current_phase: publishing
     topic_id: t001
     blocker: 一把锁 —— 抖音账号未登录（`sau douyin check` 返回 valid 前不发）。原第二把锁
