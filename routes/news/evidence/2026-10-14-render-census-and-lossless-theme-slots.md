@@ -33,7 +33,16 @@ HF_NODE22_DIR="D:/Users/zhoupei/AppData/Local/nvm/v22.20.0" \
 即「发射器现在真正用 Vue 的只有 hook 一条镜，且因为它按 `composition_id` 命中白名单、而这 30 个包的 hook 同名，
 这一条 Vue bundle 实际服务 30 个包」。其余 6 个版式仍是静态 HTML 填充。
 
-### 普查脚本自己错过的两处（写明，免得下次照抄）
+## §1.a 普查判据的**覆盖边界**（Phase 1 Task 2 修复轮实测出来，必须和上面的结论一起读）
+
+普查走 `--skip-render`，而发射器在该分支里**整步跳过取图**（日志：`分镜 → images: 跳过 (--skip-render / --check-only 不取图)`），
+于是每镜 `imagePath` 恒为空串 ⇒ **§1 的 31/31 只覆盖「无图镜」的发射与渲染**。
+带图路径（图位、`has-photo` 修饰类、署名行、`#hk-img` 补间）在本普查里**从未被执行**。
+
+已知的唯一带图真覆盖来自 Phase 1 Task 2 的重复版式 fixture（两镜同 `hook`、各带一张不同纯色图，真渲染逐帧核对）。
+⇒ 把 Vue 支当交付之前，验收必须显式含带图镜；`pack_render_census.py` 需加取图支或另建带图 fixture（已记进 Phase 1 计划的遗留）。
+
+### 普查脚本自己错过的三处（写明，免得下次照抄）
 
 1. 判据五原本用 `re.search` 取**第一条** `totalFrames/framesCompleted` —— 那是 capture 起点的
    checkpoint（`framesCompleted:0`），于是首轮 21 个包全被误判失败。现取**最后一条**（assemble 终值）。
