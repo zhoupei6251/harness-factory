@@ -16,6 +16,23 @@ import pack_variants as pkv
 HEX_RE = re.compile(r"#[0-9a-fA-F]{3,8}")
 SLOT_RE = HEX_RE  # 对外接口名（brief Interfaces 表），与 HEX_RE 同一份编译结果
 CID_RE = re.compile(r'data-composition-id="(?P<cid>[^"]+)"')
+COMMENT_RE = re.compile(r"/\*.*?\*/", re.S)
+
+
+def declaration_slot_indices(text: str) -> list[int]:
+    """`slot_css` 编号里**落在注释之外**的那些序号 —— 组件该换成 `var(--cNN)` 的那批。
+
+    为什么需要这个函数而不是「按位置数」：槽号由 `HEX_RE.findall` 的**出现序号**决定，
+    而静态版式的 CSS 注释里也写着色值（`hook.html` 的 h-sup 注释占掉 c8/c9），
+    于是声明槽号是**不连续**的。`news-coral/hook` 的 `color:` 是 c10 不是 c9 ——
+    按位置替换会让组件拿到注释里那支已废弃的 WCAG 失败色。
+    """
+    spans = [(m.start(), m.end()) for m in COMMENT_RE.finditer(text)]
+    return [
+        i for i, m in enumerate(HEX_RE.finditer(text))
+        if not any(start <= m.start() < end for start, end in spans)
+    ]
+
 
 
 def normalize(text: str) -> str:

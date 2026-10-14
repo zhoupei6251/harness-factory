@@ -4220,7 +4220,14 @@ def t_p3_emitter_photo_flow_is_deterministic():
         assert trees[0][rel] == trees[1][rel], f"重跑抖了：{rel} 两次内容不一致"
 
     # ③ 产物无墙钟/随机（判据 4a 前因；真渲染再补视频流哈希）
+    # 豁免 `vue/` 子树：那是 Vite build 产物（第三方运行时），不是发射器 authored 的字节，
+    # 而 GSAP 内部本来就有 Date.now/Math.random。静态支同样跑 GSAP —— 它没被扫到只是因为
+    # host.html 里那是一行 CDN URL 而不是一个落盘文件，**两支的这条性质相同**。
+    # 该子树的确定性由别处守：`vue-build.test.ts` 的「GSAP 版本 == 声明版本」+ 内容哈希文件名，
+    # 而上面的 ② 已经要求两次发射的 vue/ 文件集合与字节全等（豁免只免 ③，未免 ②）。
     for rel, text in trees[0].items():
+        if rel.startswith("vue/"):
+            continue
         assert "Date.now" not in text and "Math.random" not in text, \
             f"{rel} 里混进了墙钟/随机，重跑必抖"
 
@@ -4394,6 +4401,81 @@ def t_components_must_not_tween_colors():
                 offenders.append(path.name)
                 break
     assert not offenders, f"组件补间了颜色（CSS 变量在此处不生效）: {sorted(set(offenders))}"
+
+
+def _vue_entry_file(bundle: str):
+    """bundle 名 → 该入口目录下的 .vue 组件文件；目录或组件不存在则 None。"""
+    d = _WEB_DIR / "entries" / bundle
+    if not d.is_dir():
+        return None
+    vues = sorted(d.glob("*.vue"))
+    return vues[0] if vues else None
+
+
+def _source_pack_for(role: str, variant: str):
+    """(role, variant) → 该簇的代表包。
+
+    刻意**不写映射表**：簇成员由 `variant_of` 现算，写死就是再造一个会悄悄过期的手抄
+    （D20 的病）。同簇各包除 hex/`data-composition-id` 外字节相同（Task 1 无损还原已证），
+    所以取簇内排序首包即可，且跨进程稳定。
+    """
+    return next((p for p in sorted(pb.ALL_TEMPLATES)
+                 if pks.variant_of(p, role) == variant), None)
+
+
+def t_hook_vue_route_registered_for_every_pack():
+    """31 个包的 hook 全部有路由，且包内 bundle 与 variant 一致。"""
+    for pack in pb.ALL_TEMPLATES:
+        role = "hook"
+        want = f"hook-{pks.variant_of(pack, role)}"
+        assert pb.vue_bundle_for(pack, role) == want, f"{pack} 路由错"
+
+
+def t_cutover_bundle_has_a_component_entry():
+    """路由命中的每个 bundle 必须真有入口组件。
+
+    发射侧靠 `vue_bundle_built()` 回落静态支，所以「组件不存在」在渲染期是**静默**的：
+    片子照出、只是没走 Vue。路由表说切了而盘上没组件，是最难发现的一类假切。
+    """
+    missing = []
+    for pack in pb.ALL_TEMPLATES:
+        for role in sorted(pb.CUTOVER_ROLES):
+            bundle = pb.vue_bundle_for(pack, role)
+            if bundle and _vue_entry_file(bundle) is None:
+                missing.append(f"{bundle} ({pack}/{role})")
+    assert not missing, \
+        f"路由指向 Vue 但入口组件不存在（会静默回落静态支）: {sorted(set(missing))}"
+
+
+def t_component_slot_indices_match_declaration_order():
+    """组件里 `var(--cNN)` 的序号序列必须等于源版式的**声明槽**序列，且不留声明 hex。
+
+    承重前提：`slot_css` 按 hex 出现序号编号，而静态版式的 CSS 注释里也写着色值，
+    于是声明槽**不连续** —— `news-coral/hook` 的 h-sup 是 c10，c8/c9 被注释占掉。
+    按位置一一替换会错位一位，组件就拿到注释里那支废弃色。这条把映射从"人眼对"变成机检，
+    Phase 2 其余 6 角色复用同一形状。
+    """
+    problems = []
+    for role in sorted(pb.CUTOVER_ROLES):
+        for variant in ("a", "b"):
+            src = _source_pack_for(role, variant)
+            bundle = f"{role}-{variant}"
+            vue = _vue_entry_file(bundle)
+            if src is None or vue is None:
+                continue  # 缺组件由 t_cutover_bundle_has_a_component_entry 点名
+            want = pks.declaration_slot_indices(pks.read_raw(src, role))
+            body = vue.read_text(encoding="utf-8")
+            style = body[body.index("<style>"):] if "<style>" in body else ""
+            spans = [(m.start(), m.end()) for m in pks.COMMENT_RE.finditer(style)]
+            outside = lambda pos: not any(s <= pos < e for s, e in spans)
+            got = [int(m.group(1)) for m in re.finditer(r"var\(--c(\d+)\)", style)
+                   if outside(m.start())]
+            if got != want:
+                problems.append(f"{bundle}: var 序列 {got} ≠ 源声明槽 {want} (源 {src})")
+            leftover = [m.group() for m in pks.HEX_RE.finditer(style) if outside(m.start())]
+            if leftover:
+                problems.append(f"{bundle}: 仍有声明色值未槽位化 {leftover}")
+    assert not problems, "组件槽位映射错位:\n  " + "\n  ".join(problems)
 
 
 def t_emitted_vue_clip_dom_has_no_duplicate_ids_in_subtree():

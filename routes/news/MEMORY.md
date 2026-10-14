@@ -230,8 +230,13 @@ videos:
           scene 写 "image": "查询词" 取图, "image": false 显式弃图, 不写则回落 kicker。
           授权闸沿用 commons_media(拒 SA/NC/ND/GFDL); 取图失败一律降级为无图, 绝不停机。
           成片旁 media-credits.json 是授权/署名台账 —— CC BY 图发布时简介必须带它。
-          已接图板的版式: news-coral 全部 7 个(hook/story/stat/quote/catalog/rail/closer);
-          其余 31 pack 图板未接(2026-10-08 实测: 32/32 都有真版式, 但只有 news-coral 接了 .xx-photo 图板), 补图板时按同一套模式接。
+          已接图板的版式：**静态支图板早就全铺开了**，旧记录写的「只有 news-coral 接了、
+          其余 31 pack 未接」是错的（与 D15 的「2/12」同一类手抄假数，2026-10-14 实测推翻）。
+          缺口只有 `news-policy` 一簇的 hook/story/catalog/rail/closer 五个角色 —— 数量**别抄这里**，
+          现算：`cd skills/douyin-pro/templates/hyperframes_path_b && grep -L -- '-photo' */compositions/hook.html`
+          （换角色名即可；stat/quote 全 31 包都带图板）。
+          **2026-10-14 用户裁决：图板能力后续由 Vue 支承接** —— 静态支不再补任何图板，
+          上面那个 `news-policy` 缺口也不在静态支补，改由 `hook-b` 及 Phase 2 各角色组件带。
   - id: v005
     topic_id: t001
     template: news-coral

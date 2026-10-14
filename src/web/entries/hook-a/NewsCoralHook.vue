@@ -151,7 +151,12 @@ onMounted(() => {
 
 <style>
   /* unscoped: 原 hook.html 的所有 CSS 走全局（@font-face / 通用选择器不能 scoped）
-     改色先改 src/web/lib/tokens/coral.ts，再重跑 audit_pack_contrast.py */
+     色值一律走 `var(--cNN)`，槽位号 = 该色在原 hook.html 里的 hex 出现序号
+     （`pack_slots.slot_css()` 按此编号并挂到本 clip 的 style 上）。
+     ⚠️ 序号**不连续**：原文件 CSS 注释里的色值也占槽（c8/c9 落在注释文本上），
+     所以 h-sup 的 `color` 取 **c10 不是 c9**。取错一位会拿到注释里那支
+     「WCAG AA 大字档 3:1 失败」的废弃旧色 —— 映射由
+     `t_component_slot_indices_match_declaration_order` 机检，不许人眼对。 */
   @font-face {
     font-family: "HF CJK";
     src:
@@ -167,8 +172,8 @@ onMounted(() => {
     position: absolute;
     inset: 0;
     overflow: hidden;
-    background: #0a0a0d;
-    color: #f5f0e8;
+    background: var(--c0);
+    color: var(--c1);
     font-family: "HF CJK", sans-serif;
   }
   /* 通用文字阴影：让任何深浅底图上的文字都自带暗晕，WCAG AA 对比度兜底 */
@@ -180,7 +185,7 @@ onMounted(() => {
     position: absolute;
     inset: 0 0 auto 0;
     height: 22cqh;
-    background: #c0392b;
+    background: var(--c2);
     transform-origin: 50% 0%;
     z-index: 1;
   }
@@ -199,8 +204,8 @@ onMounted(() => {
     position: absolute;
     left: 6cqw;
     top: 17cqh;
-    background: #ffffff;
-    color: #e85d5d;
+    background: var(--c3);
+    color: var(--c4);
     font-family: "JetBrains Mono", monospace;
     font-size: 2.9cqw;
     font-weight: 700;
@@ -227,15 +232,15 @@ onMounted(() => {
   }
   .h-ac {
     display: inline-block;
-    background: #c0392b;
-    color: #ffffff;
+    background: var(--c5);
+    color: var(--c6);
     padding: 0 1.4cqw;
     transform-origin: 0% 50%;
   }
   .h-hair {
     width: 14cqw;
     height: 1.1cqh;
-    background: #c0392b;
+    background: var(--c7);
     margin: 3.6cqh 0;
     transform-origin: 0% 50%;
   }
@@ -243,7 +248,7 @@ onMounted(() => {
     font-size: 3.9cqw;
     font-weight: 400;
     /* #dcdcdc 在 h-sup 区（mask 0.45 alpha + 中等亮图）实测对比度 ≥ 3.7:1 */
-    color: #dcdcdc;
+    color: var(--c10);
     max-width: 74cqw;
   }
   .hk-photo {

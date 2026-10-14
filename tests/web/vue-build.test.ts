@@ -14,7 +14,7 @@
  */
 import { execSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { resolve, dirname, join } from "node:path";
+import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -239,6 +239,19 @@ for (const name of entryNames) {
   });
 }
 
+// Task 5：注册键不写死这条从「只查 hook-a」扩到**每个入口**。
+// hook-b 是本次新增的第二个组件；引擎按 `__timelines[<元素自身 id>]` 驱动，
+// 任何 `__timelines["字面量"]` 形态都会让同版式两镜撞键（Task 2 实测过这个失效模式）。
+for (const name of entryNames) {
+  check(`${name}: 时间轴注册键不写死（window.__timelines[...] 不得接字面量）`, () => {
+    const js = readFileSync(bundlePath(name), "utf8");
+    assert(
+      !/window\.__timelines\[\s*["']/.test(js),
+      `dist/vue/${name}.js 出现 window.__timelines["<字面量>"] —— 注册键必须是传入的 compositionId`
+    );
+  });
+}
+
 check("渲染依赖版本已钉死（spec §7 风险 7：caret 范围让产物字节取决于 lock）", () => {
   const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
   const deps = { ...pkg.dependencies, ...pkg.devDependencies };
@@ -262,10 +275,15 @@ check("bundle 内 GSAP 版本 == 声明版本（spec §5-P0 判据 3 的原文�
   // spec §5-P0 第 3 条要的是「**bundle 内** GSAP 版本 == 声明版本」，管的是**产物是不是这次的**。
   // 两者不等价：声明/锁一致但 dist/ 是旧 GSAP 编出来的陈旧产物时，只有这条会红。
   //
-  // 锚点实测（dist/vue/hook-a.js，gsap 3.15.0 + vue 3.5.43；旧名 news-coral-hook 时代同形态）：
-  // GSAP 在产物里写 `…version=…version=…version="3.15.0"`，全文 `version\s*=\s*"\d+\.\d+\.\d+"`
-  // 这种「版本赋值标记」**恰好命中 1 次**，且值就是 gsap 版本；vue 的 3.5.43 不以该形态出现。
-  // 所以先要求「标记存在」（GSAP 换了产物形态时必须人工重锚，不许放宽），再要求「标记值 == 声明值」。
+  // 锚点形态实测：GSAP 在产物里写 `…version=…version=…version="3.15.0"`，
+  // 全文 `version\s*=\s*"\d+\.\d+\.\d+"` 这种「版本赋值标记」命中**恰好 1 次**，值就是 gsap 版本；
+  // vue 的 3.5.43 不以该形态出现。
+  //
+  // Task 5 重锚（**不是放宽**）：原来只读 `dist/vue/hook-a.js`，那是单入口时代的形状。
+  // 第二个入口 hook-b 一进来，Vite 就把共享的 GSAP 提到 `dist/vue/chunks/hyperframes-*.js`，
+  // 入口 chunk 里连 `gsap` 字样都没有了 —— 旧读法会报「找不到标记」，而产物其实是好的。
+  // 现在扫**全部** dist JS，并要求：含 GSAP 的文件里版本标记全局恰好一处、且等于声明值。
+  // 比原来严（原来只保证 hook-a 那一份里有），且换 chunk 名 / 换入口数都不用再改这条。
   const pkg = JSON.parse(readFileSync(resolve(ROOT, "package.json"), "utf8"));
   // gsap/vue 现在都声明在 devDependencies（与被测产物同口径：合并两块，与上一条检查一致）
   const deps = { ...(pkg.dependencies ?? {}), ...(pkg.devDependencies ?? {}) };
@@ -274,15 +292,37 @@ check("bundle 内 GSAP 版本 == 声明版本（spec §5-P0 判据 3 的原文�
     typeof declared === "string" && /^\d+\.\d+\.\d+$/.test(declared),
     `package.json 的 gsap 声明 ${declared} 不是精确版本，无法拿去比 bundle`
   );
-  const js = readFileSync(DIST_ENTRY_JS, "utf8");
+  const jsFiles: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir)) {
+      const p = join(dir, entry);
+      const s = statSync(p);
+      if (s.isDirectory()) walk(p);
+      else if (entry.endsWith(".js")) jsFiles.push(p);
+    }
+  };
+  walk(DIST);
+  const markers: Array<[string, string]> = [];
+  for (const f of jsFiles) {
+    const text = readFileSync(f, "utf8");
+    if (!text.toLowerCase().includes("gsap")) continue;
+    for (const m of text.matchAll(/version\s*=\s*"(\d+\.\d+\.\d+)"/g)) {
+      markers.push([relative(DIST, f), m[1]]);
+    }
+  }
   assert(
-    /version\s*=\s*"\d+\.\d+\.\d+"/.test(js),
-    `dist/vue/${HOOK}.js 里找不到 version="x.y.z" 形态的 GSAP 版本标记 —— ` +
+    markers.length > 0,
+    `dist 下所有含 GSAP 的 JS 里都找不到 version="x.y.z" 形态的 GSAP 版本标记 —— ` +
       "GSAP/Vite 换了产物写法，这条锚需要人工重新对齐（别改成放宽断言）"
   );
   assert(
-    new RegExp(`version\\s*=\\s*"${declared.replace(/\./g, "\\.")}"`).test(js),
-    `bundle 内的 GSAP 版本标记不是声明值 ${declared} —— dist 是陈旧产物或打了别的 GSAP`
+    markers.length === 1,
+    `GSAP 版本标记出现 ${markers.length} 处（${markers.map((m) => m.join(":")).join(", ")}) —— ` +
+      "打了多份 GSAP，产物字节不再由单一版本决定"
+  );
+  assert(
+    markers[0][1] === declared,
+    `GSAP 版本标记是 ${markers[0][1]}（在 ${markers[0][0]}），不是声明值 ${declared} —— dist 是陈旧产物或打了别的 GSAP`
   );
 });
 
