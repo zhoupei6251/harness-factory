@@ -163,8 +163,10 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
 
 **门 G2**：`path_b_selftest.py` 全绿 + 31 个 pack 各出一次画面轨且结构闸过。
 
-> 为什么这步不可省（Phase 0 实测）：217 条镜只有 130 个不同 `composition_id`，30 个 pack 的 hook 同名 `nc-night-hook`
-> （见 §7 风险 8）。按 id 路由的白名单一旦登记 hook，等于同时把 29 个别主题的包也翻成 coral 版式。
+> 为什么这步不可省（Phase 0 实测）：217 条镜只有 130 个不同 `composition_id`，30 个 pack 的 hook 同名 `nc-night-hook`；
+> 更要紧的是 `choose_layout`（`path_b_build.py:2253-2280`）**逐镜独立选版式、无跨镜去重** —— 实测一条 20 镜的片子
+> 会把 hook 选 7 次、story 6 次、closer 7 次。挂载点 id（`vue-target-{composition_id}`）与时间轴键都以
+> composition_id 为唯一键 ⇒ 同版式第二镜起就撞车。**路由键必须是 `(pack, role)`，挂载身份必须是每次唯一的 `mount_id`。**
 
 ### P3 删静态（唯一不可逆动作，单独一次提交）
 
@@ -220,7 +222,8 @@ L3 路由登记    path_b_build 的 Vue 路由表      (pack, role) → (组件 
 | 6 | **两条路的 GSAP 不是同一份字节**（实测）：31/31 份 `host.html:5` 引 `cdn.jsdelivr.net/npm/gsap@**3.14.2**/dist/gsap.min.js`；Vue bundle 打的是 npm `gsap@**3.15.0**`（P0 已把声明从 `^3.15.0` 钉成精确 `3.15.0`，lock 同值，产物侧另有断言） | ~~需用户拍~~ **已拍②**（2026-10-13）：台账只承诺**结构一致**，不承诺逐字节 ⇒ P3 步骤 3 解锁 | 定义见 §5-P3「结构一致」四条断言；判据 7 按此改写 |
 | 6b | **删 CDN 不违反法则 10**（我先前把这条写成「法则 10 断掉」，是误用）：仓内 `法则 10` 只在 `hf_compile.py:21` / `:1135` 出现，指的是**编译期确定性**（同 pack 编译两次字节相同 + 无运行时随机），讲的是 path_c 编译产物，与「旧成片重渲字节一致」不是同一件事 | 表述纠正 | 台账的字节可复现**从来没有被机检过**（实测：`routes/news/*.md` 里 `逐字节\|字节一致\|deterministic` 零命中）——所以选②没有拆掉任何现存闸门，只是把这条未成文的历史假设正式关掉 |
 | 7 | Vue 侧依赖面自己也在漂：产物字节取决于 lock 而非声明，凡是 caret 范围的依赖都可能带漂 | 可复现性隐患（这条威胁的是**新片**，与 6 同源但方向相反） | **P0 已封口一半**（2026-10-13 实测）：已钉精确版本的是 `gsap = 3.15.0`、`vue = 3.5.43`，`vue-build.test.ts` 断言 ①声明 == lock 解析 ②bundle 内 GSAP 版本标记 == 声明版本。**仍未封口**：`vite = ^6.4.4`、`@vitejs/plugin-vue = ^5.2.4` 留在 caret，而 plugin-vue 内含的 `@vue/compiler-sfc` 同样决定 bundle 字节 ⇒ 「逐字节可复现」按 §4 注的范围读，不是无条件结论。Phase 1 哈希入档前补一条封口任务（钉这两个，或把哈希口径限定为「同工具链版本内」） |
-| 8 | **`composition_id` 不区分包**（Phase 0 实跑测出）：217 条镜只有 **130 个不同 id**；31 个 pack 的 `hook` 有 **30 个共用 `nc-night-hook`**（唯一例外 `news-policy` 的 `np-hook`），`stat` 才是一包一号 | 分层方案的**路由级串色**：与风险 2 同族、机制不同 | L3 路由键必须是 `(pack, role)`。现行 `VUE_COMPOSITIONS` 按 `composition_id` 命中，若照它登记 hook，会**一次性翻 30 个包**，而 bundle 里烤的是 coral 色板 ⇒ 29 包整块错色。P2「从 id 升级为 (pack, role)」是开工前提，不是优化 |
+| 8 | **`composition_id` 不区分包**（Phase 0 实跑测出）：217 条镜只有 **130 个不同 id**；31 个 pack 的 `hook` 有 **30 个共用 `nc-night-hook`**（唯一例外 `news-policy` 的 `np-hook`），`stat` 才是一包一号 | 路由唯一性风险；**原先写的「路由级串色」是错的，见下行更正** | 现行 `VUE_COMPOSITIONS` 按 `composition_id` 命中，登记 hook 一条就一次覆盖 30 个包。~~⇒ 29 包整块错色~~ **该推论被实测推翻**（2026-10-13 复查）：那 30 个包的 `compositions/hook.html` **字节完全相同**（`diff` 输出 0 行；六色集合也一致：`#0a0a0d #e85d5d #f5f0e8 #ffffff #b0b0b0 #c0392b #dcdcdc`）——即 hook 版式今天根本不随包换色，30 镜走 Vue 与走静态视觉等价，**不存在错色**。真正的必要性见风险 9 |
+| 9 | **同一次渲染里同一版式会重复出现**（Phase 0 复查实测，可复现）：`choose_layout`（`path_b_build.py:2253-2280`）逐镜独立选版式、**无跨镜去重**（只有 `is_first`/`is_last` 固定 hook/closer 的优先级）。用真样本 `t002-scenes.json` 的中段分镜复制成 20 镜跑一遍，得到的版式序列里 **hook 出现 7 次、story 6 次、closer 7 次**。而 `VUE_MOUNT_TPL` 的挂载点 id 是 `vue-target-{composition_id}`、组件注册的时间轴键是 `window.__timelines[composition_id]`，两处都以 composition_id 为唯一键。实发两条 hook mount 验证：两个 `id` **字符串相同** ⇒ loader 的 `getElementById` 只命中第一个，第二镜起挂空 target / 读到别人的 `data-variable-values` | **Phase 1 的开工前置**（不是优化项）。今天潜伏只因为唯一登记的 hook 在实际片子里恰好多为 1 镜；登记 story/stat/closer 后必发 | 挂载身份换成每次唯一的 `mount_id`（loader 与 `__timelines` 键同步改），与 `(pack, role)` 路由一起构成 L3 的唯一性面。静态路靠 `data-composition-src` 逐 clip 独立加载，所以这个键重复问题在静态路上不曾暴露 |
 
 ---
 
