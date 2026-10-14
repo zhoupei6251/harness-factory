@@ -13,6 +13,8 @@
 
 ## Global Constraints
 
+- 新增 Python 断言的函数名必须以 `t_` 开头 —— `path_b_selftest.py` 只收集 `t_*`；写成 `test_*` 会静默不执行，等于没写闸。（Phase 1 Task 1 的实现者抓到了计划原文的这条错误命名。）
+
 - 台账可复现口径 = **结构一致**，不承诺逐字节（spec §1-2，用户拍方案②）。
 - **1:1 保真**：本 Phase 不改变任何包的视觉（用户 2026-10-14 拍）。`hook` 的 11 个色位在 30 个包里取值相同，仍走同一套注入机制，**不开例外分支**。
 - 不碰 `hf_compile.py` / `hf_primitives.py` / `hf_style_spec.py` / `hyperframes_path_c` / `spec.toml`（spec §1-4）。
@@ -45,7 +47,7 @@
 - [ ] **Step 1: 写失败测试**
 
 ```python
-def test_slots_reconstruct_every_pack_byte_exact():
+def t_slots_reconstruct_every_pack_byte_exact():
     """Phase 0 证据 §2 量到 7 角色 × 30 包逐字节还原成功。
     本闸把它从「一次性脚本结论」变成仓内持续断言：
     还原失败 = 该角色存在色位/id 之外的差异 = 分层方案前提破了，当场停。"""
@@ -57,14 +59,14 @@ def test_slots_reconstruct_every_pack_byte_exact():
     assert not problems, "槽位无损还原失败:\n  " + "\n  ".join(problems)
 
 
-def test_variant_b_is_exactly_news_policy():
+def t_variant_b_is_exactly_news_policy():
     """第二簇今天只有一族：news-policy。盘上若长出第三簇，本闸点名，不许静默按 a 处理。"""
     for role in pkv.ROLE_ORDER:
         b = [s for s in pb.ALL_TEMPLATES if pks.variant_of(s, role) == "b"]
         assert b in ([], ["news-policy"]), f"{role} 的第二簇不是 news-policy: {b}"
 
 
-def test_slot_count_matches_evidence():
+def t_slot_count_matches_evidence():
     """Phase 0 证据 §2 表里的色位槽数：写死做绊线，改了版式必须显式承认。"""
     want = {"hook": 11, "stat": 12, "rail": 8, "quote": 8,
             "catalog": 8, "story": 9, "closer": 9}
@@ -172,7 +174,7 @@ def verify_pack_role(base_pack: str, role: str, packs: list[str]) -> list[str]:
 - [ ] **Step 1: 写失败测试**
 
 ```python
-def test_two_same_role_vue_mounts_have_unique_targets():
+def t_two_same_role_vue_mounts_have_unique_targets():
     """spec §7 风险 9：同一次渲染里同一版式会出现两次（实测 20 镜样本 hook×7），
     旧写法 id="vue-target-{composition_id}" 会生成重复 id ⇒ getElementById 只命中第一个。"""
     pack = pb.load_style_pack("news-coral")
@@ -238,7 +240,7 @@ for (const clip of document.querySelectorAll('[data-vue-mount]')) {
 - [ ] **Step 1: 写失败测试（三条例）**
 
 ```python
-def test_slot_css_is_ordered_and_pack_specific():
+def t_slot_css_is_ordered_and_pack_specific():
     a = pks.slot_css("news-coral", "stat")
     b = pks.slot_css("news-alert", "stat")
     assert a.startswith("--c0:") and "--c11:" in a, f"槽位必须按序编号: {a}"
@@ -246,13 +248,13 @@ def test_slot_css_is_ordered_and_pack_specific():
     assert len(re.findall(r"--c\d+:", a)) == 12
 
 
-def test_vue_clip_carries_its_own_slot_block():
+def t_vue_clip_carries_its_own_slot_block():
     pack = pb.load_style_pack("news-alert")
     out = pb.emit_mount(2, pack["layouts"]["stat"], {"value": "1"}, 0.0, 4.0, 1080, 1920)
     assert "--c0:" in out, "Vue clip 没带槽位块，色值会掉回组件默认值 ⇒ 串色"
 
 
-def test_components_must_not_tween_colors():
+def t_components_must_not_tween_colors():
     """盘上实测：217 份静态版式的补间实参里 0 条颜色语义（属性全集只有
     duration/ease/opacity/scaleX/y/x/scale/yPercent/scaleY）。
     这条把它钉成规则 —— 一旦有人补间颜色，CSS 变量在 GSAP 里不生效（判据 0b 实测），
@@ -287,7 +289,7 @@ def test_components_must_not_tween_colors():
 - [ ] **Step 1: 写失败测试**
 
 ```python
-def test_route_table_keys_are_pack_and_role_not_composition_id():
+def t_route_table_keys_are_pack_and_role_not_composition_id():
     """217 条镜只有 130 个不同 composition_id（30 包的 hook 同名 nc-night-hook）。
     按 id 登记会一次翻 30 包 —— 本 Phase 靠 1:1 保真侥幸等价，但路由键必须是 (pack, role)。"""
     ids = [pack["layouts"][role]["composition_id"]
@@ -298,7 +300,7 @@ def test_route_table_keys_are_pack_and_role_not_composition_id():
     assert pb.vue_bundle_for("news-policy", "hook") == "hook-b"
 
 
-def test_stage_vue_assets_collects_bundles_from_pack():
+def t_stage_vue_assets_collects_bundles_from_pack():
     pack = pb.load_style_pack("news-coral")
     assert "hook-a" in {pb.vue_bundle_for("news-coral", r) for r in pack["layouts"]}
 ```
@@ -328,7 +330,7 @@ def test_stage_vue_assets_collects_bundles_from_pack():
 - [ ] **Step 2: 结构闸断言（全量，31 包）**
 
 ```python
-def test_hook_vue_route_registered_for_every_pack():
+def t_hook_vue_route_registered_for_every_pack():
     """31 个包的 hook 全部有路由，且包内 bundle 与 variant 一致。"""
     for pack in pb.ALL_TEMPLATES:
         role = "hook"
@@ -356,6 +358,6 @@ PSNR_CMD = ["ffmpeg", "-hide_banner", "-i", "{a}", "-i", "{b}",
 
 ## 交接给 Phase 2 / 3 的边界
 
-- Phase 2 = 其余 6 角色（`stat`/`rail`/`catalog`/`closer` 有色位随包变，`quote`/`story` 不变），逐角色重复 Task 5 的形状；组件总数仍是 14。每个角色的色位槽数已在 `test_slot_count_matches_evidence` 里钉死。
+- Phase 2 = 其余 6 角色（`stat`/`rail`/`catalog`/`closer` 有色位随包变，`quote`/`story` 不变），逐角色重复 Task 5 的形状；组件总数仍是 14。每个角色的色位槽数已在 `t_slot_count_matches_evidence` 里钉死。
 - Phase 3 = 把 `CUTOVER_ROLES` 扩到 7 → `load_style_pack` 改读 `layouts.toml` → 删 217 份 `compositions/*.html` + 10 份 `placeholder.html` + `host.html:5` 的 CDN GSAP。
 - 未闭项：`vite` / `@vitejs/plugin-vue` 仍是 caret（产物字节仍部分取决于 lock）；台账重渲只承诺结构一致（spec §1-2）。
