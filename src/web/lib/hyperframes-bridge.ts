@@ -23,29 +23,28 @@
 
 import type { HookVariables } from "./data.contract";
 
-/** 单 composition 的 id —— 与 NewsCoralHook.vue 顶部 data-composition-id 一致 */
-export const COMPOSITION_ID = "nc-night-hook";
-
-export function readVariables(): HookVariables {
+/** 从传入的 clip 元素读 data-variable-values。
+ *
+ * spec §7 风险 9：旧写法用全局 `querySelector([data-composition-id=…])`，同一版式在一
+ * 次渲染里出现两次时两个 clip 的 composition_id 相同 ⇒ 永远命中第一个、后续镜读错数据。
+ * 现在挂载身份是每次唯一的 clip 元素（loader 传 `mod.mount(clip, …)`），本函数直接读该
+ * clip 自己的 data-variable-values，不再全局查找。 */
+export function readVariables(clip: Element): HookVariables {
   if (typeof document === "undefined") {
     throw new Error(
       "[hyperframes-bridge] document not available (SSR? POC 仅支持客户端 mount)"
     );
   }
-  const mount = document.querySelector<HTMLElement>(
-    `[data-composition-id="${COMPOSITION_ID}"]`
-  );
-  if (!mount) {
+  if (!clip) {
     throw new Error(
-      `[hyperframes-bridge] no element with data-composition-id="${COMPOSITION_ID}". ` +
-        "host.html must mount this composition via path_b_build.MOUNT_TPL."
+      "[hyperframes-bridge] readVariables(clip) 需要一个 clip 元素 —— loader 必须把整个 clip 传进来"
     );
   }
-  const raw = mount.dataset.variableValues;
+  const raw = clip.getAttribute("data-variable-values");
   if (!raw) {
     throw new Error(
-      `[hyperframes-bridge] [data-composition-id="${COMPOSITION_ID}"] ` +
-        "has no data-variable-values attribute (path_b_build not run?)"
+      `[hyperframes-bridge] clip ${clip.id || "(无 id)"} 没有 data-variable-values 属性 ` +
+        "(path_b_build 未发射该镜?)"
     );
   }
   try {

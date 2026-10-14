@@ -4249,8 +4249,23 @@ def t_vue_compose_hook_uses_vue_mount_tpl():
         f"Vue 版 mount 不该含 data-composition-src: {out}"
     assert 'data-vue-bundle="news-coral-hook"' in out, \
         f"bundle name 必须对应 VUE_COMPOSITIONS 表: {out}"
-    assert 'id="vue-target-nc-night-hook"' in out, \
-        f"Vue 应用 mount target 子元素必须存在: {out}"
+    assert 'class="vue-target"' in out, \
+        f"Vue 应用 mount target 子元素必须存在（class 而非 id）: {out}"
+
+
+def t_two_same_role_vue_mounts_have_unique_targets():
+    """spec §7 风险 9：同一次渲染里同一版式会出现两次（实测 20 镜样本 hook×7），
+    旧写法 id="vue-target-{composition_id}" 会生成重复 id ⇒ getElementById 只命中第一个。"""
+    pack = pb.load_style_pack("news-coral")
+    hook = pack["layouts"]["hook"]
+    a = pb.emit_mount(1, hook, {"kicker": "A"}, 0.0, 4.0, 1080, 1920)
+    b = pb.emit_mount(7, hook, {"kicker": "B"}, 24.0, 4.0, 1080, 1920)
+    assert 'id="vue-target-' not in a and 'id="vue-target-' not in b, \
+        "挂载点仍以 composition_id 为 id，重复版式必撞车"
+    assert a.count('class="vue-target"') == 1 and b.count('class="vue-target"') == 1, \
+        "每个 clip 内层必须恰好一个无 id 的 .vue-target 挂载点"
+    assert 'id="shot-1"' in a and 'id="shot-7"' in b, \
+        "clip 自身 id 必须仍是每次唯一的 mount_id"
 
 
 def t_non_vue_layouts_keep_composition_src_html():

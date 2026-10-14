@@ -10,9 +10,16 @@ import type { HookVariables } from "../../lib/data.contract";
  * 迁移自 skills/douyin-pro/templates/hyperframes_path_b/news-coral/compositions/hook.html
  * 保持与原版字节级一致：DOM 结构 / CSS / GSAP timeline / 数据占位契约。
  *
- * 数据流：mount → readBridge().getVariables() → reactive vars → DOM 重新渲染
- * （原版 inline <script> 在模板加载后执行同位置；这里等价）
+ * 数据流：loader 传整个 clip（每次唯一 id="shot-N"）→ mount → readVariables(clip)
+ * → reactive vars → DOM 重新渲染。本镜数据从传入的 clip 自身读，不再按 composition_id
+ * 全局查找（spec §7 风险 9：同版式重复时全局查找只命中第一个）。
+ *
+ * 时间轴登记键仍是 `window.__timelines[<data-composition-id>]`——实测 hyperframes 引擎
+ * `pollSubCompositionTimelines` 逐 `[data-composition-id]` 检查 `__timelines[id]` 是否存在，
+ * 键换成 compositionId#clip.id 会让引擎找不到而每镜超时告警。给重复版式镜分配不同
+ * composition_id 属 (pack,role) 路由决定（Task 4），不在本任务范围内。
  */
+const props = defineProps<{ compositionId: string; clip: HTMLElement }>();
 
 const vars = ref<Partial<HookVariables>>({});
 const hasPhoto = computed(() =>
@@ -21,7 +28,7 @@ const hasPhoto = computed(() =>
 const slot = computed(() => Number(vars.value.slotSeconds) || 4);
 
 onMounted(() => {
-  vars.value = readVariables();
+  vars.value = readVariables(props.clip);
 
   // 动量预算（frame.md §4，与原 hook.html 字面同值）
   const INTRO_END = 1.5;

@@ -474,6 +474,10 @@ VUE_COMPOSITIONS: dict[str, str] = {
 
 #: Vue 版 mount 模板：不引 data-composition-src（hyperframes 引擎不识别 Vue mount），
 #: 含 data-vue-mount 标记，host.html 的 loader script 异步 import 对应 bundle。
+#: spec §7 风险 9：内层挂载点用 class 不用 id —— 同一次渲染里同版式会出现两次
+#: （实测 20 镜样本 hook×7），旧 `id="vue-target-{composition_id}"` 会生成重复 id，
+#: `getElementById` 只命中第一个 ⇒ 后续同版式镜挂错节点 / 读错 data-variable-values。
+#: 每次唯一的身份在 clip 自身（`id="shot-{mount_index}"`），loader 用 `:scope >` 定位。
 VUE_MOUNT_TPL = (
     '      <div id="{mount_id}" class="clip"'
     ' data-composition-id="{composition_id}"'
@@ -482,13 +486,15 @@ VUE_MOUNT_TPL = (
     ' data-variable-values="{values}"'
     ' data-start="{start}" data-duration="{dur}" data-track-index="1"'
     ' data-width="{w}" data-height="{h}">'
-    '        <div id="vue-target-{composition_id}"></div>'
+    '        <div class="vue-target"></div>'
     '      </div>'
 )
 
 #: 注入到 host.html </head> 前的 Vue runtime + 样式 + loader script（仅当任意 mount 是 Vue 版时）。
 #: 注意这是脚本字符串 —— {{VUE_INJECTION}} 占位符在 emit_host 里替换，路径是相对 host.html 的。
-#: loader 用 ES module dynamic import 调 mod.mount(target, compId)。
+#: loader 用 ES module dynamic import 调 mod.mount(clip, compId)：把整个 clip 元素交给
+#: 组件，组件自己从 `:scope > .vue-target` 取挂载节点、从 clip 的 data-variable-values
+#: 取本镜数据 —— 不再用全局 getElementById('vue-target-'+compId)（同版式重复必撞车，风险 9）。
 #: {{VUE_CSS_LINKS}} 由 emit_host 按 work_dir/vue/assets/ 里**实际存在**的 CSS 逐个填
 #: `<link>`：.vue 的 <style> 被 Vite 拆成内容哈希名的独立资产（news-coral-hook-<hash>.css），
 #: 名字不可预测 ⇒ 只能在发射时扫盘。Vue 版没有 compositions/<layout>.html 这一层
@@ -501,10 +507,10 @@ VUE_HOST_INJECTION = """\
         for (const clip of document.querySelectorAll('[data-vue-mount]')) {
           const compId = clip.dataset.compositionId;
           const bundle = clip.dataset.vueBundle;
-          const target = document.getElementById('vue-target-' + compId);
+          const target = clip.querySelector(':scope > .vue-target');
           if (!target) continue;
           const mod = await import('./vue/' + bundle + '.js');
-          mod.mount(target, compId);
+          mod.mount(clip, compId);
         }
       })();
     </script>
