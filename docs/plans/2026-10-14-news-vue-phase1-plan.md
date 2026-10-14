@@ -276,39 +276,79 @@ def t_components_must_not_tween_colors():
 
 ---
 
-### Task 4: `(pack, role)` 路由表替换 id 白名单
+### Task 4: `(pack, role)` 路由表 + **每镜唯一 composition_id**（Ruling P 扩范围，Task 5 硬前置）
+
+**为什么扩**：Task 2 的 Step 0 探针证伪了原计划的时间轴键改名，并暴露一条结构性事实 —— 静态路每镜是独立
+document（`data-composition-src` 各载一份，`layout_selfcheck` 规则 2 要求「子合成根 id == timeline 键」在该 document 内成立）；
+Vue 路整个 host 只有一个 document、N 个 mount 共享一张 `window.__timelines` ⇒ 重复版式的两镜必撞同一个键，
+第二条注册覆盖第一条，且 `fromTo` 的 immediateRender 把先挂载那镜压在 `opacity:0`。
+⇒ 光换路由不够，**必须给每条 Vue 镜唯一的 composition 身份**，否则任何可重复角色登记进 Vue 就是首镜之后即黑。
 
 **Files:**
-- Modify: `path_b_build.py`（`VUE_COMPOSITIONS` :471、`emit_mount` :2454、`stage_vue_assets` :2391）
-- Test: `path_b_selftest.py`
+- Modify: `path_b_build.py`（`VUE_COMPOSITIONS` :471 删除、`vue_bundle_for()` 新增、`emit_mount` Vue 分支 :2464、`stage_vue_assets` :2401）
+- Modify: `src/web/entries/news-coral-hook/main.ts` / `NewsCoralHook.vue`（时间轴注册键）
+- Test: `path_b_selftest.py`、`tests/web/vue-build.test.ts`
 
 **Interfaces:**
-- Produces: `VUE_ROUTES: dict[tuple[str, str], str]`，键 `(pack, role)`、值 bundle 名；`vue_bundle_for(pack: str, role: str) -> str | None`；`VUE_COMPOSITIONS` **删除**（不留兼容层）
-- Consumes: Task 1 的 `variant_of` ⇒ bundle 名 = `f"{role}-{variant}"`（如 `hook-a` / `hook-b`）
+- Produces:
+  - `vue_bundle_for(pack: str, role: str) -> str | None`（未登记角色返回 `None` ⇒ 走静态支）
+  - `VUE_ROUTES: dict[tuple[str, str], str]` 显式覆盖表（默认为空，一律按 `f"{role}-{variant}"` 推导）
+  - `CUTOVER_ROLES: set[str]`（本 Phase = `{"hook"}`）；`vue_clip_id(cid: str, mount_index: int) -> str` = `f"{cid}__{mount_index}"`
+  - `VUE_COMPOSITIONS` **删除**，不留兼容层
+- Consumes: Task 1 `variant_of`；Task 3 `slot_css`；Task 2 的 `mod.mount(clip, compId)` 契约
+
+- [ ] **Step 0: 先量清「改 id 会碰谁」（不许跳过）**
+
+`data-composition-id` 在仓内不是自由字符串。已知消费点（逐一确认，别只信这张表）：
+`path_b_build.py:319` `ROOT_COMPOSITION_ID_RE`、`:1847/:1870`（装包时报缺 id / 存进 layouts 的 `composition_id`）、
+`layout_selfcheck.py:117-118` + 规则 2（`:329-335`：子合成**根 id 必须等于注册的 timeline 键**）、
+`emit_subtitle_composition`（:2585，path_c 才用）。
+⇒ 唯一 id 只能加在 **Vue clip 层**，不得改 `compositions/*.html` 里 `#root` 的 id，也不得改 `layouts.toml`
+里登记的 `composition_id`（那是包级身份，Phase 3 换源的读它）。若某个自检会把 Vue clip 的 id 拿去比对包级 id
+而判红，停下报 BLOCKED，别放宽自检。
 
 - [ ] **Step 1: 写失败测试**
 
 ```python
-def t_route_table_keys_are_pack_and_role_not_composition_id():
-    """217 条镜只有 130 个不同 composition_id（30 包的 hook 同名 nc-night-hook）。
-    按 id 登记会一次翻 30 包 —— 本 Phase 靠 1:1 保真侥幸等价，但路由键必须是 (pack, role)。"""
-    ids = [pack["layouts"][role]["composition_id"]
-           for pack in (pb.load_style_pack(s) for s in pb.ALL_TEMPLATES)
-           for role in ("hook",) if "hook" in pack["layouts"]]
-    assert len(set(ids)) < len(ids), "样本里 hook id 若已唯一，这条断言该改而不是删"
+def t_duplicate_role_vue_clips_get_distinct_composition_ids():
+    """spec §7 风险 9 的后半：两镜同版式时，Vue clip 的 data-composition-id 必须不同，
+    否则整个 host 只有一个 document，两条 __timelines 注册互相覆盖。"""
+    pack = pb.load_style_pack("news-coral")
+    hook = pack["layouts"]["hook"]
+    a = pb.emit_mount(1, hook, {"kicker": "A"}, 0.0, 4.0, 1080, 1920)
+    b = pb.emit_mount(7, hook, {"kicker": "B"}, 24.0, 4.0, 1080, 1920)
+    ida = re.search(r'data-composition-id="([^"]+)"', a).group(1)
+    idb = re.search(r'data-composition-id="([^"]+)"', b).group(1)
+    assert ida != idb, f"两镜同 id（{ida}）⇒ __timelines 必撞键"
+    assert hook["composition_id"] in ida and hook["composition_id"] in idb, \
+        "唯一 id 必须在包级 id 上加后缀，Phase 3 换源要靠包级 id 对齐 layouts.toml"
+
+
+def t_static_branch_composition_id_untouched():
+    """静态支的 id 一个字符都不能变 —— 否则 31/31 普查基线与台账结构一致口径双双失效。"""
+    pack = pb.load_style_pack("news-policy")          # 未登记 Vue 的包
+    stat = pack["layouts"]["stat"]
+    out = pb.emit_mount(3, stat, {"value": "1"}, 0.0, 4.0, 1080, 1920)
+    assert f'data-composition-id="{stat["composition_id"]}"' in out, "静态支 id 被改了"
+    assert "__" not in out.split("data-composition-id")[1].split("\"")[1], "静态支混进 Vue 的唯一后缀"
+
+
+def t_route_lookup_is_pack_and_role_not_composition_id():
     assert pb.vue_bundle_for("news-alert", "hook") == "hook-a"
     assert pb.vue_bundle_for("news-policy", "hook") == "hook-b"
-
-
-def t_stage_vue_assets_collects_bundles_from_pack():
-    pack = pb.load_style_pack("news-coral")
-    assert "hook-a" in {pb.vue_bundle_for("news-coral", r) for r in pack["layouts"]}
+    assert pb.vue_bundle_for("news-coral", "stat") is None, "未 cutover 的角色必须回落静态，不许半切"
+    assert not hasattr(pb, "VUE_COMPOSITIONS"), "旧 id 白名单要删净，不留兼容层"
 ```
 
-- [ ] **Step 2: 确认失败**
-- [ ] **Step 3: 实现**（`vue_bundle_for` 先查 `VUE_ROUTES`，未命中回落 `f"{role}-{pks.variant_of(pack, role)}"` 仅在 `CUTOVER_ROLES` 集合内启用；本 Phase `CUTOVER_ROLES = {"hook"}`）
-- [ ] **Step 4: 回归** —— selftest 211/211；`npm test`；普查 31/31 零 WARN
-- [ ] **Step 5: 提交**
+- [ ] **Step 2: 跑测试确认失败**（`AttributeError: vue_bundle_for` / 两镜同 id / `VUE_COMPOSITIONS` 仍在）
+- [ ] **Step 3: 实现** —— `CUTOVER_ROLES` 内的 (pack, role) 命中 Vue 分支：bundle 名 = `VUE_ROUTES.get((pack, role), f"{role}-{variant_of(pack, role)}")`，clip 的 `data-composition-id` 换成 `vue_clip_id(cid, mount_index)`；组件侧注册键改为**收到的那个 id**（`mod.mount(clip, compId)` 已经传了，注册 `__timelines[compositionId]` 即可，不再硬编码）。未命中 ⇒ 原样走 `MOUNT_TPL`，一字符不改。
+- [ ] **Step 4: 重复版式真渲染闭环**（这条是 Task 2 遗留的收口）
+  复用 Task 2 的两镜同 `hook` fixture：改前（Task 2 末态）第 1 镜被压在 `opacity:0`；改后**两镜都要各自入场并各带自己的图**。
+  `HF_NODE22_DIR=… npx -y hyperframes render -c index.html -o silent.mp4 -f 25 --quality=draft --no-browser-gpu`，
+  要求零 WARN，且逐镜抽帧证明两条都在动（不许只比 mp4 存在）。
+- [ ] **Step 5: 全量回归** —— selftest 全绿（+3 条）、`npm test` exit 0、31 包普查 `31/31` 零 WARN、`--only news-coral` pass:true
+- [ ] **Step 6: 提交** —— `git commit -m "feat(pack): Vue 路由改 (pack, role) 并给每条 Vue 镜唯一 composition 身份"`
+
 
 ---
 
