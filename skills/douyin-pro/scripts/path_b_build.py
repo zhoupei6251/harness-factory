@@ -478,11 +478,15 @@ VUE_COMPOSITIONS: dict[str, str] = {
 #: （实测 20 镜样本 hook×7），旧 `id="vue-target-{composition_id}"` 会生成重复 id，
 #: `getElementById` 只命中第一个 ⇒ 后续同版式镜挂错节点 / 读错 data-variable-values。
 #: 每次唯一的身份在 clip 自身（`id="shot-{mount_index}"`），loader 用 `:scope >` 定位。
+#: `style="{slot_css}"`：Task 3 的槽位注入 —— 该角色文件里的有序色位以
+#: `--c0:#rrggbb;…` 挂在 **clip 元素自身**（作用域在 clip 内），两镜不同包/角色互不覆盖；
+#: 静态支（MOUNT_TPL）**不带** style，保证 31/31 普查逐字节基线不受影响。
 VUE_MOUNT_TPL = (
     '      <div id="{mount_id}" class="clip"'
     ' data-composition-id="{composition_id}"'
     ' data-vue-mount="1"'
     ' data-vue-bundle="{bundle_name}"'
+    ' style="{slot_css}"'
     ' data-variable-values="{values}"'
     ' data-start="{start}" data-duration="{dur}" data-track-index="1"'
     ' data-width="{w}" data-height="{h}">'
@@ -2459,7 +2463,12 @@ def emit_mount(mount_index: int, layout: dict, values: dict, start: float,
     # Tier 3: Vue 版 composition 走 VUE_MOUNT_TPL（不含 data-composition-src）
     if layout["composition_id"] in VUE_COMPOSITIONS:
         bundle = VUE_COMPOSITIONS[layout["composition_id"]]
-        return VUE_MOUNT_TPL.format(bundle_name=bundle, **common)
+        # Task 3: clip 元素自带有序槽位块（作用域在 clip 内）。pack 从版式路径反推，
+        # role 即版式名；延迟导入 pack_slots 避开与 path_b_build 的循环依赖。
+        import pack_slots as pks
+        pack_name = os.path.basename(os.path.dirname(os.path.dirname(layout["path"])))
+        slot_css = html.escape(pks.slot_css(pack_name, layout["name"]), quote=True)
+        return VUE_MOUNT_TPL.format(bundle_name=bundle, slot_css=slot_css, **common)
     return MOUNT_TPL.format(file_name=layout["file_name"], **common)
 
 

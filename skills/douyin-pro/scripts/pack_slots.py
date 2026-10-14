@@ -41,6 +41,17 @@ def template_of(pack: str, role: str) -> tuple[str, list[str]]:
     return normalize(text), HEX_RE.findall(text)
 
 
+def slot_css(pack: str, role: str) -> str:
+    """该 pack/role 的**有序**色位槽 CSS：`--c0:#rrggbb;--c1:#rrggbb;…`。
+
+    槽位身份 = 该角色文件里 hex 的出现序号（Task 1 逐字节还原的承重前提），
+    故此处严格按 `template_of` 返回的 hex 顺序编号，数量等于该模板的槽数。
+    发射侧把这段挂到 Vue clip 元素的 `style` 上（作用域在 clip 内，两镜不互覆盖）。
+    """
+    hexes = template_of(pack, role)[1]
+    return "".join(f"--c{i}:{h};" for i, h in enumerate(hexes))
+
+
 def mainstream_base(role: str) -> str:
     """最大簇的代表包：取簇内排序第一个，保证跨进程稳定。"""
     buckets = pkv.cluster_role(role)

@@ -93,3 +93,88 @@ HF_NODE22_DIR="D:/Users/zhoupei/AppData/Local/nvm/v22.20.0" \
 ⇒ 迁移期真正需要随包注入色值的只有 `stat`/`rail`/`catalog`/`closer` 四个角色；
 `hook`/`quote`/`story` 的槽位在 30 个包里取值相同，注入结果等于原值（**仍走同一套机制，不开例外分支**，
 例外分支正是 31 份手抄文件的来路）。
+
+---
+
+## §3 槽位注入（Task 3，2026-10-14）
+
+发射侧把每角色文件的**有序 hex** 编号为 CSS 自定义属性 `--c0 … --cN`，挂到 Vue clip 元素自身的
+`style` 上（作用域在 clip 内，两镜不同包/角色互不覆盖）；静态支（`MOUNT_TPL`）**不带** `style`，
+所以 §1 的 31/31 逐字节普查基线不受影响。实现：`pack_slots.slot_css(pack, role)` +
+`path_b_build.emit_mount` 的 Vue 分支。
+
+### 实测槽数（`slot_css` 计数 == `template_of(...)[1]` 的 hex 数，逐角色）
+
+命令（离线，只读盘）：
+
+```bash
+python - <<'PY'
+import sys; sys.path.insert(0, "skills/douyin-pro/scripts")
+import pack_slots as pks, re
+for role in ("hook","stat","rail","quote","catalog","story","closer"):
+    n = len(re.findall(r"--c\d+:", pks.slot_css("news-coral", role)))
+    print(role, n)
+PY
+```
+
+| 角色 | 槽数 `--c0…` | 与 §2 表一致 |
+|---|---|---|
+| `hook` | 11 | ✅ |
+| `stat` | 12 | ✅ |
+| `rail` | 8 | ✅ |
+| `quote` | 8 | ✅ |
+| `catalog` | 8 | ✅ |
+| `story` | 9 | ✅ |
+| `closer` | 9 | ✅ |
+
+### 「盘上 0 条颜色补间」= 机检闸门 `t_components_must_not_tween_colors`
+
+§2 证明分层方案的**色位**能无损还原；本条把「主题注入只能是 CSS、不能是 GSAP 补间」钉成规则
+（GSAP 无法插值 `var(--x)`，见 §2 / 判据 0b）。盘点命令（扫 `compositions/*.html` 全部
+`fromTo/to/set/from` 实参里的属性键）：
+
+```bash
+python - <<'PY'
+import sys, re; from pathlib import Path
+sys.path.insert(0, "skills/douyin-pro/scripts")
+import path_b_build as pb
+CALL = re.compile(r"\.(?:fromTo|to|set|from)\s*\(([\s\S]*?)\)\s*(?:;|\n)")
+COLOR = re.compile(r"\b(color|background|backgroundColor|borderColor|fill|stroke)\b\s*:")
+files, props, offenders = [], set(), []
+for pack in pb.ALL_TEMPLATES:
+    d = Path(pb.pack_dir(pack)) / "compositions"
+    if d.is_dir():
+        files += [f for f in d.glob("*.html") if f.name != "placeholder.html"]
+for f in files:
+    for m in CALL.finditer(f.read_text(encoding="utf-8")):
+        props.update(re.findall(r"([A-Za-z_][\w]*)\s*:", m.group(1)))
+        if COLOR.search(m.group(1)):
+            offenders.append(f.name)
+print("非占位版式文件数:", len(files))
+print("被补间的属性全集:", sorted(props))
+print("补间了颜色的文件:", sorted(set(offenders)) or "无")
+PY
+```
+
+**实测结果（2026-10-14）**：
+- 非占位版式文件 **217** 份（31 包 × 7 角色，`news-editorial-warm` 等编译包补齐到 217 口径；占位壳已排除）；
+- 被补间的属性全集 = `{duration, ease, opacity, scale, scaleX, scaleY, x, y, yPercent}`；
+- **补间了颜色的文件 = 无（0 条）**。
+
+⇒ 全 217 份静态版式的补间里 **0 条颜色语义**，主题注入因此**只能是 CSS 变量**，无需给 GSAP 开例外；
+`t_components_must_not_tween_colors` 现扫 `src/web/**/*.vue`（当前组件同样 0 命中）把这条固化为闸门。
+若日后需要颜色补间，闸门会当场 FAIL，强制先改机制（不能悄悄用 `var(--x)` 骗过渲染）。
+
+### 发射产物取证（单包真渲染 `--only news-coral`）
+
+`.harness-news-runtime/tmp/render-census/news-coral/index.html` 内 5 个 `class="clip"`：
+首镜走 Vue（`data-vue-mount`），其余 4 镜走静态 HTML。逐条属性：
+
+```
+vue=True  style='--c0:#0a0a0d;--c1:#f5f0e8;--c2:#c0392b;--c3:#ffffff;--c4:#e85d5d;
+                  --c5:#c0392b;--c6:#ffffff;--c7:#c0392b;--c8:#dcdcdc;--c9:#b0b0b0;--c10:#dcdcdc;'
+vue=False style=None   （×4 条静态 clip）
+```
+
+⇒ Vue clip 自带 11 个 hook 槽（`--c0…--c10`），静态 clip 一律无 `style`（字节不变）。
+`row.json`：`emit_exit=0 · render_exit=0 · warn=0 · frames 1309/1309 · pass:true`。

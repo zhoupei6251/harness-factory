@@ -4299,6 +4299,58 @@ def t_components_scope_all_targets_to_their_own_clip():
         "\n  ".join(problems)
 
 
+def t_slot_css_is_ordered_and_pack_specific():
+    """槽位串必须按 hex 出现顺序编号 `--c0…--cN`，且随包变化。
+
+    槽位身份 = 该角色文件里 hex 的**序号**（Task 1 无损还原的承重前提），
+    所以 slot_css 的编号顺序必须等于 template_of(...)[1] 的 hex 顺序，
+    数量必须等于该模板的槽数。串色 = 序号错位，这里钉死。
+    """
+    a = pks.slot_css("news-coral", "stat")
+    b = pks.slot_css("news-alert", "stat")
+    assert a.startswith("--c0:") and "--c11:" in a, f"槽位必须按序编号: {a}"
+    assert a != b, "stat 的色位随包变化，两包注入串不该相同"
+    assert len(re.findall(r"--c\d+:", a)) == 12, "stat 槽数应为 12（evidence §2）"
+    # 编号顺序必须与 template_of 的 hex 顺序逐一对齐，数量必须相等
+    hexes = pks.template_of("news-coral", "stat")[1]
+    pairs = re.findall(r"--c(\d+):([^;]+)", a)
+    assert [p[1] for p in pairs] == hexes, f"注入串顺序必须等于 hex 出现顺序:\n {pairs}\n {hexes}"
+    for role, count in (("hook", 11), ("stat", 12), ("rail", 8), ("quote", 8),
+                        ("catalog", 8), ("story", 9), ("closer", 9)):
+        got = len(re.findall(r"--c\d+:", pks.slot_css("news-coral", role)))
+        assert got == count, f"{role} 槽数 {got} ≠ 期望 {count}（evidence §2 表）"
+
+
+def t_vue_clip_carries_its_own_slot_block():
+    """Vue 支 clip 元素自带 `--c0:…` 槽位块（作用域在 clip 内），静态支不带。
+
+    注意：VUE_COMPOSITIONS 目前只登记 `nc-night-hook`（Task 4 才扩表），
+    所以 Vue 支用 hook 版式验证；静态支用同包的非 Vue 版式（stat）验证不带 style。
+    """
+    pack = pb.load_style_pack("news-coral")
+    vue = pb.emit_mount(2, pack["layouts"]["hook"], {"kicker": "X"}, 0.0, 4.0, 1080, 1920)
+    assert "--c0:" in vue, f"Vue clip 没带槽位块，色值会掉回组件默认值 ⇒ 串色: {vue}"
+    assert 'style="--c' in vue, f"槽位块必须挂在 clip 元素的 style 上: {vue}"
+    stat = pb.emit_mount(3, pack["layouts"]["stat"], {"value": "1"}, 0.0, 4.0, 1080, 1920)
+    assert "--c0:" not in stat, f"静态支不该带槽位块（字节必须不变）: {stat}"
+    assert "style=" not in stat, f"静态支不该新增 style 属性: {stat}"
+
+
+def t_components_must_not_tween_colors():
+    """盘上实测：217 份静态版式的补间实参里 0 条颜色语义（属性全集只有
+    duration/ease/opacity/scaleX/y/x/scale/yPercent/scaleY）。
+    这条把它钉成规则 —— 一旦有人补间颜色，CSS 变量在 GSAP 里不生效（判据 0b 实测），
+    必须先改机制再改版式。"""
+    offenders = []
+    for path in sorted(_WEB_DIR.rglob("*.vue")):
+        body = path.read_text(encoding="utf-8")
+        for m in re.finditer(r"\.(?:fromTo|to|set|from)\(([\s\S]*?)\)\s*(?:;|\n)", body):
+            if re.search(r"\b(color|background|backgroundColor|borderColor|fill|stroke)\b\s*:", m.group(1)):
+                offenders.append(path.name)
+                break
+    assert not offenders, f"组件补间了颜色（CSS 变量在此处不生效）: {sorted(set(offenders))}"
+
+
 def t_emitted_vue_clip_dom_has_no_duplicate_ids_in_subtree():
     """风险 9 的物理层：一个 clip 的子树内 id 必须唯一，且永不出现 id="vue-target-…"。
 
