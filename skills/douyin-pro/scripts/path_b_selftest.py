@@ -4655,6 +4655,25 @@ def t_slot_count_matches_evidence():
     assert got == want, f"色位槽数漂移: {got} != {want}"
 
 
+def t_reconstruct_rejects_shuffled_hex_order():
+    """负对照：把目标包的色位顺序打乱后还原，必须与原始文件不等。
+    若 reconstruct 退化成恒等返回，本闸当场红。"""
+    base = pks.mainstream_base("stat")
+    targets = [p for p in pb.ALL_TEMPLATES
+               if p != base and pks.variant_of(p, "stat") == "a"]
+    checked = 0
+    for pack in targets:
+        mine = pks.template_of(pack, "stat")[1]          # 目标包自己的有序色位
+        shuffled = list(reversed(mine))
+        if len(set(mine)) < 2 or shuffled == mine:
+            continue          # 色位全同或回文序列：打乱后仍是原序，断言无意义
+        got = pks.reconstruct(base, "stat", pack, hexes=shuffled)
+        assert got != pks.read_raw(pack, "stat"), \
+            f"{pack}/stat 乱序还原竟与原始文件相同 ⇒ reconstruct 未真正使用传入色位"
+        checked += 1
+    assert checked >= 5, f"负对照只覆盖到 {checked} 个包，不足以约束生产路径"
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]
