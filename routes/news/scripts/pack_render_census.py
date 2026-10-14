@@ -44,6 +44,30 @@ NOISE = re.compile(r"\bWARN\b|\bERROR\b")
 
 KEEP.mkdir(parents=True, exist_ok=True)
 
+#: `--only <pack>` 只跑指定包（调试用）；`--list` 列出可跑的包。
+_args = [a for a in sys.argv[1:]]
+if "--list" in _args:
+    print("\n".join(pb.ALL_TEMPLATES))
+    raise SystemExit(0)
+_only = _args[_args.index("--only") + 1] if "--only" in _args else None
+PACKS = [p for p in pb.ALL_TEMPLATES if not _only or p == _only]
+if _only and _only not in pb.ALL_TEMPLATES:
+    raise SystemExit(f"--only {_only!r} 不在 ALL_TEMPLATES 里")
+
+#: 预检 Node 版本：引擎硬门槛 `Node.js >= 22`，用 20 跑会 31 包全挂、白等十几分钟，
+#: 而且失败原因藏在每包 render.log 里。当场拦在这里，附带修法。
+_probe = subprocess.run([os.path.join(N22, "node.exe") if N22 else "node", "-v"],
+                        capture_output=True, text=True)
+if _probe.returncode != 0:
+    raise SystemExit(f"找不到 node（{_probe.stderr.strip() or 'PATH 里没有 node'}）；"
+                     "用 HF_NODE22_DIR=<Node22 目录> 指定")
+_major = int(_probe.stdout.strip().lstrip("v").split(".")[0])
+if _major < 22:
+    hint = ("设 HF_NODE22_DIR=<Node22 目录> 重跑" if not N22
+            else f"HF_NODE22_DIR 指向的 {_probe.stdout.strip()} 仍 < 22，换目录")
+    raise SystemExit(f"Node {_probe.stdout.strip()} 过不了引擎门禁（要 >= 22）；{hint}")
+
+
 
 def one(style: str) -> dict:
     work = KEEP / style
@@ -90,17 +114,17 @@ def one(style: str) -> dict:
 
 
 rows = []
-with cf.ThreadPoolExecutor(max_workers=WORKERS) as pool:
-    for row in pool.map(one, pb.ALL_TEMPLATES):
+# 逐行增量落盘：整轮普查十几分钟，v1 只在结尾写，中断即全丢。
+with (KEEP / "_results.jsonl").open("w", encoding="utf-8") as sink, \
+        cf.ThreadPoolExecutor(max_workers=WORKERS) as pool:
+    for row in pool.map(one, PACKS):
         rows.append(row)
-        (KEEP / "_results.jsonl").open("a", encoding="utf-8").close()
+        sink.write(json.dumps(row, ensure_ascii=False) + "\n")
+        sink.flush()
         print(json.dumps(row, ensure_ascii=False), flush=True)
 
-(KEEP / "_results.jsonl").write_text(
-    "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows), encoding="utf-8")
-
 passed = [r for r in rows if r.get("pass")]
-lines = [f"# 31 pack 画面轨真渲染普查（{len(passed)}/31 通过）", "",
+lines = [f"# {len(PACKS)} pack 画面轨真渲染普查（{len(passed)}/{len(PACKS)} 通过）", "",
          "稿件：`.harness-news-runtime/articles/t001-scenes.json`（5 镜）· 零配音（`--skip-render`）· "
          "25fps · draft · `--no-browser-gpu`", "",
          "| pack | clip | vue挂载 | render exit | 帧(完成/总) | mp4 KB | WARN/ERROR | 判定 |",
@@ -111,7 +135,7 @@ for r in rows:
                  f"| {r.get('warn')} | {'✅' if r.get('pass') else '❌ ' + str(r.get('error', ''))} |")
 lines += ["", "每包产物在同目录 `<pack>/`：`silent.mp4` / `index.html` / `render.log` / `emit.log`。"]
 (KEEP / "_summary.md").write_text("\n".join(lines) + "\n", encoding="utf-8")
-print(f"\n=== {len(passed)}/31 通过；汇总: {KEEP / '_summary.md'} ===")
+print(f"\n=== {len(passed)}/{len(PACKS)} 通过；汇总: {KEEP / '_summary.md'} ===")
 for r in rows:
     if not r.get("pass"):
         print("  FAIL", r)
