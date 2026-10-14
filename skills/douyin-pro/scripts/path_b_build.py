@@ -465,12 +465,62 @@ MOUNT_TPL = (
     ' data-width="{w}" data-height="{h}"></div>'
 )
 
-#: Tier 3 POC: 哪些 composition 走 Vue 版（composition_id -> vue bundle 文件名）。
-#: Vue bundle 在 work_dir/vue/<bundle>.js（path_b 拷贝自 dist/vue/<bundle>.js）。
-#: 任何不在此表里的 composition 仍走 MOUNT_TPL 的 data-composition-src HTML 形态。
-VUE_COMPOSITIONS: dict[str, str] = {
-    "nc-night-hook": "news-coral-hook",
-}
+#: Task 4: Vue 路由表 —— 键是 **(pack, role)**，不是包级 composition_id。
+#: 旧 `VUE_COMPOSITIONS`（composition_id → bundle）已删且**不留兼容 shim**：
+#: 30 个 variant-a 包的 hook.html 根 id 字面上全都叫 `nc-night-hook`（实测），
+#: 按 id 路由等于靠命名巧合跨包命中 —— 那不是路由。包级 composition_id 是
+#: Phase 3 换源时 layouts.toml 的登记身份，不许兼任路由键。
+#: 默认 bundle 名一律按 `f"{role}-{variant_of(pack, role)}"` 推导；
+#: VUE_ROUTES 只放「推导给不了」的显式覆盖（今天为空）。
+VUE_ROUTES: dict[tuple[str, str], str] = {}
+
+#: 本 Phase 切到 Vue 的角色（Phase 3 扩到 7 个）。未列出的角色
+#: `vue_bundle_for()` 返回 None ⇒ 发射回落静态支，一字符不改。
+CUTOVER_ROLES: set[str] = {"hook"}
+
+
+def vue_bundle_for(pack: str, role: str) -> str | None:
+    """(pack, role) → Vue bundle 名；角色未进 CUTOVER_ROLES 时返回 None（走静态支）。"""
+    if role not in CUTOVER_ROLES:
+        return None
+    if (pack, role) in VUE_ROUTES:
+        return VUE_ROUTES[pack, role]
+    # 延迟导入避开与 pack_slots 的循环依赖（pack_slots 顶部 import path_b_build）。
+    import pack_slots as pks
+    return f"{role}-{pks.variant_of(pack, role)}"
+
+
+def vue_clip_id(cid: str, mount_index: int) -> str:
+    """每条 Vue 镜在本次渲染内的唯一 composition 身份 = 包级 id + `__` + 挂载序号。
+
+    后缀是**加**不是换：包级 id 原样保留在串头，Phase 3 仍按前缀对齐 layouts.toml。
+    为什么身份必须做在 id 本体上（Task 2 Step 0 实测）：静态路每镜是独立 document
+    （data-composition-src 各载一份），Vue 路整个 host 只有一个 document、N 个 mount
+    共享一张 `window.__timelines`；引擎 `pollSubCompositionTimelines` 按
+    `__timelines[<data-composition-id>]` 查时间轴 ⇒ 键的**形态**不能改，只能让 id
+    本身唯一。同版式两镜共键时第二条注册覆盖第一条，且 `fromTo` 的 immediateRender
+    把先挂载那镜压在 opacity:0（改前证据见 task-2-report.md 修复轮）。
+    字符面：包级 id 实测只含 `[A-Za-z0-9-]`，`__` 不引入新字符 ⇒ 同时落在 HTML
+    属性值与 JS 字符串字面量里都安全（无 `"`、`\\`、`#`、空格）。
+    """
+    return f"{cid}__{mount_index}"
+
+
+def _vue_dist_dir() -> Path:
+    """Vite 产物目录。path_b_build.py 在 skills/douyin-pro/scripts/，上溯 3 级到仓库根。"""
+    return (Path(os.path.dirname(os.path.abspath(__file__))).resolve()
+            .parent.parent.parent / "dist" / "vue")
+
+
+def vue_bundle_built(bundle: str) -> bool:
+    """bundle 是否真的被 Vite 建出来（`dist/vue/<bundle>.js` 存在）。
+
+    这是发射侧「生效面」的第二半：路由命中 **且** 产物存在才走 Vue 支。
+    Task 4 只建出了 hook-a；hook-b（news-policy）还没有组件 ⇒ 未建出的 bundle
+    一律回落静态支，31/31 普查基线（30 包 hook 走 Vue、news-policy 全静态）
+    就是这么守住的。Task 5 建出 hook-b 后 news-policy 自动翻到 Vue 支。
+    """
+    return (_vue_dist_dir() / f"{bundle}.js").is_file()
 
 #: Vue 版 mount 模板：不引 data-composition-src（hyperframes 引擎不识别 Vue mount），
 #: 含 data-vue-mount 标记，host.html 的 loader script 异步 import 对应 bundle。
@@ -481,6 +531,8 @@ VUE_COMPOSITIONS: dict[str, str] = {
 #: `style="{slot_css}"`：Task 3 的槽位注入 —— 该角色文件里的有序色位以
 #: `--c0:#rrggbb;…` 挂在 **clip 元素自身**（作用域在 clip 内），两镜不同包/角色互不覆盖；
 #: 静态支（MOUNT_TPL）**不带** style，保证 31/31 普查逐字节基线不受影响。
+#: Task 4：`{composition_id}` 位喂的是 `vue_clip_id(包级id, mount_index)` ——
+#: 每条 Vue 镜在本 document 内身份唯一，`__timelines` 不再撞键。
 VUE_MOUNT_TPL = (
     '      <div id="{mount_id}" class="clip"'
     ' data-composition-id="{composition_id}"'
@@ -500,7 +552,7 @@ VUE_MOUNT_TPL = (
 #: 组件，组件自己从 `:scope > .vue-target` 取挂载节点、从 clip 的 data-variable-values
 #: 取本镜数据 —— 不再用全局 getElementById('vue-target-'+compId)（同版式重复必撞车，风险 9）。
 #: {{VUE_CSS_LINKS}} 由 emit_host 按 work_dir/vue/assets/ 里**实际存在**的 CSS 逐个填
-#: `<link>`：.vue 的 <style> 被 Vite 拆成内容哈希名的独立资产（news-coral-hook-<hash>.css），
+#: `<link>`：.vue 的 <style> 被 Vite 拆成内容哈希名的独立资产（hook-a-<hash>.css），
 #: 名字不可预测 ⇒ 只能在发射时扫盘。Vue 版没有 compositions/<layout>.html 这一层
 #: （hyperframes 只认 data-composition-src，不认 Vue mount），样式是它唯一的来路 ——
 #: 实测漏发 <link> 时第 1 镜的 @font-face HF CJK 与 #root 定位规则整块丢失。
@@ -2397,10 +2449,14 @@ def stage_vue_assets(work_dir: str, pack: dict) -> list[str]:
     返回空表 = 这个包一个 Vue 版 mount 都没有，emit_host 也就不注入 loader 块。
     CSS 按 `<bundle>*.css` 过滤而不是整目录全发：一个包混用 HTML 版与 Vue 版时，
     把别的 composition 的样式挂进来会互相盖住版面（`.hk-*`/`<bundle>-*` 都是全局类名）。
+    Task 4：bundle 名经 `vue_bundle_for(pack, role)` 拿（路由是 (pack, role)，
+    不是包级 composition_id），并用 `vue_bundle_built` 过滤 —— 收集口径必须与
+    `emit_mount` 的 Vue 分支判定一致，否则会给回落静态支的镜发 `<link>`，
+    把别的 composition 的全局样式挂进一个纯静态包（普查基线立刻漂）。
     """
-    bundles = sorted({VUE_COMPOSITIONS[layout["composition_id"]]
-                      for layout in pack["layouts"].values()
-                      if layout["composition_id"] in VUE_COMPOSITIONS})
+    bundles = sorted({b for layout in pack["layouts"].values()
+                      for b in [vue_bundle_for(pack["name"], layout["name"])]
+                      if b is not None and vue_bundle_built(b)})
     if not bundles:
         return []
     vue_dst = os.path.join(work_dir, "vue")
@@ -2460,15 +2516,24 @@ def emit_mount(mount_index: int, layout: dict, values: dict, start: float,
         w=w,
         h=h,
     )
-    # Tier 3: Vue 版 composition 走 VUE_MOUNT_TPL（不含 data-composition-src）
-    if layout["composition_id"] in VUE_COMPOSITIONS:
-        bundle = VUE_COMPOSITIONS[layout["composition_id"]]
-        # Task 3: clip 元素自带有序槽位块（作用域在 clip 内）。pack 从版式路径反推，
-        # role 即版式名；延迟导入 pack_slots 避开与 path_b_build 的循环依赖。
-        import pack_slots as pks
-        pack_name = os.path.basename(os.path.dirname(os.path.dirname(layout["path"])))
+    # Task 4: (pack, role) 路由。命中 = 角色进 CUTOVER_ROLES（vue_bundle_for 非 None）
+    # **且** bundle 已建出（vue_bundle_built）。pack 名从版式路径反推，role 即版式名；
+    # 延迟导入 pack_slots 避开与 path_b_build 的循环依赖。
+    # 命中时 clip 的 data-composition-id 用 `vue_clip_id`（包级 id + `__` + 挂载序号）：
+    # 整个 host 只有一个 document，引擎按 `__timelines[<data-composition-id>]` 驱动，
+    # 同版式两镜共键 = 第二条注册覆盖第一条 + immediateRender 压黑首镜。
+    # 未命中 ⇒ 原样走 MOUNT_TPL，composition_id 保持包级原值，一字符不改。
+    import pack_slots as pks
+    pack_name = os.path.basename(os.path.dirname(os.path.dirname(layout["path"])))
+    bundle = vue_bundle_for(pack_name, layout["name"])
+    if bundle is not None and vue_bundle_built(bundle):
+        # Task 3: clip 元素自带有序槽位块（作用域在 clip 内）。
         slot_css = html.escape(pks.slot_css(pack_name, layout["name"]), quote=True)
-        return VUE_MOUNT_TPL.format(bundle_name=bundle, slot_css=slot_css, **common)
+        vue_common = dict(common,
+                          composition_id=vue_clip_id(layout["composition_id"], mount_index))
+        return VUE_MOUNT_TPL.format(bundle_name=bundle, slot_css=slot_css, **vue_common)
+    # 静态支每镜是独立 document（data-composition-src 各载一份），包级 id 在
+    # 自己 document 内天然唯一 —— 唯一化只属于 Vue 支，这里一个字符都不能改。
     return MOUNT_TPL.format(file_name=layout["file_name"], **common)
 
 

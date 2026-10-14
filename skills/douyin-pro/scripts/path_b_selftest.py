@@ -4230,25 +4230,28 @@ def t_p3_emitter_photo_flow_is_deterministic():
 
 # ---------------- Tier 3: Vue 版 mount 协议 ----------------
 def t_vue_compose_hook_uses_vue_mount_tpl():
-    """VUE_COMPOSITIONS 里的 hook 走 VUE_MOUNT_TPL（不含 data-composition-src）。
+    """路由命中的 hook 走 VUE_MOUNT_TPL（不含 data-composition-src）。
 
     Tier 3 接入：host.html 的 loader script 通过 [data-vue-mount="1"] 识别 Vue 版
     composition，异步 import 对应 Vue bundle。HTML 版 mount 的 data-composition-src
     是 hyperframes 引擎加载 composition 文件的凭据 —— Vue 版不引，引擎不会去 fetch
     不存在的文件。
+    Task 4：命中判据从「composition_id 在白名单」换成「(pack, role) 路由且有产物」。
     """
     layout = PACK["layouts"]["hook"]
     ctx = base_ctx(is_first=True)
     values = pb.fill_variables(layout, pb.parse_input(HOOK_BEAT)[0], ctx)
     out = pb.emit_mount(1, layout, values, 0.0, 4.0, 1080, 1920)
-    assert layout["composition_id"] in pb.VUE_COMPOSITIONS, \
-        f"hook 应在 VUE_COMPOSITIONS 表里，实际不在"
+    assert pb.vue_bundle_for("news-coral", "hook") == "hook-a", \
+        "news-coral/hook 应经 (pack, role) 路由命中 bundle hook-a"
+    assert pb.vue_bundle_built("hook-a"), \
+        "dist/vue/hook-a.js 不存在 —— 发射会回落静态支，本闸其余断言全部失真；先跑 npm run test:web"
     assert 'data-vue-mount="1"' in out, \
         f"Vue 版 mount 必须含 data-vue-mount: {out}"
     assert 'data-composition-src=' not in out, \
         f"Vue 版 mount 不该含 data-composition-src: {out}"
-    assert 'data-vue-bundle="news-coral-hook"' in out, \
-        f"bundle name 必须对应 VUE_COMPOSITIONS 表: {out}"
+    assert 'data-vue-bundle="hook-a"' in out, \
+        f"bundle name 必须来自 vue_bundle_for(): {out}"
     assert 'class="vue-target"' in out, \
         f"Vue 应用 mount target 子元素必须存在（class 而非 id）: {out}"
 
@@ -4273,6 +4276,48 @@ _WEB_DIR = Path(__file__).resolve().parents[3] / "src" / "web"
 #: GSAP 的选择器字符串一律按 `document` 解析，命中的是**所有**同 id 节点（不是第一个），
 #: 所以一次渲染里两条同角色 clip 会让后注册的 timeline 同时驱动前面每一镜。
 _ID_TARGET_RE = re.compile(r"""(?:fromTo|from|to|set)\s*\(\s*["'`]#""")
+
+
+def t_duplicate_role_vue_clips_get_distinct_composition_ids():
+    """spec §7 风险 9 的后半：两镜同版式时，Vue clip 的 data-composition-id 必须不同，
+    否则整个 host 只有一个 document，两条 __timelines 注册互相覆盖。
+
+    Task 2 Step 0 实测：引擎 `pollSubCompositionTimelines` 按
+    `__timelines[<data-composition-id>]` 查时间轴 —— 键不能改形态，
+    所以身份必须做在 **id 本体**上（包级 id + `__` + 挂载序号）。
+    """
+    pack = pb.load_style_pack("news-coral")
+    hook = pack["layouts"]["hook"]
+    a = pb.emit_mount(1, hook, {"kicker": "A"}, 0.0, 4.0, 1080, 1920)
+    b = pb.emit_mount(7, hook, {"kicker": "B"}, 24.0, 4.0, 1080, 1920)
+    assert 'data-vue-mount="1"' in a and 'data-vue-mount="1"' in b, \
+        "两镜都必须已切到 Vue 支，否则本闸在比静态支"
+    ida = re.search(r'data-composition-id="([^"]+)"', a).group(1)
+    idb = re.search(r'data-composition-id="([^"]+)"', b).group(1)
+    assert ida != idb, f"两镜同 id（{ida}）⇒ __timelines 必撞键"
+    assert hook["composition_id"] in ida and hook["composition_id"] in idb, \
+        "唯一 id 必须在包级 id 上加后缀，Phase 3 换源要靠包级 id 对齐 layouts.toml"
+    # id 同时出现在 HTML 属性与 JS 字符串字面量 `__timelines["…"]` 里：
+    # 只允许 HTML/JS 双安全字符（不许 `"`、`\\`、`#`、空格）。
+    assert re.fullmatch(r"[A-Za-z0-9_-]+", ida), f"Vue clip id 含不安全字符: {ida}"
+
+
+def t_static_branch_composition_id_untouched():
+    """静态支的 id 一个字符都不能变 —— 否则 31/31 普查基线与台账结构一致口径双双失效。"""
+    pack = pb.load_style_pack("news-policy")          # 未登记 Vue 的包
+    stat = pack["layouts"]["stat"]
+    out = pb.emit_mount(3, stat, {"value": "1"}, 0.0, 4.0, 1080, 1920)
+    assert f'data-composition-id="{stat["composition_id"]}"' in out, "静态支 id 被改了"
+    assert "__" not in out.split("data-composition-id")[1].split("\"")[1], \
+        "静态支混进 Vue 的唯一后缀"
+
+
+def t_route_lookup_is_pack_and_role_not_composition_id():
+    assert pb.vue_bundle_for("news-alert", "hook") == "hook-a"
+    assert pb.vue_bundle_for("news-policy", "hook") == "hook-b"
+    assert pb.vue_bundle_for("news-coral", "stat") is None, \
+        "未 cutover 的角色必须回落静态，不许半切"
+    assert not hasattr(pb, "VUE_COMPOSITIONS"), "旧 id 白名单要删净，不留兼容层"
 
 
 def t_components_scope_all_targets_to_their_own_clip():
@@ -4324,8 +4369,8 @@ def t_slot_css_is_ordered_and_pack_specific():
 def t_vue_clip_carries_its_own_slot_block():
     """Vue 支 clip 元素自带 `--c0:…` 槽位块（作用域在 clip 内），静态支不带。
 
-    注意：VUE_COMPOSITIONS 目前只登记 `nc-night-hook`（Task 4 才扩表），
-    所以 Vue 支用 hook 版式验证；静态支用同包的非 Vue 版式（stat）验证不带 style。
+    注意：CUTOVER_ROLES 目前只有 `hook`（Task 4 落地；Phase 3 扩到 7 角色），
+    所以 Vue 支用 hook 版式验证；静态支用同包的非 Vue 角色（stat）验证不带 style。
     """
     pack = pb.load_style_pack("news-coral")
     vue = pb.emit_mount(2, pack["layouts"]["hook"], {"kicker": "X"}, 0.0, 4.0, 1080, 1920)
@@ -4382,12 +4427,12 @@ def t_emitted_vue_clip_dom_has_no_duplicate_ids_in_subtree():
 
 
 def t_non_vue_layouts_keep_composition_src_html():
-    """非 VUE_COMPOSITIONS 里的 layout 仍走 MOUNT_TPL（HTML 版，不动现有协议）。"""
+    """路由未命中的 layout 仍走 MOUNT_TPL（HTML 版，不动现有协议）。"""
     layout = PACK["layouts"]["stat"]
     # emit_mount 不验证 values 完整性（fill_variables 才校验契约）—— 直接 mock
     out = pb.emit_mount(1, layout, {"kicker": "X", "slotSeconds": 4}, 0.0, 4.0, 1080, 1920)
-    assert layout["composition_id"] not in pb.VUE_COMPOSITIONS, \
-        f"stat 不应在 VUE_COMPOSITIONS 表里"
+    assert pb.vue_bundle_for("news-coral", "stat") is None, \
+        "stat 未进 CUTOVER_ROLES，vue_bundle_for 必须返回 None（回落静态支）"
     assert 'data-composition-src="compositions/stat.html"' in out, \
         f"HTML 版 mount 必须含 data-composition-src: {out}"
     assert 'data-vue-mount' not in out, \
@@ -4425,7 +4470,7 @@ def t_emit_host_links_vue_css_before_runtime():
     layout = PACK["layouts"]["hook"]
     values = pb.fill_variables(layout, pb.parse_input(HOOK_BEAT)[0], base_ctx(is_first=True))
     vue_mount = pb.emit_mount(1, layout, values, 0.0, 4.0, 1080, 1920)
-    css = "vue/assets/news-coral-hook-Br_VAm7t.css"
+    css = "vue/assets/hook-a-Br_VAm7t.css"
     filled = pb.emit_host(PACK, [vue_mount], [], 4.0, 1080, 1920, [css])
     link = f'<link rel="stylesheet" href="{css}">'
     assert link in filled, f"emit_host 没为 Vue 样式发 <link>: {css}"

@@ -37,7 +37,9 @@ const previewNames = entryNames.filter((name) =>
 );
 
 // hook 版式是唯一有逐字段内容断言的入口（其余版式共享下面的通用断言）
-const HOOK = "news-coral-hook";
+// Task 4：入口目录改名 hook-a —— bundle 名现在由 `vue_bundle_for(pack, role)`
+// 按 `f"{role}-{variant}"` 推导（path_b_build 发射的 data-vue-bundle 就是它）。
+const HOOK = "hook-a";
 const DIST_HTML = resolve(DIST, `${HOOK}.html`);
 const DIST_ENTRY_JS = bundlePath(HOOK);
 
@@ -105,19 +107,38 @@ check("产物不含 CDN 引用（hyperframes 在无网环境也跑）", () => {
   }
 });
 
-check("产物引用 entry chunk (news-coral-hook.js)", () => {
-  if (!html.includes("news-coral-hook.js")) {
+check(`产物引用 entry chunk (${HOOK}.js)`, () => {
+  if (!html.includes(`${HOOK}.js`)) {
     throw new Error("entry chunk not referenced from HTML");
   }
 });
 
-check("产物含 data-composition-id=\"nc-night-hook\"", () => {
+check(`产物含 data-composition-id="nc-night-hook"`, () => {
   // 实际值在 bundle JS 里（Vue template 编译后），HTML 里可能不出现
   // 检查 bundle JS 是否含这个字面量
   const js = readFileSync(DIST_ENTRY_JS, "utf8");
   if (!js.includes("nc-night-hook")) {
     throw new Error('"nc-night-hook" not bundled');
   }
+});
+
+check(`${HOOK}: composition 身份不写死（注册键与根 id 都用传入 compositionId）`, () => {
+  // Task 4：发射器给每条 Vue 镜唯一 `data-composition-id`（vue_clip_id =
+  // 包级 id + `__` + 挂载序号），loader 逐镜 `mod.mount(clip, compId)` 传下来；
+  // 组件必须注册 `window.__timelines[props.compositionId]`、模板必须
+  // `:data-composition-id="compositionId"`。引擎按 `__timelines[<元素自身 id>]`
+  // 驱动（Task 2 Step 0 实测），任何写死形态都会让重复版式两镜撞键。
+  const js = readFileSync(DIST_ENTRY_JS, "utf8");
+  // main.ts 的独立预览入口允许保留 1 处包级 id 字面量（无引擎，不参与撞键）。
+  const hits = js.split("nc-night-hook").length - 1;
+  assert(
+    hits <= 1,
+    `bundle 里 "nc-night-hook" 出现 ${hits} 次（>1 = 注册键或模板 id 被写死回包级字面量）`
+  );
+  assert(
+    !/window\.__timelines\[\s*["']/.test(js),
+    '发现 window.__timelines["<字面量>"] 形态 —— 注册键必须是传入的 compositionId'
+  );
 });
 
 check("GSAP 关键 API (timeline / fromTo) 出现在 dist 任一 JS", () => {
@@ -241,7 +262,7 @@ check("bundle 内 GSAP 版本 == 声明版本（spec §5-P0 判据 3 的原文�
   // spec §5-P0 第 3 条要的是「**bundle 内** GSAP 版本 == 声明版本」，管的是**产物是不是这次的**。
   // 两者不等价：声明/锁一致但 dist/ 是旧 GSAP 编出来的陈旧产物时，只有这条会红。
   //
-  // 锚点实测（dist/vue/news-coral-hook.js，gsap 3.15.0 + vue 3.5.43）：
+  // 锚点实测（dist/vue/hook-a.js，gsap 3.15.0 + vue 3.5.43；旧名 news-coral-hook 时代同形态）：
   // GSAP 在产物里写 `…version=…version=…version="3.15.0"`，全文 `version\s*=\s*"\d+\.\d+\.\d+"`
   // 这种「版本赋值标记」**恰好命中 1 次**，且值就是 gsap 版本；vue 的 3.5.43 不以该形态出现。
   // 所以先要求「标记存在」（GSAP 换了产物形态时必须人工重锚，不许放宽），再要求「标记值 == 声明值」。

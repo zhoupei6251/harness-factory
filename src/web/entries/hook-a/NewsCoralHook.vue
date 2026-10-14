@@ -36,10 +36,13 @@ import type { HookVariables } from "../../lib/data.contract";
  * **首次**渲染就出现，onMounted 时 `imgEl` / `creditEl` 这两个 ref 才拿得到节点。
  * 读的还是同一个 clip 的同一个属性，时序表一个数字没动。
  *
- * 时间轴登记键仍是 `window.__timelines[<data-composition-id>]`——实测 hyperframes 引擎
- * `pollSubCompositionTimelines` 逐 `[data-composition-id]` 检查 `__timelines[id]` 是否存在，
- * 键换成 compositionId#clip.id 会让引擎找不到而每镜超时告警。给重复版式镜分配不同
- * composition_id 属 (pack,role) 路由决定（Task 4），不在本任务范围内。
+ * 时间轴登记键 = **loader 传进来的那个 compositionId**（Task 4）：发射器给每条 Vue 镜
+ * 唯一的 `data-composition-id`（`vue_clip_id` = 包级 id + `__` + 挂载序号），loader 逐镜
+ * `mod.mount(clip, compId)` 把它交下来。引擎契约（Task 2 Step 0 实测
+ * `pollSubCompositionTimelines`）是「逐 `[data-composition-id]` 元素查
+ * `__timelines[<该元素的 id>]`」⇒ 注册键必须等于本镜 id，两者都取传入值、都不写死。
+ * 写死包级字面量会让重复版式的两镜共键：第二条注册覆盖第一条，
+ * `fromTo` 的 immediateRender 把首镜压在 opacity:0（改前证据见 task-2-report.md）。
  */
 const props = defineProps<{ compositionId: string; clip: HTMLElement }>();
 
@@ -96,7 +99,9 @@ onMounted(() => {
   }
 
   window.__timelines = window.__timelines ?? {};
-  window.__timelines["nc-night-hook"] = tl;
+  // 注册键 = 本镜收到的 compositionId（与外层 clip 的 data-composition-id 同值）。
+  // 不许退回字符串字面量 —— 闸门 t_bundle_identity_never_hardcoded（vue-build.test.ts）守着。
+  window.__timelines[props.compositionId] = tl;
 });
 </script>
 
@@ -104,7 +109,7 @@ onMounted(() => {
   <div
     id="root"
     :class="{ 'has-photo': hasPhoto }"
-    data-composition-id="nc-night-hook"
+    :data-composition-id="compositionId"
     data-width="1080"
     data-height="1920"
   >
