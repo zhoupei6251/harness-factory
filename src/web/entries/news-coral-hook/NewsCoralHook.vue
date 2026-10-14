@@ -8,11 +8,33 @@ import type { HookVariables } from "../../lib/data.contract";
  * news-coral · hook
  *
  * 迁移自 skills/douyin-pro/templates/hyperframes_path_b/news-coral/compositions/hook.html
- * 保持与原版字节级一致：DOM 结构 / CSS / GSAP timeline / 数据占位契约。
+ * 保持与原版一致：DOM 结构 / CSS / GSAP timeline（属性、时长、缓动、绝对起点逐条同值）
+ * / 数据占位契约。只有「目标怎么拿到」变了，见下面的 clip 作用域契约。
  *
  * 数据流：loader 传整个 clip（每次唯一 id="shot-N"）→ mount → readVariables(clip)
- * → reactive vars → DOM 重新渲染。本镜数据从传入的 clip 自身读，不再按 composition_id
+ * → vars → 渲染出本镜文案。本镜数据从传入的 clip 自身读，不再按 composition_id
  * 全局查找（spec §7 风险 9：同版式重复时全局查找只命中第一个）。
+ *
+ * ## clip 作用域契约（Phase 1 全部组件通用，`path_b_selftest.py` 机检）
+ *
+ * 同一次渲染里同一版式会出现两次以上（实测 20 镜样本 hook×7），Vue 把模板渲进各自
+ * clip 的 `.vue-target` ⇒ **每个实例的 DOM 完全重复**（两棵树都有 `id="h-band"`）。
+ * 于是两种「按全局取节点」的写法都错，而且错得不一样：
+ *   ① 用 `document` 全局按 id 捞节点（getElementById 那一类）—— 只命中文档第一个，
+ *     后挂载的实例会把自己的 imagePath 写进**前一镜**的 `<img>`：前一镜显示别人的图、
+ *     本镜反而一张图都没有；
+ *   ② 把补间目标写成以 `#` 开头的 id 选择器字符串（fromTo / to / from / set 的首参）——
+ *     GSAP 用 `document` 解析选择器，命中的是**所有**同 id 节点，于是后注册的 timeline
+ *     同时驱动前面每一镜，并按后镜的 slotSeconds 时序补间。
+ * 正确写法（本文件采用）：动效目标与 photo 节点一律走**模板 ref**，每个实例只拿到自己
+ * 子树里的元素；既不引 id 选择器字符串，也不碰 `document.*`。闸门
+ * `t_components_scope_all_targets_to_their_own_clip` 逐行守这两条形。
+ * ⚠️ 那条闸门是纯文本形检查、不跳注释 —— 所以本注释只描述被禁形态，不写死字面例子
+ *   （写了就把自己判红）。真实反例见 task-2-report.md 的修复前取证段。
+ *
+ * vars 在 setup 期就读（原来在 onMounted 里读）：`<figure v-if="hasPhoto">` 必须在
+ * **首次**渲染就出现，onMounted 时 `imgEl` / `creditEl` 这两个 ref 才拿得到节点。
+ * 读的还是同一个 clip 的同一个属性，时序表一个数字没动。
  *
  * 时间轴登记键仍是 `window.__timelines[<data-composition-id>]`——实测 hyperframes 引擎
  * `pollSubCompositionTimelines` 逐 `[data-composition-id]` 检查 `__timelines[id]` 是否存在，
@@ -21,15 +43,23 @@ import type { HookVariables } from "../../lib/data.contract";
  */
 const props = defineProps<{ compositionId: string; clip: HTMLElement }>();
 
-const vars = ref<Partial<HookVariables>>({});
+const vars = ref<Partial<HookVariables>>(readVariables(props.clip));
 const hasPhoto = computed(() =>
   Boolean(String(vars.value.imagePath ?? "").trim())
 );
 const slot = computed(() => Number(vars.value.slotSeconds) || 4);
 
-onMounted(() => {
-  vars.value = readVariables(props.clip);
+// 动效 / photo 节点：全部是本实例自己的元素（clip 作用域契约）
+const bandEl = ref<HTMLElement>();
+const ebEl = ref<HTMLElement>();
+const acEl = ref<HTMLElement>();
+const hairEl = ref<HTMLElement>();
+const supEl = ref<HTMLElement>();
+const fieldEl = ref<HTMLElement>();
+const imgEl = ref<HTMLImageElement>();
+const creditEl = ref<HTMLElement>();
 
+onMounted(() => {
   // 动量预算（frame.md §4，与原 hook.html 字面同值）
   const INTRO_END = 1.5;
   const MIN_DRIFT = 0.6;
@@ -39,27 +69,30 @@ onMounted(() => {
   const tl = gsap.timeline({ paused: true });
 
   // 入场（法则 8：自带 background 一律 scaleX/scaleY，禁止 opacity）
-  tl.fromTo("#h-band", { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease: "power3.out" }, 0);
-  tl.fromTo("#h-eb", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.3);
-  tl.fromTo("#h-ac", { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.82);
-  tl.fromTo("#h-hair", { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 1.05);
-  tl.fromTo("#h-sup", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.4 }, 1.25);
+  // 每条的属性 / 时长 / 缓动 / 绝对起点与 hook.html:230-239 逐字对应，只换目标来源。
+  // 节点在首次渲染就全部就位（vars 于 setup 读），所以 .value 必然有值；万一模板与动效
+  // 表不一致，GSAP 会打 `GSAP target ... not found` ⇒ 普查的零 WARN 判据当场红，不会静默。
+  tl.fromTo(bandEl.value!, { scaleY: 0 }, { scaleY: 1, duration: 0.5, ease: "power3.out" }, 0);
+  tl.fromTo(ebEl.value!, { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.3);
+  tl.fromTo(acEl.value!, { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.82);
+  tl.fromTo(hairEl.value!, { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 1.05);
+  tl.fromTo(supEl.value!, { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.4 }, 1.25);
 
   // 呼吸：整镜剩余时间持续位移
-  tl.to("#h-field", { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
-  tl.to("#h-eb", { y: 12, duration: driftDur, ease: "none" }, driftStart);
+  tl.to(fieldEl.value!, { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
+  tl.to(ebEl.value!, { y: 12, duration: driftDur, ease: "none" }, driftStart);
 
   // 真实图板（法则 8 例外：asset/img 可用 opacity）
   if (hasPhoto.value) {
-    const img = document.getElementById("hk-img") as HTMLImageElement | null;
-    const credit = document.getElementById("hk-credit");
+    const img = imgEl.value;
+    const credit = creditEl.value;
     if (img) img.src = String(vars.value.imagePath ?? "");
     if (credit) {
       credit.textContent =
         String(vars.value.imageCredit ?? "") || "图源：Wikimedia Commons";
     }
-    tl.fromTo("#hk-img", { opacity: 0 }, { opacity: 1, duration: 0.8, ease: "power2.out" }, 0);
-    tl.to("#hk-img", { scale: 1.08, duration: driftStart + driftDur, ease: "power1.inOut" }, 0);
+    tl.fromTo(imgEl.value!, { opacity: 0 }, { opacity: 1, duration: 0.8, ease: "power2.out" }, 0);
+    tl.to(imgEl.value!, { scale: 1.08, duration: driftStart + driftDur, ease: "power1.inOut" }, 0);
   }
 
   window.__timelines = window.__timelines ?? {};
@@ -75,22 +108,23 @@ onMounted(() => {
     data-width="1080"
     data-height="1920"
   >
-    <div class="h-band" id="h-band"></div>
-    <div class="h-eb" id="h-eb" data-var-text="kicker">{{ vars.kicker ?? "NEWS" }}</div>
-    <div class="h-field" id="h-field">
+    <div class="h-band" id="h-band" ref="bandEl"></div>
+    <div class="h-eb" id="h-eb" ref="ebEl" data-var-text="kicker">{{ vars.kicker ?? "NEWS" }}</div>
+    <div class="h-field" id="h-field" ref="fieldEl">
       <div class="h-hd">
         <div id="h-l1" data-var-text="headTop">{{ vars.headTop ?? "标题第一行" }}</div>
         <div>
           <span id="h-l2" data-var-text="headBottomLead">{{ vars.headBottomLead ?? "第二行" }}</span><span
             class="h-ac"
             id="h-ac"
+            ref="acEl"
             data-var-text="headAccent"
             >{{ vars.headAccent ?? "强调" }}</span
           >
         </div>
       </div>
-      <div class="h-hair" id="h-hair"></div>
-      <div class="h-sup" id="h-sup" data-var-text="support">{{ vars.support ?? "辅助信息" }}</div>
+      <div class="h-hair" id="h-hair" ref="hairEl"></div>
+      <div class="h-sup" id="h-sup" ref="supEl" data-var-text="support">{{ vars.support ?? "辅助信息" }}</div>
     </div>
     <figure
       v-if="hasPhoto"
@@ -101,11 +135,12 @@ onMounted(() => {
       <img
         class="hk-photo-img"
         id="hk-img"
+        ref="imgEl"
         data-layout-allow-overflow
         alt=""
       />
     </figure>
-    <figcaption class="hk-photo-credit" id="hk-credit">图源：Wikimedia Commons</figcaption>
+    <figcaption class="hk-photo-credit" id="hk-credit" ref="creditEl">图源：Wikimedia Commons</figcaption>
   </div>
 </template>
 

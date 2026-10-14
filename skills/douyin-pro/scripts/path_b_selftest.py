@@ -4268,6 +4268,67 @@ def t_two_same_role_vue_mounts_have_unique_targets():
         "clip 自身 id 必须仍是每次唯一的 mount_id"
 
 
+_WEB_DIR = Path(__file__).resolve().parents[3] / "src" / "web"
+#: GSAP 补间的「裸 id 字符串目标」形态：`(fromTo|from|to|set)(` 后紧跟以 `#` 开头的字符串字面量。
+#: GSAP 的选择器字符串一律按 `document` 解析，命中的是**所有**同 id 节点（不是第一个），
+#: 所以一次渲染里两条同角色 clip 会让后注册的 timeline 同时驱动前面每一镜。
+_ID_TARGET_RE = re.compile(r"""(?:fromTo|from|to|set)\s*\(\s*["'`]#""")
+
+
+def t_components_scope_all_targets_to_their_own_clip():
+    """Phase 1 契约（机检）：组件的每一次节点查找、每一个补间目标都只能在自己 clip 的子树里。
+
+    Vue 版式在一次渲染里会重复出现（实测 20 镜样本 hook×7），每个实例把同一份模板渲进各自
+    的 `.vue-target` ⇒ 文档里同 id 节点成对存在。此时两种写法必然错绑：
+      ① `document.getElementById("hk-img")` —— 只命中文档第一个：后挂载实例把自己的
+         imagePath 写进**前一镜**的 `<img>`（前一镜显示别人的图，本镜反而空图）。
+         真渲染实测（2026-10-14，两条 hook 各带一张本地图）：第 1 镜出的是第 2 镜的图，
+         第 2 镜出的是 `#root` 墨底，另带 15 条 `GSAP target #hk-img not found` WARN。
+      ② `tl.fromTo("#h-band", …)` 等裸 id 字符串目标 —— 同 id 全命中，跨镜互相驱动。
+    正确写法：模板 ref，或 `clip.querySelector(...)`（clip 由 loader 逐镜传入）。
+    """
+    problems = []
+    for vue in sorted(_WEB_DIR.rglob("*.vue")):
+        for num, line in enumerate(vue.read_text(encoding="utf-8").splitlines(), 1):
+            if "document.getElementById(" in line:
+                problems.append(f"{vue.relative_to(_WEB_DIR.parent)}:{num} 全局 getElementById")
+            if _ID_TARGET_RE.search(line):
+                problems.append(f"{vue.relative_to(_WEB_DIR.parent)}:{num} 补间目标是裸 id 字符串")
+    assert not problems, \
+        "Vue 组件存在跨 clip 的全局目标（必须改用模板 ref / clip.querySelector）:\n  " + \
+        "\n  ".join(problems)
+
+
+def t_emitted_vue_clip_dom_has_no_duplicate_ids_in_subtree():
+    """风险 9 的物理层：一个 clip 的子树内 id 必须唯一，且永不出现 id="vue-target-…"。
+
+    两条都数得出来：
+      静态层 —— 发射器写出的 clip 标记（`emit_mount` 的返回串）内 id 不重复；
+      运行时层 —— 组件模板渲进 `.vue-target` 后就是这个 clip 的子树，所以模板里的
+                  `id="…"` 在一个实例内也不能重复（`v-for` 里写死同一个 id 是最会长出
+                  重复 id 的形态，这里一并拦住）。
+    `id="vue-target-{composition_id}"` 是旧写法：同版式重复时两镜生成同一个 id，
+    `getElementById` 只命中第一个 ⇒ 后续镜挂错节点（t_two_same_role_vue_mounts_have_unique_targets
+    管发射层，这里管「一个子树内」这个口径本身，模板层是它管不到的那一半）。
+    """
+    pack = pb.load_style_pack("news-coral")
+    hook = pack["layouts"]["hook"]
+    for index in (1, 7):
+        clip = pb.emit_mount(index, hook, {"kicker": "A"}, 0.0, 4.0, 1080, 1920)
+        ids = re.findall(r'\bid="([^"]+)"', clip)
+        dup = sorted({i for i in ids if ids.count(i) > 1})
+        assert not dup, f"shot-{index} clip 子树内出现重复 id: {dup} ← {clip}"
+        assert 'id="vue-target-' not in clip, "挂载点又退回按 composition_id 当 id 了"
+    for vue in sorted(_WEB_DIR.rglob("*.vue")):
+        text = vue.read_text(encoding="utf-8")
+        body = re.search(r"<template>(.*)</template>", text, re.S)
+        if not body:
+            continue
+        static = re.findall(r'(?<![:\w])id="([^"]+)"', body.group(1))
+        dup = sorted({i for i in static if static.count(i) > 1})
+        assert not dup, f"{vue.name} 单个实例的子树内 id 重复: {dup}"
+
+
 def t_non_vue_layouts_keep_composition_src_html():
     """非 VUE_COMPOSITIONS 里的 layout 仍走 MOUNT_TPL（HTML 版，不动现有协议）。"""
     layout = PACK["layouts"]["stat"]
