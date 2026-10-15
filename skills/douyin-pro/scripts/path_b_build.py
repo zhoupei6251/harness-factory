@@ -973,11 +973,54 @@ def ffprobe_format_tag(path: str, key: str) -> str | None:
 
 
 def estimate_duration(text: str) -> float:
-    """没有 ffprobe 时的兜底估算: 中文约 4.5 字/秒, 英文约 2.5 词/秒。"""
+    """没有 ffprobe 时的兜底估算: 中文约 4.5 字/秒, 英文约 2.5 词/秒。
+
+    ⚠️ 这个常数**实测偏 15–35%**，只许当"没有音频时把链路跑通"的兜底，不许当判据
+    —— 判时长用 `check_duration_budget` 吃真实秒数。实测口径见那条函数的 docstring。
+    """
     cn = len(re.findall(r"[一-鿿]", text))
     en = len(re.findall(r"[A-Za-z]+", text))
     secs = cn / 4.5 + en / 2.5
     return max(MIN_SLOT_SECONDS, secs + 0.6)
+
+
+def check_duration_budget(durations, target_seconds, band: float = 0.10,
+                          measured: bool = True) -> float:
+    """时长预算闸：Σ逐镜**真实音频**秒数必须落在 target±band 内，出带即停机。
+
+    判据口径（实测三方一致，不是推断）：逐镜 mp3 求和 == narration.mp3 == silent.mp4
+    （43.03 / 43.03 / 43.03，样本 `.harness-news-runtime/work/pathb_48156`），且
+    `shots.json` 里每镜 `dur` 就等于该镜 mp3 原值 ⇒ 渲前拿 Σ 判带就**是**成片时长，
+    不必花 15 分钟渲染再发现出带；配音本身只要 ~40 秒，且有持久 tts-cache，
+    改一镜只重配那一镜。
+
+    为什么这里不吃 `estimate_duration`：4.5 字/秒 与实测差 15–35%（t002 逐镜
+    34/29/38/23/49 字 → 11.40/8.95/11.02/5.93/12.34 秒 = 2.98/3.24/3.45/3.88/3.97
+    字/秒），字数越多的镜字/秒反而越高；而镜内数字和单位会被读成更多音节
+    （"100km/h" → 「一百公里每小时」），CJK 计数根本抓不住。⇒ "字数→秒"造不出
+    ±10% 的判别力，拿它判带等于用假常数停机。`measured=False`（`--skip-render`
+    的估算支）直接拒绝判带。
+    """
+    if not measured:
+        raise EmitterError(
+            f"时长闸拒绝对估算秒数判带（目标 {target_seconds}s） —— "
+            "这条支路上没有真实音频，`estimate_duration` 的偏差实测达 15–35%， "
+            "拿它停机是假判据。去掉 --skip-render 真配一次音（~40 秒），"
+            "或按稿件字数自行核对后再渲。")
+    total = float(sum(durations))
+    lo, hi = target_seconds * (1.0 - band), target_seconds * (1.0 + band)
+    if lo <= total <= hi:
+        return total
+    per_shot = " / ".join(f"镜{i}: {d:.2f}s" for i, d in enumerate(durations, 1))
+    side = "偏长" if total > hi else "偏短"
+    delta = total - hi if total > hi else total - lo
+    # 不报"该删几字"：那需要一个字/秒常数，而这条函数正是因为它不可信才拒绝估算判带。
+    # 报偏差秒数和逐镜真实秒数，改哪一镜由人定。
+    raise EmitterError(
+        f"成片时长 {total:.2f}s 出带[{side}] —— 目标 {target_seconds:g}s ±{band:.0%} "
+        f"= {lo:.2f}–{hi:.2f}s，偏差 {delta:+.2f}s。\n"
+        f"  逐镜真实配音秒数: {per_shot}\n"
+        "  这一步只花了配音，没花渲染。改稿后重跑，未改动的镜会命中 tts-cache 不再联网。")
 
 
 def ffmpeg_sub_path(p: str) -> str:
@@ -3615,6 +3658,12 @@ def main():
     ap.add_argument("--skip-gate", action="store_true",
                     help="跳过 check 门禁(仅限排查门禁本身, 成片不认)")
     ap.add_argument("--skip-render", action="store_true", help="只生成音频+HTML, 不渲染(调试用)")
+    ap.add_argument("--target-seconds", type=float, default=None,
+                    help="时长预算闸(opt-in): 成片总时长必须落在此值 ± --duration-band 内, "
+                         "出带就在配音后停机(不花渲染)。不给这个参数则完全不校验 —— "
+                         "31 包普查与像素对拍基线都建立在'不校时长'上。")
+    ap.add_argument("--duration-band", type=float, default=0.10,
+                    help="时长预算闸的相对带宽(默认 0.10 = ±10%%)")
     ap.add_argument("--keep", action="store_true", help="保留中间文件")
     ap.add_argument("--timing-out", help="分段计时 JSON 落点(默认 <成片目录>/timing.json)")
     args = ap.parse_args()
@@ -3703,6 +3752,15 @@ def main():
                     log(f"配音: 持久缓存 {tts_cache}（同正文+音色复用同一份 mp3）")
                 audio_files, scene_cues, durations = synthesize_audio(
                     scenes, args.voice, work, tts_cache_dir=tts_cache)
+
+        if args.target_seconds:
+            # 判在渲染前: Σ真实配音秒数 == 成片时长(见 check_duration_budget 的实测口径),
+            # 所以这里停机只花配音, 不花那 15 分钟。估算支一律拒绝判带。
+            budget_total = check_duration_budget(
+                durations, args.target_seconds, args.duration_band,
+                measured=not args.skip_render)
+            log(f"⏱ 时长预算达标: {budget_total:.2f}s"
+                f"（目标 {args.target_seconds:g}s ±{args.duration_band:.0%}）")
 
         ctx_base = {
             "kicker": args.kicker,

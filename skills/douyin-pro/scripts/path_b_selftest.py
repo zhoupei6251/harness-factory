@@ -4929,6 +4929,50 @@ def t_reconstruct_rejects_shuffled_hex_order():
     assert checked >= 5, f"负对照只覆盖到 {checked} 个包，不足以约束生产路径"
 
 
+# ---------------- 时长预算闸（--target-seconds，opt-in） ----------------
+# 判据口径：`durations` 必须是逐镜**真实音频**秒数。实测三方一致 —— 逐镜 mp3 求和
+# = narration.mp3 = silent.mp4（43.03/43.03/43.03，路径 .harness-news-runtime/work/
+# pathb_48156），且 shots.json 的每镜 dur 就等于该镜 mp3 原值，所以渲前拿 Σ 判带
+# 就是成片时长，不需要等 15 分钟渲染。估算值 `estimate_duration` 不算真实秒数。
+
+def t_duration_budget_passes_when_measured_in_band():
+    """带内必须放行，并把实测总秒返回给调用方打进日志/台账。"""
+    assert pb.check_duration_budget([10.0, 10.0, 10.0], 30.0, 0.10) == 30.0
+
+
+def t_duration_budget_rejects_both_ends():
+    """超带和下带是两个分支，都得证 —— 只测上带的闸会在短稿上假绿。"""
+    for durs, want in (([12.0, 12.0, 12.0], "偏长"), ([8.0, 8.0, 8.0], "偏短")):
+        try:
+            pb.check_duration_budget(durs, 30.0, 0.10)
+        except pb.EmitterError as exc:
+            assert want in str(exc), f"{durs} 的拒收理由没写「{want}」: {exc}"
+        else:
+            raise AssertionError(f"{durs} 出带却放行了")
+
+
+def t_duration_budget_names_every_shot_seconds():
+    """拒收消息必须逐镜报真实秒数，否则改稿的人不知道删哪一镜。"""
+    try:
+        pb.check_duration_budget([14.2, 11.3, 10.5], 30.0, 0.10)
+    except pb.EmitterError as exc:
+        for sec in ("14.20", "11.30", "10.50"):
+            assert sec in str(exc), f"逐镜秒数没进消息（缺 {sec}）: {exc}"
+    else:
+        raise AssertionError("36.0s 对着 30s±10% 应该拒收")
+
+
+def t_duration_budget_refuses_estimated_seconds():
+    """闸门不许吃估算值：4.5 字/秒 的实测偏差已到 15–35%（t002 逐镜 2.98–3.97 字/秒），
+    拿它判 ±10% 的带等于用假常数停机。measured=False 必须当场拒绝判带。"""
+    try:
+        pb.check_duration_budget([10.0, 10.0, 10.0], 30.0, 0.10, measured=False)
+    except pb.EmitterError as exc:
+        assert "估算" in str(exc), f"没点名是估算值的锅: {exc}"
+    else:
+        raise AssertionError("估算秒数被判据当真了")
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]
