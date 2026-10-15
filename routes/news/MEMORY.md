@@ -28,6 +28,12 @@ topics:
     status: rendering                   # researching → drafting → fact_check → rendering → published
     source: 微博热搜榜 #5（tophub 采集于 2026-09-28）
     official_response: 常德市社会救助事务中心（澎湃/工人日报·三工晨报 报道内引用）
+  - id: t003
+    title: 千万新房空置 被陌生人拆成毛坯（宁波，业主给女儿的嫁妆房）
+    status: rendered                    # researching → drafting → fact_check → rendering → published
+    source: 百度实时榜 #2（tophub/baidu 采集于 2026-10-15，台账 n0046）
+    official_response: 警方「已刑事立案并采取刑事强制措施」+ 物业孟经理回应（均经 1818黄金眼/都市现场 转述）
+    note: 首条走通「时长闸 + 端到端有声片」的片子；嫌疑人姓氏两说 ⇒ 稿件不点姓，见核查单 §3
   # - id: t001
   #   title: (topic)
   #   status: (researching | drafting | fact_check | rendering | published)
@@ -41,6 +47,13 @@ drafts:
     path: .harness-news-runtime/articles/t001-script.md
     word_count: 230
     fact_check: passed         # 多源交叉：澎湃/工人日报·三工晨报 + 新浪财经 + 中华网 + 搜狐 + 官方回应
+  - id: d003
+    topic_id: t003
+    kind: 口播稿（3 镜 · 30s 窄带）
+    path: .harness-news-runtime/articles/t003-scenes.json
+    word_count: 107                      # body CJK 计数；真实时长由配音实测 27.60s 判定
+    fact_check: passed         # 5 源一致（全回溯 1818黄金眼 首报，边界见核查单 §5）
+    evidence: routes/news/evidence/2026-10-15-t003-fact-check.md
   # - id: d001
   #   topic_id: t001
   #   word_count: (count)
@@ -128,8 +141,12 @@ python skills/douyin-pro/scripts/path_b_build.py \
   --template news-coral \
   --source <署名/频道> \
   --aigc-producer <你的频道/主体名> \
+  --target-seconds 30 \
   --output .harness-news-runtime/videos/<id>/final.mp4
 ```
+
+- **`--target-seconds` 是时长预算闸，opt-in**：配音完成后用 Σ真实秒数判带（默认 ±10%），
+  出带当场停机并逐镜报秒 —— 只花配音那 ~40 秒，不花 15 分钟渲染。产线出片默认带上它。
 
 - `--input` 两种写法：**场景 JSON**（数组，每镜 `layout/kicker/title/body/onscreen`）最稳；
   走 `.md` 脚本则**每镜必须自带 `屏:` 行**，否则 `check_onscreen` 闸门挡住（不是渲染失败，是拒收）。
@@ -294,6 +311,23 @@ videos:
           **文字 inline opacity 入场 + 自带 background 会触发 SURFACE_OPACITY_TWEEN** —— 改 scaleX。
           同样教训见 v005 note 的「code-side vs data-side」, cinematic 化是「设计层数据」(版式细节),不是「内容层数据」——
           12 模版独立 7 composition × 12 = 84 静态文件 + 30 模版计划意味着 ~210 文件手工设计,后续单独 brainstorm 模版扩展策略。
+  - id: v009
+    topic_id: t003
+    template: news-coral
+    render_status: done
+    output: .harness-news-runtime/videos/t003/final.mp4
+    spec: 1080×1920 / **27.578s** / 1.19MB / h264+aac / 字幕 6 条 + aigc.json + contact-sheet.jpg + timing.json
+    voice: zh-CN-XiaoxiaoNeural
+    aigc_label: verified         # ② 元数据读回一致; ① 按姿态 no-badge 不烧, 发布须带 ③
+    note: 首条**过时长闸**的片子（`--target-seconds 30` → 配音实测 27.60s 落 27–33 带内）。
+          全程 66s（render 44.3s、dub 0.0s＝tts-cache 命中）；镜1 hook 走 Vue 支、镜2/3 走静态支
+          ⇒ 第一支**两支混排**的真片，`check --strict` 通过、三镜尾段动量 0.0875/0.0157/0.0263 达标。
+          ⚠️ 观感未达成：三镜全部降级无图，却**三镜右上角都挂「图源：Wikimedia Commons」**——
+          结构性缺陷（227 份版式里 212 份中招），见 `evidence/2026-10-15-30s-budget-gate-and-t003.md` §4。
+          另两处 3 镜片才暴露的版式问题：story 的 title 与 support 被填成**同一句话**
+          （「两次提示，一句没事」/「两次提示一句没事」），以及 ordinal「02」独占上半屏、
+          与正文之间大片留白 —— 30s/3 镜时这个镜号没有任何上下文。
+          caveat: `--aigc-producer` 仍是默认值 harness-news-pathb，发布前须定主体名重渲（同 v004.caveat）
   # - id: v001
   #   topic_id: t001
   #   template: <12 选 1, 见上方决策树>
@@ -312,7 +346,26 @@ in_progress:
     `.harness-news-runtime/tmp/render-census/<pack>/`，汇总 `_summary.md`。五条判据全绿才算通过。
     2026-10-14 首跑 **31/31 通过**（1309 帧 / 零 WARN / 零配音），证据与「静态版式可无损槽位化」的证明见
     `routes/news/evidence/2026-10-14-render-census-and-lossless-theme-slots.md`。不走 `batch_render.py`：
-    它的 `build_command` 不支持 `--skip-render`，每条任务必走配音，而配音正卡在 edge-tts 403 上（这是它的一个真空隙）。
+    它的 `build_command` 不支持 `--skip-render`，每条任务必走配音。（**2026-10-15 更新**：edge-tts
+    403 当天实测已恢复 —— 探针 `zh-CN-XiaoxiaoNeural` 出 15840 字节，落
+    `.harness-news-runtime/tmp/tts-live-2026-10-15.mp3` ⇒ 这条空隙不再阻塞端到端，但仍是空隙。）
+  - duration_budget: **已落地（2026-10-15）** —— `path_b_build.py --target-seconds 30 --duration-band 0.10`
+    在**配音后、发射前**判带（Σ真实配音秒数 == 成片时长，实测 43.03/43.03/43.03 三方一致），
+    出带即停机、逐镜报秒；opt-in，不给参数不校验（普查与像素对拍基线建立在「不校时长」上）。
+    **原计划的「发射前字数预算闸」已删**：`estimate_duration` 的 4.5 字/秒 实测偏 15–35%，
+    且「字数→秒」模型本身不成立（数字/单位被读成更多音节）⇒ 没有能撑 ±10% 带宽的字数常数。
+    标定与判据全文见 `routes/news/evidence/2026-10-15-30s-budget-gate-and-t003.md` §1–§2。
+  - photo_credit_false_label: **未修，需拍** —— 无图镜仍显示「图源：Wikimedia Commons」。
+    根因：`figcaption.xx-photo-credit` 在 v006 cinematic 化时被移出 `<figure>`，而隐藏规则挂在
+    `.xx-photo{display:none}` 上管不到它，HTML 里又写了默认文案 ⇒ `hasPhoto=false` 时常驻。
+    影响面实测 **227 份 composition 里 212 份中招，覆盖 31/31 个 pack、每包最多 7 个版式**。
+    不只是难看 —— 画面声称图来自第三方许可库而实际无图，是一份假的许可指向。
+    修法机械（补 `display:none` + 在 `hasPhoto` 分支点亮）但要扫 212 文件并重过四道闸，
+    属独立变更单元，未塞进本轮。详见同一证据文件 §4。
+  - collect_no_source: **未修** —— 今日 top 12 候选**全部**来自百度实时榜且只带一个百度搜索页 URL，
+    无任何媒体出处；`thepaper` RSS 最旧条目 304.1 天、`zaobao` 55.2 天，两个源当日零供货。
+    ⇒ 「热门」与「可核实」目前是两件事：fact-check 的 5 个源全是手工搜出来的，采集没给。
+    方向（未拍）：候选加「有无可核出处」这一维排序 / 摘掉或换掉滞后源 / curate 阶段就挂候选媒体链接。
   - current_phase: publishing
     topic_id: t001
     blocker: 一把锁 —— 抖音账号未登录（`sau douyin check` 返回 valid 前不发）。原第二把锁
@@ -330,4 +383,4 @@ in_progress:
           （skills/douyin-upload + 本机 .venv/Scripts/sau.exe，见其 references/local-env.md）
 
 ## Last updated
-last_updated: 2026-10-09
+last_updated: 2026-10-15
