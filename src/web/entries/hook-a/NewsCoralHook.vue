@@ -145,7 +145,7 @@ onMounted(() => {
         alt=""
       />
     </figure>
-    <figcaption class="hk-photo-credit" id="hk-credit" ref="creditEl">图源：Wikimedia Commons</figcaption>
+    <figcaption v-if="hasPhoto" class="hk-photo-credit" id="hk-credit" ref="creditEl">图源：Wikimedia Commons</figcaption>
   </div>
 </template>
 

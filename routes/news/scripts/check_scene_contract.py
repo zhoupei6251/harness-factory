@@ -20,6 +20,7 @@
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -124,7 +125,20 @@ def check_scene(scene: dict, layout: dict, index: int, ctx: dict | None = None,
                     f"镜{index}: {flag}={v!r} 不是 bool —— 落位禁令(§7)按 `is True` 判，"
                     "非 bool 会被 Python 视为真值或忽略，语义就漂了")
 
-    # 7) 点名版式的每个变量都得填得出 —— 判据就是发射器那条 resolve_variable，
+    # 7) 标题与屏句是同一句话 ⇒ 屏幕上并排出现两遍（2026-10-15 t003 镜2 实跑踩到：
+    #    title「两次提示，一句没事」+ onscreen「两次提示｜一句没事」，去掉 ｜ 后同串）。
+    #    story 的 title 与 onscreen 是两个独立变量位，发射器不会替作者去重。
+    onscreen_raw = (raw if raw is not None else scene).get("onscreen")
+    if isinstance(title, str) and isinstance(onscreen_raw, str):
+        def squash(s: str) -> str:
+            return re.sub(r"[，,、。：:；;｜|\s]", "", s)
+        if squash(title) and squash(title) == squash(onscreen_raw):
+            problems.append(
+                f"镜{index}: title 与 onscreen 去掉标点后是同一句话「{title.strip()[:18]}」⇒ "
+                f"版式会把同一句在领句位和屏句位各打一遍。修法: 屏句换一个角度说"
+                f"（时间/数字/落点），或删掉 onscreen")
+
+    # 8) 点名版式的每个变量都得填得出 —— 判据就是发射器那条 resolve_variable，
     #    不在预检里另立一套口径（另立 = 两边各说各话 = 假绿）。
     if ctx is not None:
         for vid, reason in unfillable_variables(scene, layout, ctx):
@@ -237,13 +251,17 @@ def _demo() -> int:
                         "onscreen": "上千万的嫁妆｜没人住"}, layouts["hook"], 1, ctx)
     assert any("填不出变量 headAccent" in p for p in got4), \
         f"hook 切不出强调段没被预检拦住(这条就是当天的假绿): {got4}"
+    # t003 镜2 实跑：title 与 onscreen 只差一个标点 ⇒ 同一句在屏上打两遍
+    got5 = check_scene({"title": "两次提示，一句没事", "body": "六月申请当租客，九月才发现被拆。",
+                        "onscreen": "两次提示｜一句没事"}, layouts["story"], 2, ctx)
+    assert any("同一句话" in p for p in got5), f"标题=屏句的重复没报出来: {got5}"
     # 干净稿不该误报
     clean = check_scene({"title": "拾荒21年，账户里42万",
                          "body": "湖南常德，71岁老人捡了21年废品。",
                          "onscreen": "他自己完全不知道",
                          "onscreenAccent": None}, layouts["hook"], 1, ctx)
     assert not clean, f"干净稿被误报: {clean}"
-    print("✅ demo 自检通过（4 个反例都报出, 1 个干净稿不误报）")
+    print("✅ demo 自检通过（5 个反例都报出, 1 个干净稿不误报）")
     return 0
 
 

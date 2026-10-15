@@ -4973,6 +4973,46 @@ def t_duration_budget_refuses_estimated_seconds():
         raise AssertionError("估算秒数被判据当真了")
 
 
+def t_imageless_shots_never_show_photo_credit():
+    """无图镜不许显示「图源：Wikimedia Commons」—— 这是一份假的许可指向。
+
+    2026-10-15 t003 实跑暴露：三镜全部降级无图，画面右上角却三镜都挂着图源署名。
+    根因是 v006 cinematic 化时把 `<figcaption>` 移出 `<figure>`（为了破除 stacking
+    context），而隐藏规则 `.xx-photo{display:none}` 只管得到 figure 内部的节点。
+    影响面 227 份 composition 里的 212 份 —— 所以判据必须是全量扫，不是抽查。
+
+    两半都要成立：CSS 默认藏起来 + `hasPhoto` 分支显式点亮。只查一半会漏掉
+    "默认显示但 JS 里藏" 这种反向写法（普查基线是零 WARN，反向写法一样能在有图时
+    显示，但它把"默认状态"变成了"需要运行时纠正"，无图时一旦 JS 出错就又回来了）。
+    """
+    root = Path(__file__).resolve().parents[3] / "skills/douyin-pro/templates/hyperframes_path_b"
+    offenders, total = [], 0
+    for path in sorted(root.glob("*/compositions/*.html")):
+        body = path.read_text(encoding="utf-8")
+        credit = re.search(r'<figcaption[^>]*class="([a-z]+-photo-credit)"', body)
+        if not credit:
+            continue
+        total += 1
+        cls = credit.group(1)
+        hidden = re.search(r"\." + re.escape(cls) + r"\s*\{[^}]*?display\s*:\s*none", body)
+        lit = re.search(r'getElementById\("([a-z]+-credit)"\)\.style\.display\s*=\s*"block"',
+                        body)
+        if not hidden or not lit:
+            offenders.append(f"{path.parent.parent.name}/{path.stem}: "
+                             f"CSS默认藏={'有' if hidden else '无'} hasPhoto点亮={'有' if lit else '无'}")
+    # 同一判据必须覆盖 Vue 支 —— 2026-10-15 差点只扫了静态支就报"修好了"，
+    # 而 hook-a 的 figcaption 当时正是常驻的。组件里的正确写法是 v-if：节点不渲染。
+    for path in sorted((Path(__file__).resolve().parents[3] / "src/web").rglob("*.vue")):
+        body = path.read_text(encoding="utf-8")
+        for tag in re.finditer(r'<figcaption([^>]*)class="[a-z]+-photo-credit"', body):
+            total += 1
+            if 'v-if="hasPhoto"' not in tag.group(1):
+                offenders.append(f"vue/{path.parent.name}: figcaption 缺 v-if=\"hasPhoto\" "
+                                 "⇒ 无图时默认文案「图源：Wikimedia Commons」会上屏")
+    assert total >= 200, f"扫描面异常（只覆盖 {total} 份带图注的版式，预期 ≥200）"
+    assert not offenders, "无图时会露出假图源署名:\n  " + "\n  ".join(offenders)
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

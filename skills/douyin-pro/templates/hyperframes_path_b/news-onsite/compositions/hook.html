@@ -173,6 +173,7 @@
            同层比较; 位置仍在火带内 (top:17cqh), 不挡火带也不挡 h-field。
            半透黑底 rgba(0,0,0,0.7) 压在珊瑚红上 => 实测对比度 ≥ 7:1 (vs 白字) */
         .hk-photo-credit {
+          display: none;
           position: absolute;
           top: 17cqh;
           right: 6cqw;
@@ -240,6 +241,7 @@
         // 真实图板: 有图才亮出(白面 → scaleX 擦入), 无图保持旧版面不变
         if (hasPhoto) {
           document.getElementById("hk-photo").style.display = "block";
+          document.getElementById("hk-credit").style.display = "block";
           document.getElementById("hk-img").src = vars.imagePath;
           document.getElementById("hk-credit").textContent =
               vars.imageCredit || "图源：Wikimedia Commons";

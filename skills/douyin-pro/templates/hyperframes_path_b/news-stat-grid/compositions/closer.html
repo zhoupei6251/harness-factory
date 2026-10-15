@@ -182,6 +182,7 @@
           transform-origin: 50% 50%;
         }
         .cl-photo-credit {
+          display: none;
           position: absolute;
           top: 5cqh;
           right: 3cqw;
@@ -239,6 +240,7 @@
         // 真实图板: 有图才亮出(白面 → scaleX 擦入), 无图保持旧版面不变
                 if (hasPhoto) {
           document.getElementById("cl-photo").style.display = "block";
+          document.getElementById("cl-credit").style.display = "block";
           document.getElementById("cl-img").src = vars.imagePath;
           document.getElementById("cl-credit").textContent =
               vars.imageCredit || "图源：Wikimedia Commons";
