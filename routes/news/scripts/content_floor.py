@@ -100,7 +100,14 @@ def intrude_only(content_floor_cqh) -> list[str]:
 
 
 def fill_only(content_floor_cqh) -> list[str]:
-    """法则 17 填幅那一半 —— 实测 31 包无图镜全不过，普查里先**只报不判**。"""
+    """法则 17 的 8cqh 线，套在**成片实文**上 —— 注意这是"报"，不是那条规则的判定点。
+
+    `hf_compile.MAX_BOTTOM_DEAD_CQH` 自己的注释写着：口径是**配方的最坏占位**
+    （`Step.height_cqh` 按最大行数算），「这条闸只管"设计意图上就不打算填幅"的那一类，
+    短文本要填幅得改配方」。本函数量的却是真实文本渲染后的帧 ⇒ 同一数字换了对称对象，
+    所以它只能当**分布指标**看。closer 探针实测：字号 +29% 只买到 +8.75cqh，
+    再放大就撞 8 字 CTA 换行 —— 短内容版式在这个数上不可能过，也不该过。
+    """
     if content_floor_cqh is None or content_floor_cqh >= FILL_FLOOR_CQH:
         return []
     return [f"最底墨线只到 {content_floor_cqh:.1f}cqh，离内容区下沿 {LIMIT_CQH:.1f}cqh 还空 "

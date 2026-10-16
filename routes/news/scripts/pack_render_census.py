@@ -15,8 +15,10 @@
   render.log 里 WARN/ERROR 计数 == 0
   终值 framesCompleted == totalFrames 且 > 0
   判据 6（2026-10-16 加）：无图镜最底墨线不许越过字幕区上沿 80cqh。
-    填幅半边（法则 17 的 8cqh 线）**只报不判** —— 实测 31 包全在 54.7–58.0cqh，
-    今天开成硬闸等于普查永久全红且没人修；它落在 _summary 的「填幅不足镜数」列上当账。
+    填幅半边**只报不判**，而且它本来就不是那条规则的判定点：`MAX_BOTTOM_DEAD_CQH` 的口径是
+    **配方的最坏占位**，其注释明写"短文本要填幅得改配方"，本列量的却是真实文本渲染帧。
+    列名叫「下沿余量>8cqh 镜数」，只当分布指标看，不当缺陷计数（closer 探针：字号 +29%
+    只买到 +8.75cqh，短内容版式在这个数上不可能过，也不该过）。
 """
 import concurrent.futures as cf
 import json
@@ -161,7 +163,7 @@ lines = [f"# {len(PACKS)} pack 画面轨真渲染普查（{len(passed)}/{len(PAC
          f"{N_VUE_ONLY} 镜走 Vue-only 契约）· 零配音（`--skip-render`）· "
          "25fps · draft · `--no-browser-gpu`", "",
          "| pack | clip | vue挂载 | render exit | 帧(完成/总) | mp4 KB | WARN/ERROR | "
-         f"最底墨线(cqh) | 填幅不足镜数 | 判定 |",
+         f"最底墨线(cqh) | 下沿余量>8cqh 镜数（报，不判） | 判定 |",
          "|---|---|---|---|---|---|---|---|---|---|"]
 for r in rows:
     lines.append(f"| {r['pack']} | {r.get('clips')} | {r.get('vue')} | {r.get('render_exit')} "
