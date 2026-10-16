@@ -392,6 +392,18 @@ in_progress:
     `check --strict` 五段全 0 finding）。⇒ 字幕区这条对 Vue 支今天没人守，且必须按
     **像素/几何口径**挂到渲染普查那一层，不是塞进 `path_b_selftest.py`。
     `field` 自身不违规：实测内容下沿 77.3cqh，距 80cqh 只空 2.7cqh（< 8.0）。
+  - vue_guard_registry: **已落地（2026-10-16，Task 5 前半）** —— 17 条不变量在 Vue 支**每条都要有归属**。
+    真源 `layout_selfcheck.VUE_GUARDS`；表由 `python skills/douyin-pro/scripts/layout_selfcheck.py
+    --vue-guards` 现生成（抄一份就会分家）；机检 `t_vue_branch_guard_registry_is_complete`
+    —— 站点必须解析得到、洞必须点名收口 Task、**洞数钉死 = 2**（多一条少一条都红）。
+    今天 `reused 11 · moved 4 · 洞 2`。接线方式：把规则 6/8/9 抽成 `check_momentum_budget` /
+    `check_font_rules` / `check_px_typography`，新增 `check_component(SFC)` 调**同一批谓词**，
+    只换两处口子（取 SFC 的 `<style>`/`<script>`；补间目标 `xEl.value!` → 同标签 class）。
+    静态支回归 227 + 7 文件 0 违规。**接线当场抓到 `field-a` 缺中文 @font-face**
+    （混挂时被 hook-a 的全局面遮住，纯 field 片子会静默降档成系统默认字）。
+  - vue_only_holes_left: **两个** —— ① `CAPTION_RESERVE_INTRUDED`（none）只能按像素几何口径做，
+    挂普查层，顺带补静态支一直缺的法则 17；② `NO_TIMELINE_REGISTER`（unwired）TS 那条只查
+    "键不写死"，组件**一条都不注册**时是绿的 ⇒ vue-build 补正向断言。
   - vue_stale_css: **已修（2026-10-16）** —— `stage_vue_assets` 只拷不清，Vite CSS 名带内容 hash，
     `emit_host` 又按 `<bundle>*.css` 全发 ⇒ 复用 work_dir 时**两代样式同挂，谁赢取决于 hash 字母序**
     （普查目录跨轮复用，不是理论风险）。闸 `t_stage_vue_assets_leaves_no_stale_generation`。

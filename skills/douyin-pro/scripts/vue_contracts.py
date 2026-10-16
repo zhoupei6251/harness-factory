@@ -18,6 +18,9 @@ from pathlib import Path
 
 import path_b_build as pb
 
+#: 常量与静态支同源：`SLOT_VARIABLE` 由 layout_selfcheck 定义（它才是那条规则的出处）
+from layout_selfcheck import SLOT_VARIABLE  # noqa: E402  (无环：layout_selfcheck 不 import 本模块)
+
 CONTRACT_NAME = "contract.toml"
 REQUIRED_VAR_FIELDS = ("id", "type", "label")
 #: 契约允许出现的顶层键。清单外的一律抛 —— 键名写错（`override` 少个 s）会静默失效，
@@ -53,6 +56,13 @@ def validate_contract(contract: dict, where: str = "<inline>") -> dict:
         if var["id"] in seen:
             raise ContractError(f"{where}: 变量 id 重复 {var['id']!r}")
         seen.add(var["id"])
+    # slotSeconds 是动量预算的唯一输入（组件里 `driftStart/driftDur` 全由它算），
+    # 静态支由 `layout_selfcheck` 的 MISSING_SLOT_VARIABLE 逐文件守；组件没有 HTML，
+    # 同一句话只能落在契约上 —— 两分支各有一个登记处，但判据是同一条。
+    if SLOT_VARIABLE not in seen:
+        raise ContractError(
+            f"{where}: 契约没声明 {SLOT_VARIABLE} —— 组件算不出 driftDur，"
+            "这一镜尾段会冻住（静态支同名规则 MISSING_SLOT_VARIABLE）")
     # `author_slots` = 作者供料位：机器切不出来、只能由分镜 JSON 显式给的事实格
     # （field 的 `ghost`/`place` —— 画面主体与地点）。它和「三条机器来源」并列成第四种，
     # 所以发射路径的判定必须是**可证的**：`resolve_variable` 的 scene 同名键分支命中它，

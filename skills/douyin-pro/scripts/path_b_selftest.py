@@ -4623,6 +4623,85 @@ def t_stage_vue_assets_leaves_no_stale_generation():
         pb.vue_bundle_built = saved
 
 
+def t_vue_only_layouts_pass_the_reusable_invariants():
+    """Vue-only 组件跑 `layout_selfcheck` 的**同一批谓词**，不是另写一套。
+
+    `check_component` 只换两处口子（取 SFC 的 `<style>`/`<script>`、把补间目标从
+    `"#id"` 换成 `xEl.value!` → 同标签 class），动量预算 / 字体四条 / px / 法则 8
+    全部调 `check_momentum_budget` / `check_font_rules` / `check_px_typography` /
+    `declarations_for_classes` —— 与静态支同一个函数。分两份实现迟早一份漂（D13）。
+
+    接线当场就抓到一条真洞：`field-a` 原来没有中文 @font-face，混挂时被 hook-a 的
+    全局 face 遮住，纯 field 的片子会静默降档成系统默认字（已补）。
+    """
+    lsc = pb.layout_selfcheck
+    vues = sorted(pb.VUE_ENTRIES_DIR.glob("*/*.vue"))
+    assert vues, f"组件目录扫不到 .vue（{pb.VUE_ENTRIES_DIR}）—— 扫描面坏了不算通过"
+    problems = [str(v) for vue in vues for v in lsc.check_component(vue)]
+    assert not problems, f"{len(vues)} 个组件违反结构不变量:\n  " + "\n  ".join(problems)
+
+
+def _guard_site_resolves(site: str, ts_checks: set[str], lsc) -> bool:
+    """登记表里的站点写法 → 真东西在不在。四种前缀，认不出的写法一律 False。"""
+    if site.startswith("component:"):
+        return callable(getattr(lsc, site.split(":", 1)[1], None))
+    if site.startswith("selftest:"):
+        return callable(globals().get(site.split(":", 1)[1]))
+    if site.startswith("contracts:"):
+        import vue_contracts as vc
+        return hasattr(vc, site.split(":", 1)[1])
+    if site.startswith("vue-build:"):
+        frag = site.split(":", 1)[1]
+        return any(frag in name for name in ts_checks)
+    return False
+
+
+def t_vue_branch_guard_registry_is_complete():
+    """17 条不变量在 Vue 支**每一条都要有归属**，缺项不许静默跳过。
+
+    登记表的值不是注释：站点必须解析得到（函数真存在 / TS 闸名真在文件里），
+    洞必须点名收口的 Task，且洞的**条数**被钉住 —— 悄悄多一条红，悄悄少一条也红
+    （改了不更新表 = 表和实现分家，那正是这张表要治的病）。
+    """
+    import inspect
+    lsc = pb.layout_selfcheck
+    src = inspect.getsource(lsc)
+    codes = set(re.findall(r'fail\(\s*"([A-Z][A-Z_]+)"', src))
+    assert len(codes) == 17, f"不变量词表应当 17 条，从源码里扫出 {len(codes)} 条: {sorted(codes)}"
+    assert set(lsc.VUE_GUARDS) == codes, (
+        f"登记表与规则表分家 —— 未登记 {sorted(codes - set(lsc.VUE_GUARDS))}，"
+        f"多余 {sorted(set(lsc.VUE_GUARDS) - codes)}")
+
+    ts_checks = set(re.findall(
+        r'check\(\s*[`"]([^`"]+)[`"]',
+        (Path(__file__).resolve().parents[3] / "tests/web/vue-build.test.ts")
+        .read_text(encoding="utf-8")))
+    holes = []
+    for code, row in sorted(lsc.VUE_GUARDS.items()):
+        state, site, note = row.get("state"), row.get("site", ""), row.get("note", "")
+        assert state in ("reused", "moved", "unwired", "none"), f"{code}: 状态不认识 {state!r}"
+        assert note.strip(), f"{code}: note 为空 —— 归属没有一句话说明等于没登记"
+        if state in ("unwired", "none"):
+            holes.append(code)
+            assert re.search(r"Task \d", note), f"{code}: 洞必须点名收口的 Task，实为 {note[:60]!r}"
+            if state == "none":
+                continue
+            # `unwired` 的 site 记的是"今天**部分**守它的那条"，不是装饰：
+            # 站点写错 = 表在撒谎（R6 变异实测过：不解析就悄悄红不了）。
+            assert _guard_site_resolves(site, ts_checks, lsc), \
+                f"{code}: 洞行点名的部分守卫 {site!r} 不存在"
+            continue
+        assert _guard_site_resolves(site, ts_checks, lsc), f"{code}: 站点不存在或写法不认识 {site!r}"
+        if site.startswith("component:"):
+            assert state == "reused", f"{code}: 跑在组件工件上的那条不该记成 {state}"
+    assert len(holes) == 2, (
+        f"Vue 支的守卫洞数变了（应为 2，实为 {len(holes)}: {holes}）—— "
+        "补了洞就把表里那行改成 reused/moved，多了洞就写清是哪一条，别把这张表改松")
+    print(f"  [vue-guards] reused {sum(1 for r in lsc.VUE_GUARDS.values() if r['state'] == 'reused')}"
+          f" · moved {sum(1 for r in lsc.VUE_GUARDS.values() if r['state'] == 'moved')}"
+          f" · 洞 {len(holes)} {holes}")
+
+
 def t_emit_host_skips_vue_loader_when_no_vue_mount():
     """无 Vue 版 mount 时，emit_host 不注入 Vue loader。
 
@@ -5206,7 +5285,8 @@ def t_contract_variables_match_schema():
     data-composition-variables 同 schema，否则 resolve_variable 会在发射阶段才炸。"""
     import vue_contracts as vc
     ok = {"role": "field", "variant": "a",
-          "variables": [{"id": "kicker", "type": "string", "label": "眉标"}]}
+          "variables": [{"id": "kicker", "type": "string", "label": "眉标"},
+                        {"id": "slotSeconds", "type": "number", "label": "秒数", "default": 4}]}
     vc.validate_contract(ok)
     for bad, why in (({"role": "field", "variant": "a", "variables": [{"id": "kicker"}]}, "缺字段"),
                      ({"role": "field", "variant": "a",
@@ -5233,7 +5313,8 @@ def t_discover_is_keyed_by_role_and_variant():
             d.mkdir()
             (d / "contract.toml").write_text(
                 f'role = "field"\nvariant = "{variant}"\n'
-                'variables = [ { id = "kicker", type = "string", label = "眉标" } ]\n'
+                'variables = [ { id = "kicker", type = "string", label = "眉标" },'
+                ' { id = "slotSeconds", type = "number", label = "秒数", default = 4 } ]\n'
                 '[slots]\nc0 = "paper"\n', encoding="utf-8")
         try:
             vc.discover(tmp)
@@ -5251,7 +5332,8 @@ def _field_contract_text(role="field", ground="#0a0a0d"):
     return (f'role = "{role}"\nvariant = "a"\n'
             f'ground = "{ground}"\n'
             'variables = [ { id = "kicker", type = "string", label = "眉标", default = "FIELD" },'
-            ' { id = "title", type = "string", label = "领句", default = "标题" } ]\n'
+            ' { id = "title", type = "string", label = "领句", default = "标题" },'
+            ' { id = "slotSeconds", type = "number", label = "秒数", default = 4, min = 1 } ]\n'
             '[slots]\nc0 = "#f5f0e8"\nc1 = "#1a1a1a"\n')
 
 
@@ -5312,7 +5394,7 @@ def t_vue_only_layout_entry_has_emitter_shape():
     assert lay["vue_only"] is True and lay["bundle"] == "field-a"
     assert lay["composition_id"] == "field-news-coral", lay["composition_id"]
     assert lay["ground_tone"] == pb.GROUND_TONE_BY_HEX["#0a0a0d"]
-    assert [v["id"] for v in lay["variables"]] == ["kicker", "title"]
+    assert [v["id"] for v in lay["variables"]] == ["kicker", "title", "slotSeconds"]
     bad = _tmp_entries(role="cause", ground="#123456")   # 不在色板里的地面
     try:
         pb.load_style_pack("news-coral", vue_only=vc.discover(bad))
@@ -5418,13 +5500,14 @@ def t_author_slots_may_not_have_defaults():
         return {"role": "field", "variant": "a", "variables": vars_,
                 "author_slots": author}
 
-    ok = [{"id": "ghost", "type": "string", "label": "巨号事实"}]
+    slot = {"id": "slotSeconds", "type": "number", "label": "秒数", "default": 4}
+    ok = [{"id": "ghost", "type": "string", "label": "巨号事实"}, slot]
     vc.validate_contract(contract(ok, ["ghost"]))         # 合法形状先要过
     for vars_, author, why in (
-            ([{"id": "ghost", "type": "string", "label": "x"}], ["ghostt"], "id 拼错"),
-            ([{"id": "ghost", "type": "string", "label": "x", "default": "现场"}],
+            ([{"id": "ghost", "type": "string", "label": "x"}, slot], ["ghostt"], "id 拼错"),
+            ([{"id": "ghost", "type": "string", "label": "x", "default": "现场"}, slot],
              ["ghost"], "事实位带默认值"),
-            ([{"id": "title", "type": "string", "label": "x"}], ["title"], "机器切得出的 id"),
+            ([{"id": "title", "type": "string", "label": "x"}, slot], ["title"], "机器切得出的 id"),
     ):
         try:
             vc.validate_contract(contract(vars_, author))

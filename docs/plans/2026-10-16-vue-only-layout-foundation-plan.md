@@ -208,6 +208,15 @@ spec §7.5 未拍），改落 `ghost`/`place` 两个作者供料位。
 文本口径可复用的那几条（法则 8 面淡入、动量预算、px 排版、@font-face）另做一份
 **SFC 版**检查，并显式登记"17 条里哪几条在 Vue 支由谁守"，缺项不许静默跳过。
 
+**落地记录（2026-10-16，前半做完）**：登记表 = `layout_selfcheck.VUE_GUARDS`
+（`--vue-guards` 现生成，`t_vue_branch_guard_registry_is_complete` 机检，洞数钉死 2）；
+SFC 版检查 = `check_component`，复用抽出来的 `check_momentum_budget` / `check_font_rules` /
+`check_px_typography` + `declarations_for_classes`。今天 `reused 11 · moved 4 · 洞 2`，
+`path_b_selftest.py` **242/242**，静态支 227 + 7 文件 0 违规。
+接线当场抓到 `field-a` 缺中文 @font-face（已补）。
+**未做**：像素几何闸（含法则 17 填幅）与 vue-build 的"注册必须存在"正向断言。
+全文 `evidence/2026-10-16-vue-guard-registry.md`。
+
 ### Task 6: 真渲染闭环
 
 `--target-seconds 30` 渲一条含 `field` 镜的片；要求 `check --strict` 0/0、零 WARN、

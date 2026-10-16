@@ -93,6 +93,20 @@ onMounted(() => {
 <style>
 /* 不写 hex、不写 var() 回退值：色位由发射器按包注入在 clip 的 style 上。
    类名一律 fd- 前缀 —— Vite 打出的 CSS 是全局的，没有 scoped 属性可依赖。 */
+/* 中文 face 必须**本文件自带**（静态支同理：`layout_selfcheck` 的 MISSING_CJK_FONT_FACE
+   按文件核）。混挂时 hook-a 的 CSS 里也有一份，字段镜会"看起来正常"—— 但一版纯 field
+   的片子（全镜无 hook）就静默回落系统默认字，字体降档没有任何现象提示。 */
+@font-face {
+  font-family: "HF CJK";
+  src:
+    local("Noto Sans SC"),
+    local("NotoSansSC-VF"),
+    local("Source Han Sans SC"),
+    local("Noto Sans CJK SC"),
+    local("Microsoft YaHei"),
+    local("PingFang SC");
+  font-weight: 100 900;
+}
 .fd-root {
   position: absolute;
   inset: 0;

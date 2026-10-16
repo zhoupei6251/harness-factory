@@ -288,6 +288,69 @@ def bottom_is_intruding(value: str) -> bool:
     return 0.0 < cqh < CAPTION_RESERVE_CQH
 
 
+# ---------------------------------------------------------------- 可共享的三条规则体
+# 抽出来的唯一理由：Vue-only 版式没有 compositions/*.html，但它有 <style> 与 <script>，
+# 这三条的判据对两种工件**是同一句话**。分两份实现 = 迟早一份漂（D13 的口径）。
+
+
+def check_momentum_budget(fail, script_blocks: str) -> None:
+    """规则 6：动量预算具名常数 + 至少一条用 driftDur 的持续位移。"""
+    for constant in BUDGET_CONSTANTS:
+        if not re.search(rf"\bconst\s+{constant}\s*=", script_blocks):
+            fail("MAGIC_BUDGET_VALUE", f"动量预算常数 {constant} 必须具名声明")
+    if "driftDur" not in script_blocks or not re.search(r"\bconst\s+driftDur\s*=", script_blocks):
+        fail("MISSING_DRIFT_DURATION", "必须按 frame.md 预算算出 driftDur")
+    drift_tweens = [t for t in enumerate_tweens(script_blocks) if "driftDur" in t[2]]
+    if not drift_tweens:
+        fail("MISSING_CONTINUOUS_MOTION", "没有任何补间使用 driftDur —— 该镜头尾段会冻住")
+
+
+def check_font_rules(fail, style_blocks: str) -> None:
+    """规则 8：中文 face 必备、用到的中文族必须本文件声明、声明的中文族必须有真落点。"""
+    clean_styles = strip_css_comments(style_blocks)
+    font_faces = FONT_FACE_BLOCK_RE.findall(clean_styles)
+    declared = declared_font_faces(clean_styles)
+    cjk_declared = [name for name in CJK_FAMILIES if name in declared]
+    if not cjk_declared:
+        fail(
+            "MISSING_CJK_FONT_FACE",
+            f'缺少中文 @font-face（允许的族名: {" / ".join(CJK_FAMILIES)}；审计按文件走）',
+        )
+    undeclared = (font_families_used(clean_styles) & set(CJK_FAMILIES)) - set(declared)
+    for name in sorted(undeclared):
+        fail(
+            "CJK_FAMILY_USED_NOT_DECLARED",
+            f'正文用了 font-family:"{name}" 但本文件没有它的 @font-face —— '
+            "浏览器静默回落到系统默认字，字体降档不会有任何人报错",
+        )
+    for name in cjk_declared:
+        candidates = LOCAL_NAME_RE.findall(declared[name])
+        if not set(candidates) & set(CJK_INSTALLED_LOCALS):
+            fail(
+                "CJK_FONT_LOCAL_NOT_INSTALLED",
+                f'{name} 的 local() 候选（{candidates}）在本机一个都没装'
+                f"（在装口径: {list(CJK_INSTALLED_LOCALS)}）—— "
+                "这条 @font-face 形同虚设，中文会回落",
+            )
+    for block in font_faces:
+        for family in CANONICAL_LATIN_FAMILIES:
+            if family in block and "local(" in block:
+                fail(
+                    "CANONICAL_FONT_LOCAL_OVERRIDE",
+                    f"{family} 被写成 local() 会让引擎自动下载失效，只留裸族名",
+                )
+
+
+def check_px_typography(fail, rules: list[tuple[str, dict[str, str]]]) -> None:
+    """规则 9：排版属性不许 px（纹理渐变例外）。"""
+    for selector, decls in rules:
+        for prop, value in decls.items():
+            if prop in PX_ALLOWED_PROPS or not any(prop.startswith(p) for p in PX_FORBIDDEN_PROPS):
+                continue
+            if re.search(r"\d+(\.\d+)?px", value):
+                fail("PX_TYPOGRAPHY", f"{selector} 的 {prop}:{value} 用了 px —— 换分辨率会崩版")
+
+
 # ---------------------------------------------------------------- 单文件检查
 
 
@@ -375,14 +438,7 @@ def check_layout(path: Path) -> list[Violation]:
     # 6) 动量预算：具名常数 + 至少一条用 driftDur 的持续位移
     #    （字幕 / 示意标注子合成豁免：静态文字层不做整段位移呼吸，见 SUBTITLE/SCHEMATIC_FILE_STEM）
     if not is_bottom_overlay:
-        for constant in BUDGET_CONSTANTS:
-            if not re.search(rf"\bconst\s+{constant}\s*=", script_blocks):
-                fail("MAGIC_BUDGET_VALUE", f"动量预算常数 {constant} 必须具名声明")
-        if "driftDur" not in script_blocks or not re.search(r"\bconst\s+driftDur\s*=", script_blocks):
-            fail("MISSING_DRIFT_DURATION", "必须按 frame.md 预算算出 driftDur")
-        drift_tweens = [t for t in enumerate_tweens(script_blocks) if "driftDur" in t[2]]
-        if not drift_tweens:
-            fail("MISSING_CONTINUOUS_MOTION", "没有任何补间使用 driftDur —— 该镜头尾段会冻住")
+        check_momentum_budget(fail, script_blocks)
 
     # 7) 底部字幕禁入区（字幕/示意标注子合成豁免：那 20cqh 本就是底部叠加层的家，见两 STEM 常量）
     if not is_bottom_overlay:
@@ -395,48 +451,159 @@ def check_layout(path: Path) -> list[Violation]:
                     fail("CAPTION_RESERVE_INTRUDED", f"{selector} 的 inset 下边界 {bottom_value} 侵入字幕区")
 
     # 8) 字体：中文 face 必备、用到的中文族必须本文件声明、声明的中文族必须有真落点
-    clean_styles = strip_css_comments(style_blocks)
-    font_faces = FONT_FACE_BLOCK_RE.findall(clean_styles)
-    declared = declared_font_faces(clean_styles)
-    cjk_declared = [name for name in CJK_FAMILIES if name in declared]
-    if not cjk_declared:
-        fail(
-            "MISSING_CJK_FONT_FACE",
-            f'缺少中文 @font-face（允许的族名: {" / ".join(CJK_FAMILIES)}；审计按文件走）',
-        )
-    undeclared = (font_families_used(clean_styles) & set(CJK_FAMILIES)) - set(declared)
-    for name in sorted(undeclared):
-        fail(
-            "CJK_FAMILY_USED_NOT_DECLARED",
-            f'正文用了 font-family:"{name}" 但本文件没有它的 @font-face —— '
-            "浏览器静默回落到系统默认字，字体降档不会有任何人报错",
-        )
-    for name in cjk_declared:
-        candidates = LOCAL_NAME_RE.findall(declared[name])
-        if not set(candidates) & set(CJK_INSTALLED_LOCALS):
-            fail(
-                "CJK_FONT_LOCAL_NOT_INSTALLED",
-                f'{name} 的 local() 候选（{candidates}）在本机一个都没装'
-                f"（在装口径: {list(CJK_INSTALLED_LOCALS)}）—— "
-                "这条 @font-face 形同虚设，中文会回落",
-            )
-    for block in font_faces:
-        for family in CANONICAL_LATIN_FAMILIES:
-            if family in block and "local(" in block:
-                fail(
-                    "CANONICAL_FONT_LOCAL_OVERRIDE",
-                    f"{family} 被写成 local() 会让引擎自动下载失效，只留裸族名",
-                )
+    check_font_rules(fail, style_blocks)
 
     # 9) 排版禁止 px（纹理渐变例外）
-    for selector, decls in rules:
-        for prop, value in decls.items():
-            if prop in PX_ALLOWED_PROPS or not any(prop.startswith(p) for p in PX_FORBIDDEN_PROPS):
-                continue
-            if re.search(r"\d+(\.\d+)?px", value):
-                fail("PX_TYPOGRAPHY", f"{selector} 的 {prop}:{value} 用了 px —— 换分辨率会崩版")
+    check_px_typography(fail, rules)
 
     return violations
+
+
+SFC_STYLE_RE = re.compile(r"<style[^>]*>(.*?)</style>", re.S)
+SFC_SCRIPT_RE = re.compile(r"<script[^>]*>(.*?)</script>", re.S)
+SFC_TEMPLATE_RE = re.compile(r"<template[^>]*>(.*?)</template>", re.S)
+#: 组件里补间目标的写法：`chipEl.value!` / `chipEl.value`
+REF_TARGET_RE = re.compile(r"^([A-Za-z0-9_]+)\.value!?$")
+
+
+def check_component(path: Path) -> list[Violation]:
+    """Vue-only 版式的结构不变量面 —— **跑的是 `check_layout` 同一批谓词，不重写**。
+
+    静态支的工件是 `compositions/*.html`，组件支的工件是 SFC：`<style>` 与 `<script>`
+    都是原生 CSS / JS，所以动量预算、字体、px、法则 8 这四组判据对两者是同一句话。
+    分两份实现迟早一份漂（D13 的口径），因此这里只换**取文本的口子**和**目标解析**，
+    谓词一律调 `check_*` 那几个函数。
+
+    两处刻意不同，都是组件形态决定的：
+    - 补间目标不是 `"#id"` / `".class"` 而是 `xEl.value!` —— 选择器字符串在组件里是
+      被禁的（跨镜串目标），所以这里把 ref 解析成同标签的 class 再走同一个
+      `declarations_for_classes`；出现选择器反而要红。
+    - 规则 7（字幕禁入区）**不在这里跑**：它读 CSS 的 `bottom:`/`inset:`，成立前提是
+      偏移相对满幅 `#root`，而组件的偏移相对内层 stage（`.fd-place{bottom:6cqh}` 在
+      `.fd-stage{inset:0 0 36cqh 0}` 里，实际 42cqh）⇒ 文本口径会假红。
+      那条只能按像素几何口径做，见 `VUE_GUARDS`。
+    """
+    violations: list[Violation] = []
+
+    def fail(code: str, detail: str) -> None:
+        violations.append(Violation(path.name, code, detail))
+
+    text = path.read_text(encoding="utf-8")
+    style_blocks = "".join(SFC_STYLE_RE.findall(text))
+    script_blocks = "".join(SFC_SCRIPT_RE.findall(text))
+    template = "".join(SFC_TEMPLATE_RE.findall(text))
+    if not template:
+        fail("NO_TEMPLATE", "SFC 没有 <template> 块")
+        return violations
+    rules = parse_css_rules(style_blocks)
+
+    refs: dict[str, set[str]] = {}
+    for tag in re.findall(r"<[a-zA-Z][^>]*>", template):
+        ref = re.search(r'\bref="([A-Za-z0-9_]+)"', tag)
+        if not ref:
+            continue
+        cls = re.search(r'\bclass="([^"]*)"', tag)
+        refs[ref.group(1)] = set(cls.group(1).split()) if cls else set()
+
+    # 4) 补间目标必须解析得到本组件的 ref（GSAP 打空目标只会 WARN，不会停）
+    for method, target, vars_text in enumerate_tweens(script_blocks):
+        resolved = REF_TARGET_RE.match(target.strip())
+        if target.startswith(("#", ".")):
+            fail("MISSING_TWEEN_TARGET",
+                 f'{method}("{target}") 用选择器找节点 —— 组件只准拿自己的 ref（跨镜串目标）')
+            continue
+        if not resolved:
+            continue                      # 数字/字符串常量等形态不是本条的口径
+        if resolved.group(1) not in refs:
+            fail("MISSING_TWEEN_TARGET",
+                 f"{method}({target}) 的 ref {resolved.group(1)!r} 在模板里没有对应标签")
+            continue
+        # 5) 法则 8：自带 background 的面禁止 opacity 补间
+        if "opacity" in vars_text:
+            decls = declarations_for_classes(refs[resolved.group(1)], rules)
+            if "background" in decls or "background-color" in decls:
+                fail("SURFACE_OPACITY_TWEEN",
+                     f'{method}({target}) 用了 opacity，但该元素自带 background'
+                     f"（{decls.get('background') or decls.get('background-color')}）—— "
+                     "半透明会与地面混色导致对比不过，改用 scaleX/scaleY 擦入")
+
+    check_momentum_budget(fail, script_blocks)
+    check_font_rules(fail, style_blocks)
+    check_px_typography(fail, rules)
+    return violations
+
+
+#: 17 条不变量在 **Vue 支**由谁守。这张表的存在理由：新角色没有静态文件，
+#: 结构闸天然扫不到它 —— 没有登记，就没人知道哪几条是"换了地方守"、哪几条是"没人守"。
+#: 状态只有四种，且由 `t_vue_branch_guard_registry_is_complete` 机检：
+#:   reused  同一份谓词直接跑在组件工件上（`check_component`）
+#:   moved   这条规则的字面前提在组件形态不成立，但它保护的**性质**由点名站点守
+#:   unwired 谓词可复用、今天没跑 = 洞（note 必须点名收口的 Task）
+#:   none    今天没有任何东西守 = 洞（note 必须点名收口的 Task）
+#: 站点写法：`selftest:<t_函数名>` / `vue-build:<check 名子串>` / `contracts:<函数名>` /
+#: `component:check_component` / `census:<判据>`。
+VUE_GUARDS: dict[str, dict[str, str]] = {
+    "NO_TEMPLATE": {
+        "state": "reused", "site": "component:check_component",
+        "note": "同一条 code 由 check_component 发。对 SFC 它近乎恒真（没有 <template> 先编译失败），"
+                "登记成 reused 而不是 moved，是为了让「谁发的这条」在表里只有一个答案。"},
+    "CONTENT_OUTSIDE_TEMPLATE": {
+        "state": "moved", "site": "vue-build:编译出 dist/vue/assets",
+        "note": "组件样式不会「掉进 head」，但它的对应风险是样式没编译出资产或没发 <link>，"
+                "由 vue-build 那条 + selftest:t_emit_host_links_vue_css_before_runtime 守。"},
+    "NO_ROOT_COMPOSITION_ID": {
+        "state": "moved", "site": "selftest:t_vue_only_contract_is_the_registry_for_its_role",
+        "note": "组件没有 <div id=\"root\" data-composition-id>：id 挂在发射器写的 clip 上，"
+                "取值由 contract.toml 供（那条闸逐字段比契约→条目）。"},
+    "NO_TIMELINE_REGISTER": {
+        "state": "unwired", "site": "vue-build:时间轴注册键不写死",
+        "note": "今天那条 TS 闸只查「键不是字面量」，组件**一条都不注册**时它是绿的 —— "
+                "缺「注册必须存在」这一半。收口：Task 5 在 vue-build 里补一条正向断言。"},
+    "CONTRACT_ID_MISMATCH": {
+        "state": "moved", "site": "vue-build:composition 身份不写死",
+        "note": "子合成「根 id == timeline 键」在组件里由同一个变量保证：注册键 = 传入的 "
+                "compositionId = clip 的 data-composition-id。写死字面量即红（含反向："
+                "selftest:t_two_same_role_vue_mounts_have_unique_targets 守唯一化）。"},
+    "MISSING_SLOT_VARIABLE": {
+        "state": "moved", "site": "contracts:validate_contract",
+        "note": "静态支从 HTML 的 data-composition-variables 里找 slotSeconds；组件支的"
+                "变量表在 contract.toml，由 validate_contract 要求同一格存在（动量预算依赖它）。"},
+    "MISSING_TWEEN_TARGET": {
+        "state": "reused", "site": "component:check_component",
+        "note": "目标口径换成 ref：解析不到对应标签就红；用选择器也红（组件禁跨镜串目标）。"},
+    "SURFACE_OPACITY_TWEEN": {
+        "state": "reused", "site": "component:check_component",
+        "note": "ref → 同标签 class → declarations_for_classes → background 判定，"
+                "与静态支共用同一个谓词函数。"},
+    "MAGIC_BUDGET_VALUE": {"state": "reused", "site": "component:check_component",
+                           "note": "跑 SFC 的 <script> 块。口径两分支一样弱：只查具名常数**声明了**，"
+                                   "不查它有没有被用（`Math.max(0.6, …)` 绕过 MIN_DRIFT 这里不红）—— "
+                                   "要收紧就两边一起收，别只收组件支。"},
+    "MISSING_DRIFT_DURATION": {"state": "reused", "site": "component:check_component",
+                               "note": "同上。"},
+    "MISSING_CONTINUOUS_MOTION": {"state": "reused", "site": "component:check_component",
+                                  "note": "enumerate_tweens 对 ref 目标同样产出变量文本，"
+                                          "所以 driftDur 出现与否的判据不用改。"},
+    "CAPTION_RESERVE_INTRUDED": {
+        "state": "none", "site": "none",
+        "note": "文本口径对组件会**假红**（偏移相对内层 stage 不是 #root），而引擎的 "
+                "--caption-zone 已用活体负例证明不是侵入探测器（地点行渲到 85.6cqh，"
+                "check --strict 仍 0 finding，见 evidence/2026-10-16-task5-precheck-findings.md）。"
+                "只能按像素几何口径做。收口：Task 5 的普查层像素闸。"},
+    "MISSING_CJK_FONT_FACE": {"state": "reused", "site": "component:check_component",
+                              "note": "接线时 field-a 真的缺这份 face（混挂时被 hook-a 的"
+                                      "「全局 @font-face」遮住了）—— 这条不是假想洞。"},
+    "CJK_FAMILY_USED_NOT_DECLARED": {"state": "reused", "site": "component:check_component",
+                                     "note": "跑 <style> 原文；Vite 只做压缩不改族名。"},
+    "CJK_FONT_LOCAL_NOT_INSTALLED": {"state": "reused", "site": "component:check_component",
+                                     "note": "同一份在装口径（本机点测的 5 个名字）。"},
+    "CANONICAL_FONT_LOCAL_OVERRIDE": {"state": "reused", "site": "component:check_component",
+                                      "note": "同上。"},
+    "PX_TYPOGRAPHY": {"state": "reused", "site": "component:check_component",
+                      "note": "跑 <style> 原文。⚠ 口径差异要认：Vite 会把 `inset:0 0 36cqh 0`"
+                              "展成四条 top/right/bottom/left —— 所以 px 判定用源文更安全，"
+                              "而 bottom 类判定（规则 7）用源文反而更不安全。"},
+}
 
 
 def discover_layouts(directory: Path) -> list[Path]:
@@ -448,13 +615,37 @@ def discover_layouts(directory: Path) -> list[Path]:
 # ---------------------------------------------------------------- CLI
 
 
+def vue_guard_table() -> str:
+    """把 `VUE_GUARDS` 打成 markdown —— 表由数据现生成，抄一份就会和实现分家。"""
+    header = ("| 不变量 | 状态 | 站点 | 说明 |\n|---|---|---|---|")
+    rows = [f"| `{code}` | {row['state']} | `{row['site']}` | {row['note']} |"
+            for code, row in sorted(VUE_GUARDS.items())]
+    counts = {s: sum(1 for r in VUE_GUARDS.values() if r["state"] == s)
+              for s in ("reused", "moved", "unwired", "none")}
+    holes = sorted(c for c, r in VUE_GUARDS.items() if r["state"] in ("unwired", "none"))
+    return "\n".join([
+        header, *rows, "",
+        f"合计 {len(VUE_GUARDS)} 条：reused {counts['reused']} · moved {counts['moved']} · "
+        f"洞 {counts['unwired'] + counts['none']}（{', '.join(holes)}）",
+    ])
+
+
 def main(argv: list[str] | None = None) -> int:
     if hasattr(sys.stdout, "reconfigure"):  # Windows 控制台默认 cp936，中文说明会变问号
         sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description="Path B 版式结构自检（逐 pack 目录跑）")
-    parser.add_argument("directories", nargs="+", type=Path, help="含 compositions/*.html 的版式目录")
+    parser.add_argument("directories", nargs="*", type=Path, help="含 compositions/*.html 的版式目录")
     parser.add_argument("--quiet", action="store_true", help="只在有违规或用法错误时输出")
+    parser.add_argument("--vue-guards", action="store_true",
+                        help="打印 17 条不变量在 Vue 支的守卫登记表（markdown），不跑检查")
     args = parser.parse_args(argv)
+    if args.vue_guards:
+        print(vue_guard_table())
+        return 0
+    if not args.directories:
+        print("版式自检：一个目录都没给 —— 不算检查，也不算通过。"
+              "参数要写含 compositions/*.html 的目录（或改用 --vue-guards 打登记表）。")
+        return 1
 
     total_files = 0
     all_violations: list[Violation] = []
