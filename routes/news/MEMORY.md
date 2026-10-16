@@ -384,10 +384,20 @@ in_progress:
     闸：`t_vue_only_contract_is_the_registry_for_its_role`（契约就是新角色的登记表，`layouts.toml`
     拒收 Vue-only 角色）+ 变量第四来源「作者供料位」（`author_slots`，不许有 default）。
     详见 `evidence/2026-10-16-vue-only-merge.md`。
-  - vue_only_next: **Task 5 未做，且它是硬前置** —— `layout_selfcheck` 只扫 `compositions/*.html`，
-    所以 `field` 现在**绕过全部 17 条结构不变量**；后果当场就看见了：渲出来的下沿 ~22% 空带
-    `check --strict` 的 layout 段报 0 finding。**先落 `t_vue_only_layouts_pass_layout_selfcheck`，
-    再按闸修填幅**，别先目测改一版（那没有判据）。
+  - vue_only_next: **Task 5 已改判（2026-10-16 实测，见 `evidence/2026-10-16-task5-precheck-findings.md`）**
+    —— 原计划"对 Vue-only 版式跑同一套 17 条不变量"**不成立**：① 17 条里**没有填幅**
+    （法则 17 只在 `hf_compile` 用配方几何实现，静态 227 份 HTML 同样没这条闸）；
+    ② 规则 7（字幕禁入区）的前提是"偏移相对 `#root`"，组件相对内层 stage ⇒ 直接搬会**假红**；
+    ③ 活体负例证明**引擎的 `--caption-zone` 不是侵入探测器**（把地点行渲到 85.6cqh，
+    `check --strict` 五段全 0 finding）。⇒ 字幕区这条对 Vue 支今天没人守，且必须按
+    **像素/几何口径**挂到渲染普查那一层，不是塞进 `path_b_selftest.py`。
+    `field` 自身不违规：实测内容下沿 77.3cqh，距 80cqh 只空 2.7cqh（< 8.0）。
+  - vue_stale_css: **已修（2026-10-16）** —— `stage_vue_assets` 只拷不清，Vite CSS 名带内容 hash，
+    `emit_host` 又按 `<bundle>*.css` 全发 ⇒ 复用 work_dir 时**两代样式同挂，谁赢取决于 hash 字母序**
+    （普查目录跨轮复用，不是理论风险）。闸 `t_stage_vue_assets_leaves_no_stale_generation`。
+    教训：**负例要先证明"改动真的生效"再解读结果** —— 第一版字幕区负例打在没赢的那份 CSS 上，
+    画面一个像素没动却报"check 通过"，那次是**假阴**；复测像素后才做出活体负例（85.6cqh 侵入，
+    引擎仍报 0 finding），"引擎不拦"这句才是被证的。
   - composition_id_legacy_debt: **未修，独立口子** —— 30 个包的 `hook`/`quote`/`story`
     的 `composition_id` 全是 `nc-night-*`（v008 批量从 `news-coral-night` 复制骨架留下），
     即 `news-alert/hook` 与 `news-coral/hook` **共用同一个 id 字符串**。

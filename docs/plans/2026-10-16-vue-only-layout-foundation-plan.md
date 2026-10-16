@@ -189,11 +189,24 @@ news-world = { c0 = "#0e1b36" }   # 想随包变的，显式写一条 —— 是
 spec §7.5 未拍），改落 `ghost`/`place` 两个作者供料位。
 **遗留**：下沿 ~22% 空带 —— 必须先做 Task 5 的闸再按闸修，否则改一版没有判据。
 
-### Task 5: 新角色的自检面
+### Task 5: 新角色的自检面（**2026-10-16 实测后改判**）
 
-`layout_selfcheck` 只扫 `compositions/*.html` ⇒ Vue-only 角色**不在 17 条结构不变量覆盖内**。
-必须补一条 `t_vue_only_layouts_pass_layout_selfcheck`：对 Vue-only 版式跑同一套不变量
-（复用同一实现，不重写），否则新角色是个"没有闸的洞"。
+原写法：「`layout_selfcheck` 只扫 `compositions/*.html` ⇒ 对 Vue-only 版式跑同一套 17 条不变量
+（复用同一实现，不重写）」。**这条按原样做不到**，三处实测（`evidence/2026-10-16-task5-precheck-findings.md`）：
+
+1. 17 条里**没有"填幅"**——法则 17 只在 `hf_compile` 按配方几何实现（`MAX_BOTTOM_DEAD_CQH=8.0`），
+   静态 227 份 HTML 同样没这条闸。所以"跑 17 条再按闸修空带"是两件事。
+   `field` 实测内容下沿 **77.3cqh**（字幕区上沿 80cqh）⇒ 空 2.7cqh，**不违规**，那段黑是留给字幕的。
+2. 规则 7（字幕禁入区）读 CSS 的 `bottom:`/`inset:`，成立前提是**偏移相对满幅 `#root`**；
+   组件的 `.fd-place{bottom:6cqh}` 相对 `.fd-stage{inset:0 0 36cqh 0}`，实际在 42cqh ⇒
+   把文本口径直接搬到组件上会**假红**。
+3. 活体负例证明**引擎的 `--caption-zone` 不是侵入探测器**：把地点行渲到 **85.6cqh**（区内），
+   `check --strict` 五段仍 0 finding。
+
+⇒ 改判后的 Task 5：字幕区/填幅两条对 Vue 支按**像素几何口径**做，挂在渲染普查那一层
+（每角色一镜、量最底内容行 vs 80cqh 上下界），不进 `path_b_selftest.py`；
+文本口径可复用的那几条（法则 8 面淡入、动量预算、px 排版、@font-face）另做一份
+**SFC 版**检查，并显式登记"17 条里哪几条在 Vue 支由谁守"，缺项不许静默跳过。
 
 ### Task 6: 真渲染闭环
 

@@ -2572,9 +2572,18 @@ def stage_vue_assets(work_dir: str, pack: dict) -> list[str]:
     bundles = sorted({b for layout in pack["layouts"].values()
                       for b in [vue_bundle_for(pack["name"], layout["name"])]
                       if b is not None and vue_bundle_built(b)})
+    vue_dst = os.path.join(work_dir, "vue")
+    # **先清后拷**。work_dir 会被复用（普查目录 `.harness-news-runtime/tmp/render-census/<pack>/`
+    # 跨轮重跑、同包重试），而 Vite 的 CSS 资产名带内容 hash：不清就同时留着上一代的
+    # `assets/<bundle>-<旧hash>.css`，下面的 glob 又会把两代全发进 host —— 哪份生效
+    # 取决于 hash 的字母序（实测 `C-nBYAjC` 排在 `Ni89-8RF` 前 ⇒ 这次侥幸是新的赢，
+    # 反过来就静默用旧样式，且 index.html 字节不再只由本次输入决定）。
+    # 清空放在 bundles 判空**之前**：一个包从"有 Vue 镜"改回"纯静态"时，
+    # 旧 work_dir 里残留的 vue/ 也该跟着消失。
+    if os.path.isdir(vue_dst):
+        shutil.rmtree(vue_dst)
     if not bundles:
         return []
-    vue_dst = os.path.join(work_dir, "vue")
     os.makedirs(vue_dst, exist_ok=True)
     # 仓库根：path_b_build.py 在 skills/douyin-pro/scripts/, 上溯 3 级到 harness-factory/
     repo_root = Path(os.path.dirname(os.path.abspath(__file__))).resolve().parent.parent.parent

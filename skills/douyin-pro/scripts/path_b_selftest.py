@@ -4583,6 +4583,46 @@ def t_stage_vue_assets_returns_nothing_for_html_only_pack():
         assert not os.path.exists(os.path.join(work, "vue"))
 
 
+def t_stage_vue_assets_leaves_no_stale_generation():
+    """复用 work_dir 重发时，上一代 CSS 资产必须消失 —— 不是靠 hash 字母序碰运气。
+
+    撞过的现场：`field-probe2/index.html` 同时链着 `field-a-C-nBYAjC.css`（改色前）和
+    `field-a-Ni89-8RF.css`（改色后）。Vite 的 CSS 名带内容 hash，`stage_vue_assets`
+    只拷不清，`emit_host` 又按 `<bundle>*.css` 全发 ⇒ 两代同挂，**谁生效取决于 hash 的
+    字母序**。这次恰好新的赢（C < N），反过来就是"改了没效"且没有任何现象会提示。
+    普查目录 `.harness-news-runtime/tmp/render-census/<pack>/` 正是跨轮复用的，
+    所以这不是理论风险。
+    """
+    import tempfile
+    pack = pb.load_style_pack("news-coral")
+    saved = pb.vue_bundle_built
+    pb.vue_bundle_built = lambda b: True          # 不依赖 npm run build:templates 跑没跑
+    try:
+        with tempfile.TemporaryDirectory() as work:
+            first = pb.stage_vue_assets(work, pack)
+            assets = Path(work) / "vue" / "assets"
+            assets.mkdir(parents=True, exist_ok=True)
+            (assets / "field-a-ZZ9stale.css").write_text(".fd-place{color:#123456}", encoding="utf-8")
+            (Path(work) / "vue" / "stale-chunk.js").write_text("// 上一代残留", encoding="utf-8")
+            second = pb.stage_vue_assets(work, pack)
+
+            assert not (assets / "field-a-ZZ9stale.css").exists(), \
+                "复用时上一代 CSS 资产还留着 —— 它会和现行那份一起挂进 host"
+            assert not (Path(work) / "vue" / "stale-chunk.js").exists(), \
+                "vue/ 根目录的上一代残留没清"
+            assert first == second, f"同一包两次暂存交出的样式表不一致：{first} vs {second}"
+            # 一个 bundle 至多一条 <link>：两条就是两代同挂（本次事故的直接形态）
+            stems = [re.sub(r"-[A-Za-z0-9_-]{6,}\.css$", "", os.path.basename(p)) for p in second]
+            assert len(stems) == len(set(stems)), f"同一 bundle 发了多条 CSS: {second}"
+            dist = pb._vue_dist_dir() / "assets"
+            if dist.is_dir():
+                assert sorted(p.name for p in assets.glob("*.css")) == \
+                    sorted(p.name for p in dist.glob("*.css")), \
+                    "暂存集 != 当前 dist 集 —— 暂存目录必须是 dist 的一次干净快照"
+    finally:
+        pb.vue_bundle_built = saved
+
+
 def t_emit_host_skips_vue_loader_when_no_vue_mount():
     """无 Vue 版 mount 时，emit_host 不注入 Vue loader。
 
