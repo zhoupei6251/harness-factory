@@ -12,10 +12,10 @@ per-pack 只有两样：**槽位值**（来自该包 `theme.toml`）与 **`compo
 """
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
-import pack_theme
 import path_b_build as pb
 
 CONTRACT_NAME = "contract.toml"
@@ -92,22 +92,39 @@ def composition_id_for(pack: str, role: str) -> str:
 
 
 def slot_values(pack: str, contract: dict) -> list[str]:
-    """按契约 `[slots]`（`cNN = "<theme token 名>"`）从该包 `theme.toml` 取有序色值。
+    """该包该角色的有序槽位值 = 契约 `[slots]` 的字面 hex，套上 `[slots.overrides].<pack>`。
 
-    token 不存在就抛。新角色没有静态文件可抽 hex，theme 是唯一真源；
-    取不到时补默认色 = 让一个没人核对过的常数上屏，正是 `estimate_duration` 那次的路。
+    **不查 `theme.toml`。** 两条实测把那条路堵死了：31 包共 68 个 token、
+    在所有包都存在的有 **0 个**；且 **0/31 包有"单一地面"**（每包在 7 个版式上用多个地面），
+    所以"从包主题推导槽位"没有可推导的对象。随包变只能显式写 override ——
+    那是**设计决定**，不是猜出来的；写错包名当场抛（拼错会静默不生效，最难查）。
     """
     slots = contract.get("slots") or {}
     if not slots:
         raise ContractError(f"{pack}/{contract['role']}: 契约没有 [slots]，槽位无来源")
-    tokens = {k.lower(): v for k, v in pack_theme.load_theme(pb.pack_dir(pack)).items()}
-    ordered = sorted(slots, key=lambda s: int(s[1:]))
+    overrides = contract.get("overrides") or {}
+    unknown = sorted(set(overrides) - set(pb.ALL_TEMPLATES))
+    if unknown:
+        raise ContractError(
+            f"{contract['role']} 的 [slots.overrides] 写了不存在的包 {unknown} —— "
+            "这条 override 永远不会生效；拼包名请从 ALL_TEMPLATES 里取")
+    merged = dict(slots)
+    merged.update(overrides.get(pack) or {})
+    ordered = sorted(merged, key=lambda s: _slot_index(s, pack, contract))
     values = []
     for name in ordered:
-        token = str(slots[name]).lower()
-        if token not in tokens:
+        hex_value = str(merged[name]).lower()
+        if not re.fullmatch(r"#[0-9a-f]{6}", hex_value):
             raise ContractError(
-                f"{pack}/{contract['role']}: 槽位 {name} 指向 theme token {token!r}，"
-                f"该包 theme.toml 里没有它（现有: {sorted(tokens)}）")
-        values.append(tokens[token])
+                f"{pack}/{contract['role']}: 槽位 {name} = {merged[name]!r} 不是 #rrggbb —— "
+                "槽位值必须是字面色值，别名/变量名一律不认（取错是静默的）")
+        values.append(hex_value)
     return values
+
+
+def _slot_index(name: str, pack: str, contract: dict) -> int:
+    try:
+        return int(name[1:])
+    except ValueError:
+        raise ContractError(
+            f"{pack}/{contract['role']}: 槽位名 {name!r} 不是 cNN 形式") from None

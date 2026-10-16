@@ -495,6 +495,21 @@ def vue_only_contracts() -> dict:
     return VUE_ONLY_CONTRACTS
 
 
+def vue_only_contract(pack: str, role: str) -> dict | None:
+    """该角色的 Vue-only 契约（没有则 None）。
+
+    `pack` 现在没参与判断 —— 契约是跨包共享的一份；留着这个参数是为了调用点读起来
+    与 `vue_bundle_for(pack, role)` 同形，且将来若要 per-pack 停用某角色有地方接。
+    """
+    found = vue_only_contracts()
+    return found.get((role, "a")) or found.get((role, "b"))
+
+
+def static_roles() -> set[str]:
+    """有静态 `compositions/<role>.html` 的那 7 个角色 —— 分支判据就是"有没有静态文件"。"""
+    return set(AUTO_LAYOUT_STEMS)
+
+
 def vue_bundle_for(pack: str, role: str) -> str | None:
     """(pack, role) → Vue bundle 名；两者都不匹配时返回 None（走静态支）。
 

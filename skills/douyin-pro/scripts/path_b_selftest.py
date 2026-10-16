@@ -5033,23 +5033,73 @@ def t_new_composition_ids_collide_with_nothing():
             assert want == f"{role}-{pack}", f"{want} 不符合约定"
 
 
-def t_slot_values_come_from_theme_and_fail_loudly():
-    """槽位必须来自 theme.toml；token 名写错要当场抛，不许悄悄退回默认色 ——
-    那是拿假常数当判据（`estimate_duration` 的 4.5 字/秒 就是这么把时长闸废掉的）。"""
+def t_slot_values_are_literal_with_explicit_overrides():
+    """槽位默认值写在契约里（字面 hex），**不查 theme** —— 31 包 68 个 token、
+    全包共有的为 0 个，且 0/31 包有"单一地面"，所以"从 theme 推导"没有可推导的对象。
+    随包变只能靠 `[slots.overrides]` 显式写一条：那是设计决定，不是猜出来的。"""
     import vue_contracts as vc
     contract = {"role": "field", "variant": "a",
-                "slots": {"c0": "cream", "c1": "ink"},
+                "slots": {"c0": "#0a0a0d", "c1": "#f5f0e8"},
+                "overrides": {"news-world": {"c0": "#0e1b36"}},
                 "variables": [{"id": "kicker", "type": "string", "label": "眉标"}]}
-    got = vc.slot_values("news-coral", contract)
-    assert len(got) == 2 and all(h.startswith("#") for h in got), f"槽位取值异常: {got}"
-    bad = {"role": "field", "variant": "a",
-           "slots": {"c0": "no-such-token-xyz"}, "variables": []}
+    assert vc.slot_values("news-coral", contract) == ["#0a0a0d", "#f5f0e8"]
+    assert vc.slot_values("news-world", contract)[0] == "#0e1b36", "override 没生效"
+    assert vc.slot_values("news-stat", contract)[0] == "#0a0a0d", "override 泄漏到别的包"
+    for bad, why in (({"role": "f", "variant": "a", "slots": {"c0": "black"},
+                        "variables": [{"id": "a", "type": "string", "label": "x"}]}, "不是 hex"),
+                     ({"role": "f", "variant": "a", "slots": {},
+                        "variables": [{"id": "a", "type": "string", "label": "x"}]}, "没有槽位")):
+        try:
+            vc.slot_values("news-coral", bad)
+        except vc.ContractError:
+            pass
+        else:
+            raise AssertionError(f"非法槽位被静默收下（{why}）: {bad}")
+    # override 里的包名拼错 = 那条永远不生效，是最难发现的一类"改了没效"
+    ghost = {"role": "field", "variant": "a", "slots": {"c0": "#0a0a0d"},
+             "overrides": {"news-contrl": {"c0": "#0e1b36"}},
+             "variables": [{"id": "a", "type": "string", "label": "x"}]}
     try:
-        vc.slot_values("news-coral", bad)
+        vc.slot_values("news-coral", ghost)
     except vc.ContractError as exc:
-        assert "no-such-token-xyz" in str(exc), f"没点名缺哪个 token: {exc}"
+        assert "news-contrl" in str(exc), f"拼错的包名没被点名: {exc}"
     else:
-        raise AssertionError("theme 里不存在的 token 被静默放行了")
+        raise AssertionError("override 写了个不存在的包名却静默通过")
+
+
+def t_static_roles_never_take_the_contract_path():
+    """已有 7 角色绝不能被 Vue-only 契约截走 —— 那会让普查基线与
+    `t_slots_reconstruct_every_pack_byte_exact` 证明的那个真源失效。"""
+    import vue_contracts as vc
+    entries = _tmp_entries()
+    saved = pb.VUE_ONLY_CONTRACTS
+    pb.VUE_ONLY_CONTRACTS = vc.discover(entries)
+    try:
+        for pack in pb.ALL_TEMPLATES:
+            for role in pb.static_roles():
+                assert pb.vue_only_contract(pack, role) is None, f"{pack}/{role} 被契约截走"
+        assert pb.vue_only_contract("news-coral", "field") is not None, "新角色没走契约路径"
+    finally:
+        pb.VUE_ONLY_CONTRACTS = saved
+
+
+def t_slot_css_uses_contract_for_vue_only():
+    """`slot_css` 的分支必须按"有没有契约"走，且输出格式与静态支同构（发射器共用）。"""
+    import pack_slots as pks
+    import vue_contracts as vc
+    entries = _tmp_entries()
+    saved = pb.VUE_ONLY_CONTRACTS
+    pb.VUE_ONLY_CONTRACTS = vc.discover(entries)
+    try:
+        css = pks.slot_css("news-coral", "field")
+        assert css == "--c0:#f5f0e8;--c1:#1a1a1a;", css
+        assert re.match(r"^(--c\d+:#[0-9a-f]{6};)+$", css), "槽位串格式与静态支不同构"
+        # 静态支一条不许变
+        assert pks.slot_css("news-coral", "stat") == \
+            "".join(f"--c{i}:{h};" for i, h in enumerate(pks.template_of("news-coral", "stat")[1]))
+    finally:
+        pb.VUE_ONLY_CONTRACTS = saved
+
 
 
 def t_contract_variables_match_schema():
@@ -5103,7 +5153,7 @@ def _field_contract_text(role="field", ground="#0a0a0d"):
             f'ground = "{ground}"\n'
             'variables = [ { id = "kicker", type = "string", label = "眉标", default = "FIELD" },'
             ' { id = "title", type = "string", label = "领句", default = "标题" } ]\n'
-            '[slots]\nc0 = "cream"\nc1 = "ink"\n')
+            '[slots]\nc0 = "#f5f0e8"\nc1 = "#1a1a1a"\n')
 
 
 def _tmp_entries(role="field", ground="#0a0a0d"):

@@ -61,10 +61,18 @@ def template_of(pack: str, role: str) -> tuple[str, list[str]]:
 def slot_css(pack: str, role: str) -> str:
     """该 pack/role 的**有序**色位槽 CSS：`--c0:#rrggbb;--c1:#rrggbb;…`。
 
-    槽位身份 = 该角色文件里 hex 的出现序号（Task 1 逐字节还原的承重前提），
-    故此处严格按 `template_of` 返回的 hex 顺序编号，数量等于该模板的槽数。
+    两条来源，按"有没有静态文件"分叉：
+      · 静态角色 —— 槽位身份 = 该角色文件里 hex 的出现序号（Task 1 逐字节还原的承重前提），
+        严格按 `template_of` 的顺序编号；
+      · Vue-only 角色（`field`/`rank`/…）—— 没有静态文件可抽，取契约自带的字面值
+        （见 `vue_contracts.slot_values`，含显式 per-pack override）。
+
     发射侧把这段挂到 Vue clip 元素的 `style` 上（作用域在 clip 内，两镜不互覆盖）。
     """
+    contract = pb.vue_only_contract(pack, role)
+    if contract:
+        import vue_contracts as vc
+        return "".join(f"--c{i}:{h};" for i, h in enumerate(vc.slot_values(pack, contract)))
     hexes = template_of(pack, role)[1]
     return "".join(f"--c{i}:{h};" for i, h in enumerate(hexes))
 

@@ -146,11 +146,33 @@ Task 2 的合并逻辑原本在装载时就解析槽位，跑全 31 包立刻炸
 **"能变的色"本来就没多少可变的**。**我倾向这条**：省掉 31 个 frame.md 的改动与一层长期维护的映射，
 把力气全放在结构上。
 
-### Task 3: 槽位来源分叉
+### Task 3: 槽位来源 = 契约自带字面值 + 显式 per-pack 覆盖
 
-`pack_slots.slot_css(pack, role)` 现在一律读静态文件。改为：
-`vue_only` 角色走 `vue_contracts.slot_values`，其余走原路。
-判据：`t_slot_css_unchanged_for_static_roles`（31 包 × 7 角色逐个比对改前改后字符串全等）。
+**Task 2.5 取消**（不建 canonical 层）。除 §1.1/上面两条实测外，又量到一条独立理由：
+
+> **0/31 个包有"单一地面"** —— 每个包在它的 7 个版式上用**多个**地面
+> （`news-coral` 同时用 `#1a1a1a`、`#0a0a0d`、`#f5f0e8`、`#e8e0d4`）。
+> 所以「该包的地面」这个可绑定对象**不存在**：包的身份体现为"每个版式各用哪个地面"，
+> 是 per-layout 属性，不是 per-pack 属性。任何"自动随包变色"的方案都是虚构。
+
+新做法：
+
+```toml
+# src/web/entries/field-a/contract.toml
+[slots]                       # 契约自带默认值（字面 hex，不查 theme）
+c0 = "#0a0a0d"                # 暗地面
+c1 = "#f5f0e8"                # 暗面上的字
+[slots.overrides]             # 想随包变的，显式写一条 —— 是设计决定，不是推导结果
+news-world = { c0 = "#0e1b36" }
+```
+
+- `pack_slots.slot_css(pack, role)`：先查该 `(role, variant)` 有没有 Vue-only 契约；
+  有 → 用契约的 `[slots]` + 该包 override；没有 → 原路（读静态文件 hex），**一字节不变**。
+- 判据 `t_slot_css_unchanged_for_static_roles`：31 包 × 7 角色，改前改后 `slot_css` 字符串全等。
+- 判据 `t_vue_only_slot_css_honours_override`：给 `news-world` 写 override，
+  该包必须变、其余 30 包必须不变；反向负例：override 里写一个不存在的包名 ⇒ 抛
+  （拼错包名会静默不生效，那是最难发现的一类"改了没效"）。
+
 
 ### Task 4: 第一个 Vue-only 角色 `field-a`（none 单态）
 
