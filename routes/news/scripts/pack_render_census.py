@@ -47,6 +47,14 @@ NPX = "npx.cmd" if os.name == "nt" else "npx"
 TRACE = re.compile(r'"totalFrames":(\d+),"framesCompleted":(\d+)')
 NOISE = re.compile(r"\bWARN\b|\bERROR\b")
 
+#: 汇总行里的镜数与稿件路径一律现算 —— 手抄的"5 镜"在我把 field 镜加进清单的那一刻就会变成假话
+#: （D20 治的是同一个病：没人断言的数字就是死数字）。
+SCENES = json.loads(Path(SCRIPT).read_text(encoding="utf-8"))
+import vue_contracts as _vc                      # noqa: E402
+_VUE_ONLY_ROLES = {c["role"] for c in _vc.discover(pb.VUE_ENTRIES_DIR).values()}
+N_POINTED = sum(1 for sc in SCENES if sc.get("layout"))
+N_VUE_ONLY = sum(1 for sc in SCENES if sc.get("layout") in _VUE_ONLY_ROLES)
+
 KEEP.mkdir(parents=True, exist_ok=True)
 
 #: `--only <pack>` 只跑指定包（调试用）；`--list` 列出可跑的包。
@@ -91,7 +99,11 @@ def one(style: str) -> dict:
         html = work / "index.html"
         text = html.read_text(encoding="utf-8") if html.is_file() else ""
         row.update(emit_exit=emit.returncode, html=html.is_file(),
-                   clips=text.count('class="clip"'), vue=text.count("data-vue-mount"))
+                   clips=text.count('class="clip"'),
+                   # 数 `data-vue-bundle` 而不是 `data-vue-mount`：后者还会出现在注入的
+                   # loader 脚本里（`querySelectorAll("[data-vue-mount]")`），实测 2 个 Vue clip
+                   # 会被数成 3 —— 列名是"挂载数"，多出来的那一次是选择器，不是挂载。
+                   vue=text.count("data-vue-bundle"))
 
         if emit.returncode == 0 and html.is_file():
             rnd = subprocess.run(
@@ -144,7 +156,9 @@ with (KEEP / "_results.jsonl").open("w", encoding="utf-8") as sink, \
 
 passed = [r for r in rows if r.get("pass")]
 lines = [f"# {len(PACKS)} pack 画面轨真渲染普查（{len(passed)}/{len(PACKS)} 通过）", "",
-         "稿件：`.harness-news-runtime/articles/t001-scenes.json`（5 镜）· 零配音（`--skip-render`）· "
+         f"稿件：`{Path(SCRIPT).relative_to(REPO).as_posix()}`"
+         f"（{len(SCENES)} 镜，其中 {N_POINTED} 镜点名版式、"
+         f"{N_VUE_ONLY} 镜走 Vue-only 契约）· 零配音（`--skip-render`）· "
          "25fps · draft · `--no-browser-gpu`", "",
          "| pack | clip | vue挂载 | render exit | 帧(完成/总) | mp4 KB | WARN/ERROR | "
          f"最底墨线(cqh) | 填幅不足镜数 | 判定 |",
