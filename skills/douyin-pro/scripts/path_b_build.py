@@ -478,9 +478,32 @@ VUE_ROUTES: dict[tuple[str, str], str] = {}
 #: `vue_bundle_for()` 返回 None ⇒ 发射回落静态支，一字符不改。
 CUTOVER_ROLES: set[str] = {"hook"}
 
+#: 组件目录：`contract.toml` 放在这里，声明"只有组件、没有静态文件"的版式。
+VUE_ENTRIES_DIR = Path(__file__).resolve().parents[3] / "src" / "web" / "entries"
+
+#: 扫出来的 {(role, variant): 契约}。`None` = 还没扫（懒扫，见 `vue_only_contracts`）；
+#: 自检直接赋一个 dict 当注入缝 —— 懒扫一旦跑过就缓存，测试若靠"先后顺序"覆盖它会漂。
+VUE_ONLY_CONTRACTS: dict | None = None
+
+
+def vue_only_contracts() -> dict:
+    """懒扫组件目录。为什么懒：`vue_contracts` 顶部 import 本模块，模块级互相 import 会成环。"""
+    global VUE_ONLY_CONTRACTS
+    if VUE_ONLY_CONTRACTS is None:
+        import vue_contracts as vc
+        VUE_ONLY_CONTRACTS = vc.discover(VUE_ENTRIES_DIR)
+    return VUE_ONLY_CONTRACTS
+
 
 def vue_bundle_for(pack: str, role: str) -> str | None:
-    """(pack, role) → Vue bundle 名；角色未进 CUTOVER_ROLES 时返回 None（走静态支）。"""
+    """(pack, role) → Vue bundle 名；两者都不匹配时返回 None（走静态支）。
+
+    先查 Vue-only 契约：新角色（`field`/`rank`/…）**没有静态文件可回落**，
+    也不该挤进 `CUTOVER_ROLES` —— 那个集合管的是"已有静态版式要不要换组件"。
+    """
+    contract = vue_only_contracts().get((role, "a")) or vue_only_contracts().get((role, "b"))
+    if contract:
+        return f"{role}-{contract['variant']}"
     if role not in CUTOVER_ROLES:
         return None
     if (pack, role) in VUE_ROUTES:
@@ -1913,8 +1936,11 @@ def ready_packs() -> list[str]:
     return [s for s in available_templates() if pack_has_real_layout(s)]
 
 
-def load_style_pack(style: str) -> dict:
+def load_style_pack(style: str, vue_only: dict | None = None) -> dict:
     """读 `<pack 根>/<style>/`: 宿主骨架 + 各版式契约（根按 `PACK_ROOTS` 顺序找，见 `pack_dir`）。
+
+    `vue_only` 是给自检留的**注入缝**（传 `{(role, variant): 契约}`）；不传就走
+    `vue_only_contracts()`（今天扫出来为空 —— 还没有组件带 `contract.toml`）。
 
     ``placeholder.html`` 不进 ``layouts`` (D7): 它只是把三层目录凑齐的壳, 不是版式。
     跳掉之后若一个版式都不剩, 就在这里停 —— 报"这个 pack 还没有真版式 + 现在哪些有",
@@ -1977,6 +2003,34 @@ def load_style_pack(style: str) -> dict:
                else "当前没有任何 pack 有真版式。")
             + " 处理: 换用可渲染的 pack, 或按 frame.md 的设计契约补出真 composition。"
         )
+    # Vue-only 版式：有契约、无静态文件的角色（field/rank/versus/cause）。
+    # 合并放在"包不可渲染"检查**之后** —— 让契约去救一个没有真版式的包是错的，
+    # 那会把"这包还没填实"这个信号悄悄盖掉。
+    import vue_contracts as vc                      # 函数级导入：模块级会与它形成循环
+    contracts = vue_only if vue_only is not None else vue_only_contracts()
+    for (role, variant), contract in sorted(contracts.items()):
+        if role in layouts:
+            raise EmitterError(
+                f"{style}/{role}: 既有静态版式 compositions/{role}.html，又有组件契约 "
+                f"{contract['_bundle']}/contract.toml —— 静默二选一等于渲染结果取决于扫描顺序。"
+                "删掉一个：Phase 2 迁移期该删静态文件，新角色该只留契约。")
+        ground = str(contract.get("ground", "")).lower()
+        if ground not in GROUND_TONE_BY_HEX:
+            raise EmitterError(
+                f"{style}/{role}: 契约声明的地面 {ground!r} 不在设计系统色板里 (已知: "
+                + ", ".join(sorted(GROUND_TONE_BY_HEX))
+                + ") —— 未登记的地面会让逐镜换色失效。")
+        layouts[role] = {
+            "name": role, "file_name": None, "path": None,
+            "composition_id": vc.composition_id_for(style, role),
+            "ground_hex": ground, "ground_tone": GROUND_TONE_BY_HEX[ground],
+            "variables": contract["variables"], "primitives": [],
+            "vue_only": True, "bundle": f"{role}-{variant}",
+            # 槽位**不在这里解析**：31 包的 theme 词表没归一（68 个 token、全包共有的为 0 个），
+            # 合并阶段就取值会让"某个包缺 token"变成整包不可加载。留给发射时解析，
+            # 那时失败只影响这一镜，且能被渲染前的预检抓到。
+            "contract": contract,
+        }
     # 编译包（path_c，带 spec.toml）走 HyperFrames 原生字幕轨；存量手发包（path_b）
     # 维持烧录 ASS。字幕收进合成是裁决 2 的落地，只对编译包开放，31 套存量片子节不变。
     return {"name": style, "dir": root_dir, "host": read_text(host_path),

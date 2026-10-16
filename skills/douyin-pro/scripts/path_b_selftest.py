@@ -5096,6 +5096,91 @@ def t_discover_is_keyed_by_role_and_variant():
         shutil.rmtree(tmp, ignore_errors=True)
 
 
+# ---------------- Task 2：load_style_pack 合并 Vue-only 版式（第一次动发射器） ----------------
+
+def _field_contract_text(role="field", ground="#0a0a0d"):
+    return (f'role = "{role}"\nvariant = "a"\n'
+            f'ground = "{ground}"\n'
+            'variables = [ { id = "kicker", type = "string", label = "眉标", default = "FIELD" },'
+            ' { id = "title", type = "string", label = "领句", default = "标题" } ]\n'
+            '[slots]\nc0 = "cream"\nc1 = "ink"\n')
+
+
+def _tmp_entries(role="field", ground="#0a0a0d"):
+    """临时组件目录 —— 真契约要到 Task 4 才有，本 Task 只验合并机制本身。"""
+    import shutil, tempfile
+    tmp = Path(tempfile.mkdtemp(prefix="vue-only-"))
+    (tmp / f"{role}-a").mkdir()
+    (tmp / f"{role}-a" / "contract.toml").write_text(
+        _field_contract_text(role, ground), encoding="utf-8")
+    _tmp_entries._keep.append(tmp)                       # noqa: SLF001
+    return tmp
+
+
+_tmp_entries._keep = []
+
+
+def t_static_layout_entries_untouched_by_vue_only():
+    """合并 Vue-only 版式**只许加键，不许动已有 7 角色** —— 普查 31/31 与
+    `t_slots_reconstruct_every_pack_byte_exact` 全部 keyed 在这些条目上，
+    改一个字段就是拿重构的名义偷改产线。"""
+    import vue_contracts as vc
+    entries = _tmp_entries()
+    for pack in pb.ALL_TEMPLATES:
+        before = pb.load_style_pack(pack)
+        after = pb.load_style_pack(pack, vue_only=vc.discover(entries))
+        for role, lay in before["layouts"].items():
+            assert role in after["layouts"], f"{pack}/{role} 在合并后消失了"
+            assert after["layouts"][role] == lay, f"{pack}/{role} 条目被改了"
+        assert "field" in after["layouts"], f"{pack}: 新角色没被合并进来"
+
+
+def t_vue_only_conflict_with_static_file_raises():
+    """同一角色既有 `compositions/hook.html` 又有 hook 契约 ⇒ 抛。
+    静默二选一 = 渲染结果取决于扫描顺序，那是最难查的一类 bug。"""
+    import vue_contracts as vc
+    entries = _tmp_entries(role="hook")
+    try:
+        pb.load_style_pack("news-coral", vue_only=vc.discover(entries))
+    except pb.EmitterError as exc:
+        assert "hook" in str(exc), f"冲突消息没点名角色: {exc}"
+    else:
+        raise AssertionError("静态文件与契约撞车被静默吞了")
+
+
+def t_vue_only_layout_entry_has_emitter_shape():
+    """合并出的条目必须有发射器读的字段，且 composition_id 走零血统约定；
+    地面必须登记在 GROUND_TONE_BY_HEX —— 未登记的地面会让逐镜换色失效。"""
+    import vue_contracts as vc
+    entries = _tmp_entries()
+    pack = pb.load_style_pack("news-coral", vue_only=vc.discover(entries))
+    lay = pack["layouts"]["field"]
+    assert lay["vue_only"] is True and lay["bundle"] == "field-a"
+    assert lay["composition_id"] == "field-news-coral", lay["composition_id"]
+    assert lay["ground_tone"] == pb.GROUND_TONE_BY_HEX["#0a0a0d"]
+    assert [v["id"] for v in lay["variables"]] == ["kicker", "title"]
+    bad = _tmp_entries(role="cause", ground="#123456")   # 不在色板里的地面
+    try:
+        pb.load_style_pack("news-coral", vue_only=vc.discover(bad))
+    except pb.EmitterError as exc:
+        assert "#123456" in str(exc), f"未登记地面没点名色值: {exc}"
+    else:
+        raise AssertionError("色板外的地面被静默收下")
+
+
+def t_vue_bundle_for_resolves_from_contract():
+    """新角色不进 CUTOVER_ROLES 也该被路由到组件 —— 它没有静态文件可回落。"""
+    import vue_contracts as vc
+    entries = _tmp_entries()
+    saved = pb.VUE_ONLY_CONTRACTS
+    pb.VUE_ONLY_CONTRACTS = vc.discover(entries)
+    try:
+        assert pb.vue_bundle_for("news-coral", "field") == "field-a"
+        assert pb.vue_bundle_for("news-coral", "stat") is None, "未切角色必须仍回落静态支"
+    finally:
+        pb.VUE_ONLY_CONTRACTS = saved
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

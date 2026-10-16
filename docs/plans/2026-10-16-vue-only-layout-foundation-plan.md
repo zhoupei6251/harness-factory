@@ -78,6 +78,32 @@ src/web/entries/<bundle>/contract.toml
   因为新角色没有静态文件可聚类）。
 - 反向保护：某包既有 `field.html` 又有 `field` 契约 ⇒ **抛**，不许静默二选一。
 
+### Task 2.5: theme 词表归一（**Task 2 当场挖出的前置，未做**）
+
+Task 2 的合并逻辑原本在装载时就解析槽位，跑全 31 包立刻炸在
+`news-policy/field: 槽位 c0 指向 theme token 'cream'，该包 theme.toml 里没有它`。
+量下去才发现这不是个别缺项：
+
+> **31 个包的 `theme.toml` 一共 68 个 token，而在全部 31 包中都存在的 token 有 0 个**
+> —— 连 `ink`、`gray` 都不是全包共有。（`news-coral` 有 `cream/white/light-gray`，
+> `news-policy` 一个都没有；反过来 `news-policy` 有 `paper/cobalt/rule`。）
+
+⇒ **「新角色槽位来自 theme」这条前提当前不成立**：共享组件没法用 token 名引用色，因为没有公共名字。
+
+- **不做的方案**：给每个槽位配候选别名列表（`c0 = ["cream","paper","white",…]`，先命中先用）。
+  它会在某些包静默挑到语义不同的色（`paper` 在 A 包是冷白、在 B 包可能是暗调），
+  那是把"取不到就抛"换成"取错也不说" —— 与本片自己立的规矩冲突。
+- **要做的方案**：给每包 theme 加一层**规范角色别名**（`[canonical]` 段：
+  `ground / surface / paper / ink / accent / accent_deep / mute / mute_light`），
+  由该包自己的 token 显式映射而来，`frame.md` 色板表是它的出处；
+  契约只准引用 canonical 名。映射表本身由机检覆盖：每包 8 个角色必须都能解析、
+  且解析出的值必须真的是该包色板里的某一项（不许凭空造色）。
+- **这一层同时是 Phase 3 的前置**：静态文件删掉之后，槽位只能从归一后的主题取。
+  现在不做，Phase 3 也会撞上同一堵墙。
+- 因此 Task 2 的合并阶段**不再解析槽位**（改为存 `contract` 引用，发射时解析），
+  这样"某包缺 token"不会把整包变成不可加载；等 Task 2.5 落地后，
+  `slot_css` 的 vue-only 分支（Task 3）才有稳定的取值来源。
+
 ### Task 3: 槽位来源分叉
 
 `pack_slots.slot_css(pack, role)` 现在一律读静态文件。改为：
