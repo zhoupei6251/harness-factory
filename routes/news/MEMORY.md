@@ -396,14 +396,24 @@ in_progress:
     真源 `layout_selfcheck.VUE_GUARDS`；表由 `python skills/douyin-pro/scripts/layout_selfcheck.py
     --vue-guards` 现生成（抄一份就会分家）；机检 `t_vue_branch_guard_registry_is_complete`
     —— 站点必须解析得到、洞必须点名收口 Task、**洞数钉死 = 2**（多一条少一条都红）。
-    今天 `reused 11 · moved 4 · 洞 2`。接线方式：把规则 6/8/9 抽成 `check_momentum_budget` /
+    落地时 `reused 11 · moved 4 · 洞 2`（现况见下一条）。接线方式：把规则 6/8/9 抽成 `check_momentum_budget` /
     `check_font_rules` / `check_px_typography`，新增 `check_component(SFC)` 调**同一批谓词**，
     只换两处口子（取 SFC 的 `<style>`/`<script>`；补间目标 `xEl.value!` → 同标签 class）。
     静态支回归 227 + 7 文件 0 违规。**接线当场抓到 `field-a` 缺中文 @font-face**
     （混挂时被 hook-a 的全局面遮住，纯 field 片子会静默降档成系统默认字）。
-  - vue_only_holes_left: **两个** —— ① `CAPTION_RESERVE_INTRUDED`（none）只能按像素几何口径做，
-    挂普查层，顺带补静态支一直缺的法则 17；② `NO_TIMELINE_REGISTER`（unwired）TS 那条只查
-    "键不写死"，组件**一条都不注册**时是绿的 ⇒ vue-build 补正向断言。
+  - vue_only_holes_left: **已清零（2026-10-16）** —— ① `CAPTION_RESERVE_INTRUDED` 改由像素口径守：
+    `routes/news/scripts/content_floor.py`（墨 = 对本帧地面 ≥3:1；界现取自
+    `CAPTION_RESERVE_CQH` / `MAX_BOTTOM_DEAD_CQH`），普查判据 6 `intrude == 0` 已进 `pass`；
+    ② `NO_TIMELINE_REGISTER` 由 vue-build 新增正向断言补上（删掉注册语句时旧的"键不写死"
+    仍是绿的，只有新那条红 —— 实测）。登记表今天 `reused 11 · moved 6 · 洞 0`。
+  - bottom_dead_band: **量出来的一笔新账，未拍** —— 31 包**无图镜**最底墨线全在
+    54.7–58.0cqh，法则 17 要求 ≥71.5 ⇒ **0/31 达标**，下半部空 21.5–25.3cqh；
+    唯一过线的是新组件 `field`（77.34cqh）。不是退化 —— 法则 17 过去只在 path_c 配方几何上实现，
+    path_b 的 227 份模板从没量过。字幕区那半边 31/31 干净，所以已开成硬闸；
+    填幅这半边**只报不判**（`_summary.md` 的「填幅不足镜数」列），开成硬闸等于把闸改成装饰。
+    要拍的是：按法则 17 把无图态版式往下推（动 31 包 × 7 版式骨架），还是承认"无图态
+    上半部构图 + 下半部留给字幕"并把口径改成按有图态判。数据全文
+    `evidence/2026-10-16-content-floor-pixel-gate.md`。
   - vue_stale_css: **已修（2026-10-16）** —— `stage_vue_assets` 只拷不清，Vite CSS 名带内容 hash，
     `emit_host` 又按 `<bundle>*.css` 全发 ⇒ 复用 work_dir 时**两代样式同挂，谁赢取决于 hash 字母序**
     （普查目录跨轮复用，不是理论风险）。闸 `t_stage_vue_assets_leaves_no_stale_generation`。

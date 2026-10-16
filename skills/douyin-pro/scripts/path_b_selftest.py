@@ -4653,6 +4653,12 @@ def _guard_site_resolves(site: str, ts_checks: set[str], lsc) -> bool:
     if site.startswith("vue-build:"):
         frag = site.split(":", 1)[1]
         return any(frag in name for name in ts_checks)
+    if site.startswith("census:"):
+        # 站点串本身就是那条接线断言：`census:intrude` → 普查里必须有
+        # `row.get("intrude", 0) == 0`。普查改了写法，这里当场红。
+        src = (Path(__file__).resolve().parents[3]
+               / "routes/news/scripts/pack_render_census.py").read_text(encoding="utf-8")
+        return f'row.get("{site.split(":", 1)[1]}", 0) == 0' in src
     return False
 
 
@@ -4694,12 +4700,71 @@ def t_vue_branch_guard_registry_is_complete():
         assert _guard_site_resolves(site, ts_checks, lsc), f"{code}: 站点不存在或写法不认识 {site!r}"
         if site.startswith("component:"):
             assert state == "reused", f"{code}: 跑在组件工件上的那条不该记成 {state}"
-    assert len(holes) == 2, (
-        f"Vue 支的守卫洞数变了（应为 2，实为 {len(holes)}: {holes}）—— "
-        "补了洞就把表里那行改成 reused/moved，多了洞就写清是哪一条，别把这张表改松")
+    assert len(holes) == 0, (
+        f"Vue 支的守卫洞数变了（应为 0，实为 {len(holes)}: {holes}）—— "
+        "补了洞就把表里那行改成 reused/moved；真要开新洞，就把它写进计划并改这个数，"
+        "别把这张表改松")
     print(f"  [vue-guards] reused {sum(1 for r in lsc.VUE_GUARDS.values() if r['state'] == 'reused')}"
           f" · moved {sum(1 for r in lsc.VUE_GUARDS.values() if r['state'] == 'moved')}"
           f" · 洞 {len(holes)} {holes}")
+
+
+def t_content_floor_judgement_keeps_the_two_halves_apart():
+    """`content_floor` 的两半必须各自可判 —— 普查把字幕半边开成硬闸、填幅半边只报。
+
+    分不开就会一起被"先放宽一条"拖走：实测 31 包无图镜最底墨线全在 54.7–58.0cqh，
+    填幅半边今天没人过；字幕半边（>80cqh）31 包全过。合成一个判据就只能全红或全放。
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "routes/news/scripts"))
+    import content_floor as cfl
+    assert cfl.intrude_only(85.6) and not cfl.fill_only(85.6), \
+        "越过字幕区的帧应当只报侵入 —— 两半混了就没法分软硬"
+    assert cfl.fill_only(58.0) and not cfl.intrude_only(58.0), "空带不该被说成侵入字幕区"
+    assert not cfl.judge(77.3), f"field 实测 77.3cqh 两半都不该红: {cfl.judge(77.3)}"
+    assert cfl.judge(None) and cfl.intrude_only(None), "整帧无墨 = 空画面，必须红"
+    # 常数不许在这里抄第二份：三条界必须能从被检对象的源常量推出来
+    assert cfl.ZONE_TOP_CQH == 100.0 - cfl.lsc.CAPTION_RESERVE_CQH
+    assert cfl.FILL_FLOOR_CQH == cfl.LIMIT_CQH - cfl.hc.MAX_BOTTOM_DEAD_CQH
+
+
+def t_content_floor_skips_image_bearing_shots():
+    """带图镜整条跳过：照片本身就是画面内容，判它等于判"这张图铺满了"。
+
+    用提交进库的那份 field 探针 index.html 当被测面（hook 镜声明了 imagePath 但值为空，
+    所以三镜都该算无图 —— 空串和缺键是两回事，这里两头都测）。
+    """
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "routes/news/scripts"))
+    import content_floor as cfl
+    html = (Path(__file__).resolve().parents[3]
+            / "routes/news/evidence/2026-10-16-vue-only-merge/index.html")
+    windows = cfl.text_only_windows(html)
+    assert [name for name, _ in windows] == ["nc-night-hook__1", "field-news-coral__2", "nc-closer"], \
+        f"探针三镜都无图，窗口表应当三条: {windows}"
+    for _, at in windows:
+        assert 0.0 < at, f"中点秒数不合法: {at}"
+    text = html.read_text(encoding="utf-8")
+    # 属性值是 HTML 转义的（&quot;），改文要按盘上真实形态改，不然前提断言会假失败
+    patched = text.replace("imagePath&quot;: &quot;&quot;",
+                           "imagePath&quot;: &quot;assets/pic.jpg&quot;")
+    assert patched != text, "前提坏了：探针 index.html 里没有 imagePath 空串可改"
+    with tempfile.TemporaryDirectory() as tmp:
+        probe = Path(tmp) / "index.html"
+        probe.write_text(patched, encoding="utf-8")
+        got = cfl.text_only_windows(probe)
+        # 三条 clip 里只有 field 留得下来：hook/closer 被改成"有图"该跳过，
+        # 而 field 的契约**根本没有 imagePath 这一格**（none 单态）—— "缺键"与"空串"
+        # 是两种无图形态，都得算无图镜，这条顺带把两种都覆盖了。
+        assert [name for name, _ in got] == ["field-news-coral__2"], \
+            f"带图镜没被跳过 / 无图两种形态判错: {got}"
+
+
+def t_census_wires_the_content_floor_criterion():
+    """普查的第 6 条判据必须真的接在 pass 上 —— 只在工具里能跑不算闸。"""
+    src = (Path(__file__).resolve().parents[3]
+           / "routes/news/scripts/pack_render_census.py").read_text(encoding="utf-8")
+    assert "import content_floor" in src, "普查没引 content_floor"
+    assert 'row.get("intrude", 0) == 0' in src, "字幕侵入没进 pass 判据"
+    assert '"floor_worst"' in src and "thin_fill" in src, "填幅半边没落进表（只报也要看得见）"
 
 
 def t_emit_host_skips_vue_loader_when_no_vue_mount():

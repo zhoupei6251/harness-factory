@@ -250,6 +250,19 @@ for (const name of entryNames) {
       `dist/vue/${name}.js 出现 window.__timelines["<字面量>"] —— 注册键必须是传入的 compositionId`
     );
   });
+
+  // 上一条只查"键不是字面量"，**一条都不注册**时它是绿的 —— 那是半条断言。
+  // 引擎 `pollSubCompositionTimelines` 逐 `[data-composition-id]` 元素查
+  // `__timelines[<该元素 id>]`：没注册 = clip 存在但一帧都不动，且没有任何地方报错。
+  // 所以正向半边必须单独钉：至少一条 `__timelines[<非字面量>] =` 赋值。
+  check(`${name}: 时间轴必须注册（正向：__timelines[<传入 id>] 至少一条赋值）`, () => {
+    const js = readFileSync(bundlePath(name), "utf8");
+    assert(
+      /window\.__timelines\[\s*(?!["'])[^=\]]+\]\s*=/.test(js),
+      `dist/vue/${name}.js 里找不到 window.__timelines[<传入 id>] = tl —— ` +
+        "组件不注册时间轴时 clip 会静止不动，且 check --strict 不报（Task 5 实测）"
+    );
+  });
 }
 
 check("渲染依赖版本已钉死（spec §7 风险 7：caret 范围让产物字节取决于 lock）", () => {

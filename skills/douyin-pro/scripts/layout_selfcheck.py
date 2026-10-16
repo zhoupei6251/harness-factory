@@ -556,9 +556,11 @@ VUE_GUARDS: dict[str, dict[str, str]] = {
         "note": "组件没有 <div id=\"root\" data-composition-id>：id 挂在发射器写的 clip 上，"
                 "取值由 contract.toml 供（那条闸逐字段比契约→条目）。"},
     "NO_TIMELINE_REGISTER": {
-        "state": "unwired", "site": "vue-build:时间轴注册键不写死",
-        "note": "今天那条 TS 闸只查「键不是字面量」，组件**一条都不注册**时它是绿的 —— "
-                "缺「注册必须存在」这一半。收口：Task 5 在 vue-build 里补一条正向断言。"},
+        "state": "moved", "site": "vue-build:时间轴必须注册",
+        "note": "静态支查的是「脚本里有没有 `window.__timelines[\"<id>\"]`」；组件的键是传入的 "
+                "compositionId，所以正向半边由 vue-build 那条正则断言（`__timelines[<非字面量>] =` "
+                "至少一条）。负向半边（不许写字面量）是同文件的另一条。"
+                "两半各红过一次：删掉注册语句时只有正向红（实测）。"},
     "CONTRACT_ID_MISMATCH": {
         "state": "moved", "site": "vue-build:composition 身份不写死",
         "note": "子合成「根 id == timeline 键」在组件里由同一个变量保证：注册键 = 传入的 "
@@ -585,11 +587,15 @@ VUE_GUARDS: dict[str, dict[str, str]] = {
                                   "note": "enumerate_tweens 对 ref 目标同样产出变量文本，"
                                           "所以 driftDur 出现与否的判据不用改。"},
     "CAPTION_RESERVE_INTRUDED": {
-        "state": "none", "site": "none",
+        "state": "moved", "site": "census:intrude",
         "note": "文本口径对组件会**假红**（偏移相对内层 stage 不是 #root），而引擎的 "
                 "--caption-zone 已用活体负例证明不是侵入探测器（地点行渲到 85.6cqh，"
                 "check --strict 仍 0 finding，见 evidence/2026-10-16-task5-precheck-findings.md）。"
-                "只能按像素几何口径做。收口：Task 5 的普查层像素闸。"},
+                "只能按像素几何口径做 —— 已落 `routes/news/scripts/content_floor.py`"
+                "（墨 = 对本帧地面 ≥3:1，界 = 80.0 / 71.5cqh），普查第 6 条判据引它。"
+                "口径边界要写清：它量的是**普查那条片子里的无图镜**，`field` 要进普查稿件"
+                "清单才会被量到（Task 6）；今天它由探针帧实测 77.34cqh 过线，"
+                "活体负例 85.57cqh 被同一把尺判红。"},
     "MISSING_CJK_FONT_FACE": {"state": "reused", "site": "component:check_component",
                               "note": "接线时 field-a 真的缺这份 face（混挂时被 hook-a 的"
                                       "「全局 @font-face」遮住了）—— 这条不是假想洞。"},
@@ -623,10 +629,11 @@ def vue_guard_table() -> str:
     counts = {s: sum(1 for r in VUE_GUARDS.values() if r["state"] == s)
               for s in ("reused", "moved", "unwired", "none")}
     holes = sorted(c for c, r in VUE_GUARDS.items() if r["state"] in ("unwired", "none"))
+    tail = f"（{', '.join(holes)}）" if holes else "（无 —— 每条都有归属）"
     return "\n".join([
         header, *rows, "",
         f"合计 {len(VUE_GUARDS)} 条：reused {counts['reused']} · moved {counts['moved']} · "
-        f"洞 {counts['unwired'] + counts['none']}（{', '.join(holes)}）",
+        f"洞 {counts['unwired'] + counts['none']}{tail}",
     ])
 
 

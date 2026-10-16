@@ -217,6 +217,14 @@ SFC 版检查 = `check_component`，复用抽出来的 `check_momentum_budget` /
 **未做**：像素几何闸（含法则 17 填幅）与 vue-build 的"注册必须存在"正向断言。
 全文 `evidence/2026-10-16-vue-guard-registry.md`。
 
+**Task 5 后半做完（2026-10-16，同日）**：两个洞都清零。
+① vue-build 补正向断言 `__timelines[<非字面量>] =` 至少一条（删掉注册语句时只有新那条红，实测）；
+② 像素口径闸门 = `routes/news/scripts/content_floor.py`，接成普查判据 6。
+字幕区半边（>80cqh）31 包全过 ⇒ 开成硬判据；填幅半边（<71.5cqh）**0/31 过** ⇒ 只报不判，
+落进 `_summary.md` 当账。登记表 `reused 11 · moved 6 · 洞 0`，`path_b_selftest` 245/245。
+数据与口径全文 `evidence/2026-10-16-content-floor-pixel-gate.md`。
+**新开的账（未拍）**：无图态版式下半部空 21.5–25.3cqh（227 份模板共有，从没量过）。
+
 ### Task 6: 真渲染闭环
 
 `--target-seconds 30` 渲一条含 `field` 镜的片；要求 `check --strict` 0/0、零 WARN、

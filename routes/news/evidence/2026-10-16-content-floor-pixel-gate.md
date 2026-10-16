@@ -1,0 +1,87 @@
+# 内容下沿的像素闸（Task 5 后半）· 顺带量出静态支一笔没记账的空带
+
+**日期** 2026-10-16 · 承接 `2026-10-16-vue-guard-registry.md`（登记表当时剩两个洞）
+
+## 为什么只能按像素量
+
+`layout_selfcheck` 规则 7 读 CSS 的 `bottom:`/`inset:`，成立前提是**偏移相对满幅 `#root`**。
+组件不是：`.fd-place{bottom:6cqh}` 在 `.fd-stage{inset:0 0 36cqh 0}` 里，实际 42cqh ⇒
+文本口径搬到组件上**假红**。而引擎的 `--caption-zone` 已用活体负例证明**不是侵入探测器**
+（`2026-10-16-task5-precheck-findings.md` §2）。所以两边都不许抄，只能量。
+
+## 口径（三条界全部现取，不抄数）
+
+- **墨** = 与**本帧地面色**构成 ≥ 3:1 的像素。3:1 不是新阈值，是本仓库对比度审计与引擎
+  `contrast_aa_failure` 用的同一条 AA 大字档线 —— "看得见的字"本就是它的语义。
+- **地面色** = 本帧像素按 8 阶量化后的众数（版式是平涂地面 + 少量墨，按面积必赢）。
+- **界** = 字幕区上沿 `100 − CAPTION_RESERVE_CQH = 80.0cqh`；填幅下界
+  `80.0 − CONTENT_FLOOR_MARGIN_CQH − MAX_BOTTOM_DEAD_CQH = 71.5cqh`（后两个常数取自 `hf_compile`）。
+- **只量无图镜**：照片本身就是画面内容，判它等于判"这张图铺满了"。
+  "缺 `imagePath` 这一格"（field 的 none 单态）与"有格但值为空串"两种形态都算无图，
+  由 `t_content_floor_skips_image_bearing_shots` 一头一条钉住。
+
+工具：`routes/news/scripts/content_floor.py`（`--png` 单帧 / `--video` 逐无图镜中点帧）。
+
+## 先校验尺子，再拿它量
+
+| 帧 | 已知 | 本尺量出 |
+|---|---|---|
+| `field-frame-after.png` | 上一轮用 >120 亮度粗尺量得 77.3cqh | **77.34cqh** ✓ |
+| `field-frame-before-contrast-fix.png` | 同画面，地点行更暗 | 77.40cqh ✓（不受影响，符合预期） |
+| `caption-intrusion-negative.png` | 活体负例，地点行故意压进 14cqh | **85.57cqh ✗ 判红** ✓ |
+
+两把独立的尺在同一帧上差 0.04cqh，负例被同一把尺判红 —— 尺子先自证。
+
+## 31 包普查（拿现成的 10-16 上午那轮 `silent.mp4`，零渲染成本）
+
+每包取"最底墨线最高"的那一镜（worst）：
+
+```
+54.7cqh  news-policy
+58.0cqh  news-alert / news-alert-warning / news-blast / news-blast-score / news-bulletin /
+         news-bulletin-strip / news-coral / news-coral-mono / news-dawn / news-dusk /
+         news-explainer / news-explainer-blueprint / news-ink / news-ink-graphite /
+         news-mosaic / news-noir / news-onsite / news-onsite-urgent / news-paper /
+         news-podcast / news-polarity / news-policy-bold / news-stat / news-stat-grid /
+         news-takes / news-takes-column / news-thread / news-thread-tribute /
+         news-world / news-world-globe
+包数 31 · 最差 54.7 · 中位 58.0 · 最好 58.0
+达标(≥71.5) 0/31        越字幕区(>80) 0/31
+```
+
+⇒ **两件事，分开看**：
+1. 字幕区半边 **31/31 干净** —— 把它开成硬闸今天零成本，且能防回归。已开（普查判据 6）。
+2. 填幅半边 **0/31 达标**。今天所有 pack 的无图镜下半部空 **21.5–25.3cqh**，
+   而 `field`（新组件）是量到 **77.34cqh** 的那一个 —— 唯一过的。
+   这不是新退化：法则 17 从来没在 path_b 上量过（`hf_compile` 那条只管 path_c 配方几何）。
+   30 包都恰好 58.0 是因为它们同一份 t001 稿、同一副骨架（v008 从 news-coral-night 复制），
+   最差镜都是 closer。
+
+⇒ 半边硬、半边报，写死在代码里而不是"以后再说"：
+`row["intrude"] == 0` 进 `pass`；`floor_worst` / `thin_fill` 进 `_summary.md` 的列上当账。
+把填幅开成硬闸 = 普查永久全红且没人修，那是把闸改成装饰。
+
+## 接线时测试自己抓到的一个 bug
+
+`text_only_windows` 第一版用 `'"imagePath"' in 属性值` 判有没有图 —— 但 `data-variable-values`
+里的 JSON 是 **HTML 转义**的（`&quot;`），那个子串**永远不成立** ⇒ 带图镜一条都不会被跳过。
+是 `t_content_floor_skips_image_bearing_shots` 的"前提断言"（改不到 imagePath 就抛）先失败
+才暴露的。改成 `html.unescape` 后再 `json.loads`。
+
+## 现在谁守 `CAPTION_RESERVE_INTRUDED`
+
+登记表里那行从 `none` 改成 `moved`，站点 `census:intrude` —— 站点串本身就是接线断言
+（普查源码里必须出现 `row.get("intrude", 0) == 0`，改了写法当场红）。
+Vue 支的守卫洞数从 2 降到 **0**（另一个洞 `NO_TIMELINE_REGISTER` 由 vue-build 的正向断言补上：
+删掉注册语句时，旧的"键不写死"那条仍是绿的，只有新那条红 —— 实测）。
+
+`path_b_selftest.py` **245/245**；`reused 11 · moved 6 · 洞 0`。
+
+## 留给下一步的两件事
+
+1. **`field` 进普查稿件清单**（Task 6）：现在这条闸量的是 t001 那条片子里的镜，
+   `field` 不在里面 —— 它今天只被探针帧量过。不进去，新角色就还是"闸扫不到"。
+2. **填幅这笔账要不要平**（未拍）：21.5–25.3cqh 的下半部空带是 227 份模板共有的设计事实，
+   不是某包的偏差。要么按法则 17 把无图态的版式往下推（动骨架，31 包 × 7 版式），
+   要么承认"无图态就该上半部构图 + 下半部留给字幕"并把法则 17 的口径改成按有图态判。
+   两条都比开闸便宜地伤人，所以先落账不先动手。
