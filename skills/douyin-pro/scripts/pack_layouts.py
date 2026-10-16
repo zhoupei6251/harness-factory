@@ -29,6 +29,19 @@ FIELDS = ("composition_id", "ground_hex", "ground_tone")
 VAR_FIELDS = ("id", "type", "label", "default", "min", "max")
 
 
+def static_layouts(pack: dict) -> dict:
+    """把 ``layouts`` 收口到**静态支**（有 ``compositions/<role>.html`` 的那些）。
+
+    Vue-only 版式（地基 Task 2 合并进来的）的真源是组件目录里的 ``contract.toml``，
+    不是 HTML。让它进 ``layouts.toml`` 会造成同一份变量契约有两个登记处 —— 而本模块的
+    全部意义是「登记表 == HTML」，多一个来源就等于把等价闸改成比抄写。
+    所以生成侧直接拒，比对侧按这个口径收口（P3 换源后仍然成立：那时静态支读这张表，
+    契约支读 contract.toml，两条各有唯一真源）。
+    """
+    return {role: layout for role, layout in pack["layouts"].items()
+            if not layout.get("vue_only")}
+
+
 def _toml_str(value: str) -> str:
     return '"' + value.replace("\\", "\\\\").replace('"', '\\"') + '"'
 
@@ -59,6 +72,13 @@ def _variable_table(var: dict, where: str) -> str:
 
 
 def write_layouts(pack_dir: str, pack: dict) -> str:
+    vue_only = sorted(role for role, layout in pack["layouts"].items()
+                      if layout.get("vue_only"))
+    if vue_only:
+        raise ValueError(
+            f"{Path(pack_dir).name}: 试图把 Vue-only 版式 {vue_only} 写进 {LAYOUTS_FILENAME} —— "
+            "它们没有 compositions/*.html，契约在 src/web/entries/<bundle>/contract.toml。"
+            "一张表两个真源等于把等价闸变成比抄写。")
     lines = [
         "# 编译产物：由 pack_layouts.write_layouts 从 compositions/*.html 抽出，勿手改。",
         "schema = \"news-layouts/2\"",
@@ -120,12 +140,16 @@ def _compare_variables(name: str, role: str, got_vars, want_vars) -> list[str]:
 
 
 def verify_pack(pack_dir: str, live_pack: dict) -> list[str]:
-    """layouts.toml 与 load_style_pack() 当次读出的逐字段相等（等价闸）。"""
+    """layouts.toml 与 load_style_pack() 当次读出的**静态支**条目逐字段相等（等价闸）。
+
+    Vue-only 版式按 `static_layouts` 收口在外 —— 它的登记表是 contract.toml，
+    由 `t_vue_only_contract_is_the_registry_for_its_role` 单独守。
+    """
     path = Path(pack_dir) / LAYOUTS_FILENAME
     if not path.exists():
         return [f"{Path(pack_dir).name}: 缺 {LAYOUTS_FILENAME}"]
     got = load_layouts(pack_dir)
-    live = live_pack["layouts"]
+    live = static_layouts(live_pack)
     name = Path(pack_dir).name
     problems = [f"{name}: 登记表缺版式 {role}" for role in set(live) - set(got)]
     problems += [f"{name}: 登记表多出版式 {role}" for role in set(got) - set(live)]

@@ -373,6 +373,21 @@ in_progress:
     机检必须审关系词表而非只审箭头。
     另沉淀**法则 10**：清单行区禁用 `space-between` 撑固定区高，且任何 N 下不得留 >15% 整块空白
     —— 这条是**被"照法则写出来的正确实现"证伪一次后**才修订的（`layers` 版 N=3 仍留 40% 空）。
+  - vue_only_foundation: **地基 Task 1–4 已落地（2026-10-16）** —— 版式可以**只有组件、没有静态 HTML**：
+    `src/web/entries/<bundle>/contract.toml` 供身份/变量/槽位，`load_style_pack` 把它**合并进同一个
+    `pack["layouts"]`**（用户裁决：走合并方案，Phase 3 少一步；我提的"另立一个 dict"被否），
+    六类消费者假设逐条改判。第一个使用者 `field-a`（none 单态）真渲染通过：490/490 帧、0 WARN、
+    `check --strict` 0 finding。两条**产线级**规矩由这次实测立起来：
+    ① 装饰性文字（12% 水印那一类）**必须带 `data-layout-ignore="true"`**，否则 `check --strict`
+      按正文 3:1 判它、**整片被拒渲染**（去掉属性的负例已复现，不是推测）；
+    ② 组件里不许写死色，一律 `var(--cNN)` —— 地点行 `rgba(245,240,232,.30)` 实测 2.43:1 就是被这条抓出来的。
+    闸：`t_vue_only_contract_is_the_registry_for_its_role`（契约就是新角色的登记表，`layouts.toml`
+    拒收 Vue-only 角色）+ 变量第四来源「作者供料位」（`author_slots`，不许有 default）。
+    详见 `evidence/2026-10-16-vue-only-merge.md`。
+  - vue_only_next: **Task 5 未做，且它是硬前置** —— `layout_selfcheck` 只扫 `compositions/*.html`，
+    所以 `field` 现在**绕过全部 17 条结构不变量**；后果当场就看见了：渲出来的下沿 ~22% 空带
+    `check --strict` 的 layout 段报 0 finding。**先落 `t_vue_only_layouts_pass_layout_selfcheck`，
+    再按闸修填幅**，别先目测改一版（那没有判据）。
   - composition_id_legacy_debt: **未修，独立口子** —— 30 个包的 `hook`/`quote`/`story`
     的 `composition_id` 全是 `nc-night-*`（v008 批量从 `news-coral-night` 复制骨架留下），
     即 `news-alert/hook` 与 `news-coral/hook` **共用同一个 id 字符串**。
@@ -401,4 +416,4 @@ in_progress:
           （skills/douyin-upload + 本机 .venv/Scripts/sau.exe，见其 references/local-env.md）
 
 ## Last updated
-last_updated: 2026-10-15
+last_updated: 2026-10-16

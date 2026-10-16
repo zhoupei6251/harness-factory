@@ -162,8 +162,9 @@ Task 2 的合并逻辑原本在装载时就解析槽位，跑全 31 包立刻炸
 [slots]                       # 契约自带默认值（字面 hex，不查 theme）
 c0 = "#0a0a0d"                # 暗地面
 c1 = "#f5f0e8"                # 暗面上的字
-[slots.overrides]             # 想随包变的，显式写一条 —— 是设计决定，不是推导结果
-news-world = { c0 = "#0e1b36" }
+[overrides]                   # ← 顶层段。写成 [slots.overrides] 会被 tomllib 嵌进 slots，
+                              #   于是 "overrides" 当成一条槽位名（不是 cNN）当场抛。
+news-world = { c0 = "#0e1b36" }   # 想随包变的，显式写一条 —— 是设计决定，不是推导结果
 ```
 
 - `pack_slots.slot_css(pack, role)`：先查该 `(role, variant)` 有没有 Vue-only 契约；
@@ -179,6 +180,14 @@ news-world = { c0 = "#0e1b36" }
 按 `evidence/2026-10-16-field-proto.md` 的原型落组件，含两处已定改动：
 眉标不写"现场无影像"这类道歉式文案；36–62cqh 的空带压掉。
 契约变量：`kicker / title / onscreen / imagePath / imageCredit / imageGrade / slotSeconds`。
+
+**落地记录（2026-10-16）**：合并方案按用户裁决走完，六类消费者假设逐条改判 + 13 处变异证明，
+`path_b_selftest.py` **239/239**；第一条 `field` 镜真渲染 490/490 帧、0 WARN、`check --strict` 0 finding。
+两处实测缺陷（地点行 2.43:1、12% 水印漏 `data-layout-ignore`）已修，证据与归因负例见
+`evidence/2026-10-16-vue-only-merge.md`。
+变量表与本计划不同：`imagePath/imageCredit/imageGrade` **本 Task 不进契约**（影像供给实测 0/9 可用，
+spec §7.5 未拍），改落 `ghost`/`place` 两个作者供料位。
+**遗留**：下沿 ~22% 空带 —— 必须先做 Task 5 的闸再按闸修，否则改一版没有判据。
 
 ### Task 5: 新角色的自检面
 

@@ -20,6 +20,10 @@ import path_b_build as pb
 
 CONTRACT_NAME = "contract.toml"
 REQUIRED_VAR_FIELDS = ("id", "type", "label")
+#: 契约允许出现的顶层键。清单外的一律抛 —— 键名写错（`override` 少个 s）会静默失效，
+#: 而静默失效的槽位覆盖正是「改了没效」里最难发现的那一类。
+CONTRACT_KEYS = {"role", "variant", "ground", "variables", "slots",
+                 "overrides", "author_slots"}
 
 
 class ContractError(RuntimeError):
@@ -49,11 +53,40 @@ def validate_contract(contract: dict, where: str = "<inline>") -> dict:
         if var["id"] in seen:
             raise ContractError(f"{where}: 变量 id 重复 {var['id']!r}")
         seen.add(var["id"])
+    # `author_slots` = 作者供料位：机器切不出来、只能由分镜 JSON 显式给的事实格
+    # （field 的 `ghost`/`place` —— 画面主体与地点）。它和「三条机器来源」并列成第四种，
+    # 所以发射路径的判定必须是**可证的**：`resolve_variable` 的 scene 同名键分支命中它，
+    # 而"没给就抛"由下面这条 no-default 规则保证 —— 一旦给了 default，缺事实会被
+    # 兜底字符串静默填上，那正是 frame.md 法则 6 禁的"拿占位文字冒充事实"。
+    author = contract.get("author_slots") or []
+    if not isinstance(author, list):
+        raise ContractError(f"{where}: author_slots 必须是字符串数组，实为 {type(author).__name__}")
+    by_id = {var["id"]: var for var in variables}
+    for var_id in author:
+        if var_id not in by_id:
+            raise ContractError(
+                f"{where}: author_slots 里的 {var_id!r} 不是本契约的变量 id —— "
+                "这条登记永远不会生效（改名时忘了同步），别让它挂着")
+        var = by_id[var_id]
+        if "default" in var:
+            raise ContractError(
+                f"{where}: {var_id!r} 既声明为作者供料位又带 default={var['default']!r} —— "
+                "分镜没写这一格时会静默用上占位默认值。事实位不许有默认值")
+        if pb.INDEXED_VAR_RE.match(var_id) or var_id in pb.DERIVERS:
+            raise ContractError(
+                f"{where}: {var_id!r} 声明为作者供料位，但发射器本来就能自己切出来"
+                "（DERIVERS / 条目类语法）—— 作者漏写时会被静默填上，这条登记是个谎")
     return contract
 
 
 def load(path: Path) -> dict:
     contract = tomllib.loads(Path(path).read_text(encoding="utf-8"))
+    # 先按"人写的键"校验，再注入 _bundle/_dir：内部键混进白名单就等于给拼写错误开了个口子
+    unknown = sorted(set(contract) - CONTRACT_KEYS)
+    if unknown:
+        raise ContractError(
+            f"{path}: 契约有认识不到的顶层键 {unknown} —— 认得的是 "
+            f"{sorted(CONTRACT_KEYS)}。名字写错的段（如 [override]）不会报错，只会静默不生效")
     contract["_bundle"] = Path(path).parent.name
     contract["_dir"] = str(Path(path).parent)
     contract.setdefault("slots", {})
@@ -92,7 +125,11 @@ def composition_id_for(pack: str, role: str) -> str:
 
 
 def slot_values(pack: str, contract: dict) -> list[str]:
-    """该包该角色的有序槽位值 = 契约 `[slots]` 的字面 hex，套上 `[slots.overrides].<pack>`。
+    """该包该角色的有序槽位值 = 契约 `[slots]` 的字面 hex，套上顶层 `[overrides].<pack>`。
+
+    覆盖段是**顶层** `[overrides]`（不是 `[slots.overrides]`）：后者会被 tomllib 嵌进
+    `slots` 里，`slots` 的每个键都必须是 `cNN`，于是"overrides"会当成一条槽位名报错 ——
+    看得见的失败比静默合并好，但段落形状还是照实际读的写。
 
     **不查 `theme.toml`。** 两条实测把那条路堵死了：31 包共 68 个 token、
     在所有包都存在的有 **0 个**；且 **0/31 包有"单一地面"**（每包在 7 个版式上用多个地面），
@@ -106,7 +143,7 @@ def slot_values(pack: str, contract: dict) -> list[str]:
     unknown = sorted(set(overrides) - set(pb.ALL_TEMPLATES))
     if unknown:
         raise ContractError(
-            f"{contract['role']} 的 [slots.overrides] 写了不存在的包 {unknown} —— "
+            f"{contract['role']} 的 [overrides] 写了不存在的包 {unknown} —— "
             "这条 override 永远不会生效；拼包名请从 ALL_TEMPLATES 里取")
     merged = dict(slots)
     merged.update(overrides.get(pack) or {})

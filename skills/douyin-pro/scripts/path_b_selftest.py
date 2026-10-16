@@ -1713,8 +1713,15 @@ def t_auto_layout_stems_are_the_only_vocabulary():
     assert named <= vocab, f"choose_layout 把词表外的名放进了自动候选: {sorted(named - vocab)}"
     assert named == vocab, f"词表与形态优先级表脱节: 这些词干永不被优先点名 {sorted(vocab - named)}"
     for pack_name in pb.ready_packs():
-        stems = set(pb.load_style_pack(pack_name)["layouts"])
-        assert stems <= vocab, f"{pack_name} 交出自动模式选不到的版式: {sorted(stems - vocab)}"
+        layouts = pb.load_style_pack(pack_name)["layouts"]
+        # 词表外的名要分两种，只有第一种是本闸要防的：
+        #   静态版式 → 自动模式永远选不到、也不会报错 = 静默惰性（原判据，一个字符没松）；
+        #   Vue-only 契约 → 「只能点名、不进自动候选」是**设计状态**（地基 Task 4），
+        #     它由 contract.toml 供身份，所以有出处、不是孤儿。不进自动候选这件事
+        #     由上面两条断言证完：自动候选 = 优先级表里的字面名 ∪ AUTO_LAYOUT_STEMS。
+        orphans = sorted(role for role, layout in layouts.items()
+                         if role not in vocab and not layout.get("vue_only"))
+        assert not orphans, f"{pack_name} 交出自动模式选不到的版式: {orphans}"
 
 
 # ---------------- 版式闸门的用法错误(不许"0 个文件"空过) ----------------
@@ -3015,15 +3022,18 @@ def t_hf_compile_pack_loads_through_the_real_emitter():
     resolved = pb.pack_dir("news-editorial-warm")
     assert resolved.endswith(os.path.join("hyperframes_path_c", "news-editorial-warm")), resolved
     pack = pb.load_style_pack("news-editorial-warm")
-    assert sorted(pack["layouts"]) == sorted(hs.CANONICAL_LAYOUTS)
+    # CANONICAL_LAYOUTS 是**编译产物**的家族定义；Vue-only 契约角色（field）不是编译出来的，
+    # 按静态口径收口后再比 —— 否则这条闸会随每个新角色红一次，而编译支一个字节都没变。
+    static = pkl.static_layouts(pack)
+    assert sorted(static) == sorted(hs.CANONICAL_LAYOUTS)
     spec, _tok = _flagship_tokens()
     prefix = hc.pack_prefix(spec.id)
-    for layout, entry in pack["layouts"].items():
+    for layout, entry in static.items():
         assert entry["composition_id"] == f"{prefix}-{layout}", entry["composition_id"]
         assert entry["ground_hex"] == spec.surfaces[hc.GROUNDS[layout]].lower()
         assert [v["id"] for v in entry["variables"]] == hc.CONTRACTS[layout], \
             f"{layout}: 发射器解析出的契约与 CONTRACTS 不同"
-    tones = {entry["ground_tone"] for entry in pack["layouts"].values()}
+    tones = {entry["ground_tone"] for entry in static.values()}
     assert tones == {pb.TONE_LIGHT, pb.TONE_DARK}, \
         f"包里只有一个明暗面，`_tone` 的翻面与相邻镜换地面都无从可判: {tones}"
     # story 的翻面必须三样齐：CSS 覆盖、根节点属性初值、脚本改 dataset（news-coral 实测形状）
@@ -4738,7 +4748,9 @@ def t_layouts_toml_roundtrip_keeps_loader_fields():
     # 用 tempfile 而不是 live["dir"]：测试往真 pack 目录写 layouts.toml，
     # 会把未审的产物留在工作树里，git status 当场不干净（AGENTS.md 的 hygiene gate）。
     for style in ("news-coral", "news-alert"):
-        live = pb.load_style_pack(style)
+        # vue_only={} ⇒ 纯静态视图。layouts.toml 的口径是「compositions/*.html 的编译产物」，
+        # 契约支的角色不进这张表（否则同一份变量契约两个登记处，等价闸就变成比抄写）。
+        live = pb.load_style_pack(style, vue_only={})
         with tempfile.TemporaryDirectory() as tmp:
             pkl.write_layouts(tmp, live)
             got = pkl.load_layouts(tmp)
@@ -4757,6 +4769,20 @@ def t_layouts_toml_roundtrip_keeps_loader_fields():
                     f"{style}/{role} 变量契约漂：登记表={rec['variables'][:2]}… "
                     f"HTML={want['variables'][:2]}…")
             assert pkl.verify_pack(tmp, live) == [], f"{style}: round-trip 应零问题"
+            # 拒绝侧要当场证明（绿闸不会自己长出来）：把合并视图喂给生成器必须抛，
+            # 否则"契约支不进表"只是注释里的一句话。
+            merged = pb.load_style_pack(style)
+            assert "field" in merged["layouts"], f"{style}: 前提坏了 —— 合并视图里没有 Vue-only 角色"
+            try:
+                pkl.write_layouts(tmp, merged)
+            except ValueError as exc:
+                assert "field" in str(exc), f"拒绝消息没点名角色: {exc}"
+            else:
+                raise AssertionError("Vue-only 版式被静默写进了 layouts.toml")
+            # 比对侧同理：合并视图交给 verify_pack 应当零问题（按静态口径收口），
+            # 而不是报"登记表缺版式 field"——那是把收口写反。
+            assert pkl.verify_pack(tmp, merged) == [], \
+                f"{style}: verify_pack 没按静态口径收口: {pkl.verify_pack(tmp, merged)}"
 
 
 def t_layouts_equivalence_gate_covers_all_217_layouts():
@@ -4767,17 +4793,27 @@ def t_layouts_equivalence_gate_covers_all_217_layouts():
     比对口径（终审 I-2）：版式级三字段 + **整条变量契约逐字段**（id/type/label/default，
     number 型还带 min）；不是只比 id 序列。发射器实读 type（path_b_build.py:1937）与
     default（:2154-2155），HTML 里这两样漂了必须在这里红，否则 P3 换源时登记表供不出来。
+
+    217 这个数字**只属于静态支**（7 角色 × 31 包）。Vue-only 版式的登记表是组件目录里的
+    `contract.toml`，所以这里按 `pkl.static_layouts` 收口比对，另外单独锁合并数量：
+    契约条数 × 包数 —— 少合并（某个包没拿到 field）和多合并（同角色算两遍）都红。
     """
-    problems, total = [], 0
+    problems, n_static, n_vue = [], 0, 0
     for style in pb.ALL_TEMPLATES:
         live = pb.load_style_pack(style)
         problems += pkl.verify_pack(live["dir"], live)
-        total += len(live["layouts"])
+        n_static += len(pkl.static_layouts(live))
+        n_vue += len(live["layouts"]) - len(pkl.static_layouts(live))
     assert not problems, "等价闸失败:\n  " + "\n  ".join(problems)
-    assert total == 217, f"版式总数应为 7 × {len(pb.ALL_TEMPLATES)} = {7 * len(pb.ALL_TEMPLATES)}，实得 {total}"
+    assert n_static == 217, (f"静态版式总数应为 7 × {len(pb.ALL_TEMPLATES)} = "
+                             f"{7 * len(pb.ALL_TEMPLATES)}，实得 {n_static}")
+    want_vue = len(pb.vue_only_contracts()) * len(pb.ALL_TEMPLATES)
+    assert n_vue == want_vue, (f"Vue-only 版式合并数对不上契约登记表: 实得 {n_vue}, "
+                               f"应为 {len(pb.vue_only_contracts())} 条契约 × "
+                               f"{len(pb.ALL_TEMPLATES)} 包 = {want_vue}")
 
 
-#: 发射器给变量填值的三条来源。词表本身就是三条并集，逐条都被行使；
+#: 发射器给变量填值的四条来源。词表本身就是四条并集，逐条都被行使；
 #: 各类的**实际条数**由 `t_every_layout_variable_id_has_a_source` 末尾的断言机器校验，
 #: 所以这里不再抄写数字——抄来的副本会腐烂（这条注释已经错过一次）。
 IMAGE_SOURCED_IDS = {"imagePath", "imageCredit"}   # resolve_variable 里写死的取图分支
@@ -4785,9 +4821,16 @@ IMAGE_SOURCED_IDS = {"imagePath", "imageCredit"}   # resolve_variable 里写死�
 
 def t_every_layout_variable_id_has_a_source():
     unknown = []
-    n_derivers = n_indexed = n_image = 0
+    static_author = []
+    n_derivers = n_indexed = n_image = n_author = 0
     for style in pb.ALL_TEMPLATES:
         for role, layout in pb.load_style_pack(style)["layouts"].items():
+            # 第四桶「作者供料位」不是"某条 id 的特殊待遇"，而是版式条目自带的一项登记
+            # （Vue-only 契约的 author_slots，由 vue_contracts 校验：id 必须在契约里、
+            # 且不许有 default）。静态支这里恒为空集 —— 七角色一条也不走这条路。
+            author = set(layout.get("author_slots") or ())
+            if author and not layout.get("vue_only"):
+                static_author.append(f"{style}/{role}: {sorted(author)}")
             for var in layout["variables"]:
                 var_id = var["id"]
                 # 先判 INDEXED_VAR_RE 这条**语法**，再查 DERIVERS 那张**可变字典**——顺序不能反过来。
@@ -4807,21 +4850,31 @@ def t_every_layout_variable_id_has_a_source():
                 if var_id in IMAGE_SOURCED_IDS:
                     n_image += 1
                     continue
+                if var_id in author:
+                    n_author += 1
+                    continue
                 unknown.append(f"{style}/{role}: {var_id}")
-    assert not unknown, ("这些变量 id 三条来源都不沾，抽取出来也填不进: "
+    assert not unknown, ("这些变量 id 四条来源都不沾，抽取出来也填不进: "
                          + ", ".join(sorted(set(unknown))[:12]))
-    # 四桶计数 + 总数一起断言：某条来源退化（比如 load_style_pack 抽 variables 抽成空表、
+    # 五桶计数 + 总数一起断言：某条来源退化（比如 load_style_pack 抽 variables 抽成空表、
     # 或 DERIVERS 少了条目被 INDEXED/取图桶顶位）都会在这里红，而不是靠 unknown 为空蒙过。
     # 不许调用 pb.register_indexed_derivers()：那会改全局 DERIVERS。上面的优先级已让四数与
     # DERIVERS 是否被发射路径灌过无关，本断言因此在干净/污染两种进程状态下都该是同一组数。
-    seen = n_derivers + n_indexed + n_image + len(unknown)
-    got = (n_derivers, n_indexed, n_image, len(unknown))
-    want = (1147, 372, 424, 0)
+    seen = n_derivers + n_indexed + n_image + n_author + len(unknown)
+    got = (n_derivers, n_indexed, n_image, n_author, len(unknown))
+    # 口径（2026-10-16 起）：静态支 2005 条 = 1147 DERIVERS + 372 条目类 + 424 取图，
+    # field 契约 ×31 包再贡献 186 条 —— kicker/title/onscreen/slotSeconds 4×31=124 落进
+    # DERIVERS（1147+124=1271），ghost/place 2×31=62 落进作者供料位。
+    want = (1271, 372, 424, 62, 0)
     assert got == want and seen == sum(want), (
-        "变量取值来源分布漂移（DERIVERS / INDEXED 语法 / imagePath+imageCredit / 无来源）："
-        f"实测 {got[0]}/{got[1]}/{got[2]}/{got[3]}（总 {seen}）"
-        f" != 期望 {want[0]}/{want[1]}/{want[2]}/{want[3]}（总 {sum(want)}）"
-        " —— 对比四数，哪一格变了就去查那一条来源")
+        "变量取值来源分布漂移（DERIVERS / INDEXED 语法 / imagePath+imageCredit / "
+        "作者供料位 / 无来源）："
+        f"实测 {got[0]}/{got[1]}/{got[2]}/{got[3]}/{got[4]}（总 {seen}）"
+        f" != 期望 {want[0]}/{want[1]}/{want[2]}/{want[3]}/{want[4]}（总 {sum(want)}）"
+        " —— 对比五数，哪一格变了就去查那一条来源")
+    # 第四桶只准长在契约支上：静态版式只要冒出一个 author_slots，就说明有人拿
+    # "作者会写这一格"当缺来源的挡箭牌 —— 那正是本闸要拦的东西。
+    assert not static_author, ("静态版式声明了作者供料位: " + ", ".join(static_author[:6]))
 
 
 def t_variant_clusters_hook_has_the_measured_two_shapes():
@@ -5025,12 +5078,18 @@ def t_new_composition_ids_collide_with_nothing():
     Task 4 被迫加唯一后缀撞上的就是它。新角色不该续这笔债（见 `vue_contracts.composition_id_for`）。
     """
     import vue_contracts as vc
+    import pack_layouts as pkl
+    new_ids = set()
     for pack in pb.ALL_TEMPLATES:
-        ids = {l["composition_id"] for l in pb.load_style_pack(pack)["layouts"].values()}
+        # 比的是"新 id 不许撞上**已有静态** composition_id"。合并视图里 field 自己就在，
+        # 拿它当对手表会自撞（Task 2 落地后这条就是这么红的）。
+        ids = {l["composition_id"] for l in pkl.static_layouts(pb.load_style_pack(pack)).values()}
         for role in ("field", "rank", "versus", "cause"):
             want = vc.composition_id_for(pack, role)
             assert want not in ids, f"{pack}: 新 id {want} 与已有 composition_id 撞车"
             assert want == f"{role}-{pack}", f"{want} 不符合约定"
+            assert want not in new_ids, f"{want} 被两个新角色共用"
+            new_ids.add(want)
 
 
 def t_slot_values_are_literal_with_explicit_overrides():
@@ -5177,12 +5236,17 @@ def t_static_layout_entries_untouched_by_vue_only():
     import vue_contracts as vc
     entries = _tmp_entries()
     for pack in pb.ALL_TEMPLATES:
-        before = pb.load_style_pack(pack)
+        # before 必须是**纯静态**视图（vue_only={}）：真契约今天已在盘上，
+        # 让自动发现参与装载的话 before 里就带着 field，于是"临时契约的 field ≠
+        # 真契约的 field"会被当成"已有条目被改了"——本闸就是这么自红的（Task 4）。
+        before = pb.load_style_pack(pack, vue_only={})
         after = pb.load_style_pack(pack, vue_only=vc.discover(entries))
         for role, lay in before["layouts"].items():
             assert role in after["layouts"], f"{pack}/{role} 在合并后消失了"
             assert after["layouts"][role] == lay, f"{pack}/{role} 条目被改了"
         assert "field" in after["layouts"], f"{pack}: 新角色没被合并进来"
+        assert set(after["layouts"]) - set(before["layouts"]) == {"field"}, \
+            f"{pack}: 合并动了静态支的键集合"
 
 
 def t_vue_only_conflict_with_static_file_raises():
@@ -5229,6 +5293,144 @@ def t_vue_bundle_for_resolves_from_contract():
         assert pb.vue_bundle_for("news-coral", "stat") is None, "未切角色必须仍回落静态支"
     finally:
         pb.VUE_ONLY_CONTRACTS = saved
+
+
+def t_vue_only_without_built_bundle_refuses_to_emit():
+    """Vue-only 版式没有静态文件可回落。bundle 没建出来时必须停机 ——
+    继续走 MOUNT_TPL 会发出 `data-composition-src="…/None.html"` 的坏 clip，
+    而且它可能一路渲完都不报错。静默坏掉的东西不许出厂。"""
+    lay = {"name": "field", "file_name": None, "path": None, "pack": "news-coral",
+           "composition_id": "field-news-coral", "variables": [], "primitives": [],
+           "ground_hex": "#0a0a0d", "ground_tone": "dark", "vue_only": True,
+           "bundle": "field-a"}
+    saved = pb.vue_bundle_built
+    pb.vue_bundle_built = lambda b: False
+    try:
+        pb.emit_mount(1, lay, {"kicker": "现场"}, 0.0, 5.0, 1080, 1920)
+    except pb.EmitterError as exc:
+        assert "build:templates" in str(exc), f"没给出可执行的修法: {exc}"
+    else:
+        raise AssertionError("bundle 缺失时没有停机，会发出 file_name=None 的坏 clip")
+    finally:
+        pb.vue_bundle_built = saved
+
+
+def t_vue_only_pack_name_does_not_read_the_missing_path():
+    """`emit_mount` 原本从 `layout["path"]` 反推包名，而 Vue-only 的 path 是 None ⇒ TypeError。
+
+    这条真调 `emit_mount`（上一版只断言自己写的 dict 字面量 = 一条死闸）：
+    bundle 是否在 dist 里由 `vue_bundle_built` 打桩决定，本闸不依赖 `npm run build:templates`
+    跑没跑过 —— 打桩成 False 的拒绝侧由 `t_vue_only_without_built_bundle_refuses_to_emit` 守。
+    """
+    lay = pb.load_style_pack("news-coral")["layouts"]["field"]
+    assert lay["path"] is None, "前提：Vue-only 没有静态路径"
+    saved = pb.vue_bundle_built
+    pb.vue_bundle_built = lambda b: True
+    try:
+        clip = pb.emit_mount(3, lay, {"kicker": "现场", "ghost": "塔楼", "place": "里加",
+                                     "title": "拆出来的毛坯", "onscreen": "验收标准没人认",
+                                     "slotSeconds": 5.0}, 0.0, 5.0, 1080, 1920)
+    finally:
+        pb.vue_bundle_built = saved
+    assert 'data-vue-bundle="field-a"' in clip, clip
+    # 包名走 layout["pack"]，id 走契约的零血统约定，再叠挂载序号（Task 4 唯一化）
+    assert 'data-composition-id="field-news-coral__3"' in clip, clip
+    assert "compositions/" not in clip and "None" not in clip, \
+        f"Vue-only 镜里漏出了静态支的路径或 file_name=None: {clip}"
+    assert re.search(r'style="--c0:#[0-9a-f]{6};', clip), f"槽位块没从契约取: {clip}"
+
+
+def t_vue_only_contract_is_the_registry_for_its_role():
+    """Vue-only 版式的登记表就是 `contract.toml` 本身 —— 等价闸的契约支对应物。
+
+    `pkl.verify_pack` 把契约支收口在外（layouts.toml 只登 HTML 抽出来的东西），
+    那不等于新角色没有闸：这里逐字段比 契约 → 合并条目，改契约里的 id/地面/变量
+    必须当场反映到发射器读到的条目上，反映不出来（装载侧另抄了一份）就是分家。
+    """
+    import vue_contracts as vc
+    contracts = pb.vue_only_contracts()
+    assert contracts, "前提坏了：组件目录里一条契约都没有"
+    for (role, variant), contract in sorted(contracts.items()):
+        for pack in ("news-coral", "news-world", "news-policy"):
+            lay = pb.load_style_pack(pack)["layouts"][role]
+            assert lay["bundle"] == f"{role}-{variant}", f"{pack}/{role}: bundle 名不对"
+            assert lay["composition_id"] == vc.composition_id_for(pack, role), \
+                f"{pack}/{role}: composition_id 不走契约的零血统约定"
+            assert lay["ground_hex"] == contract["ground"].lower(), \
+                f"{pack}/{role}: 地面没照契约"
+            assert lay["ground_tone"] == pb.GROUND_TONE_BY_HEX[lay["ground_hex"]], \
+                f"{pack}/{role}: 地面明暗与地面色不自洽"
+            assert lay["variables"] == contract["variables"], \
+                f"{pack}/{role}: 发射器读到的变量契约不是 contract.toml 那一份"
+            assert set(lay["author_slots"]) <= {v["id"] for v in lay["variables"]}, \
+                f"{pack}/{role}: author_slots 登记了契约里没有的变量 id"
+
+
+def t_author_slots_may_not_have_defaults():
+    """作者供料位的三条拒绝侧（id 不在契约里 / 带 default / 机器本来切得出）。
+
+    第四桶一旦能被随手声明，`t_every_layout_variable_id_has_a_source` 就从"每条 id
+    都要有出处"退化成"声明了就免检" —— 所以拒绝分支必须逐条实测，不是只在文档里写。
+    """
+    import vue_contracts as vc
+
+    def contract(vars_, author):
+        return {"role": "field", "variant": "a", "variables": vars_,
+                "author_slots": author}
+
+    ok = [{"id": "ghost", "type": "string", "label": "巨号事实"}]
+    vc.validate_contract(contract(ok, ["ghost"]))         # 合法形状先要过
+    for vars_, author, why in (
+            ([{"id": "ghost", "type": "string", "label": "x"}], ["ghostt"], "id 拼错"),
+            ([{"id": "ghost", "type": "string", "label": "x", "default": "现场"}],
+             ["ghost"], "事实位带默认值"),
+            ([{"id": "title", "type": "string", "label": "x"}], ["title"], "机器切得出的 id"),
+    ):
+        try:
+            vc.validate_contract(contract(vars_, author))
+        except vc.ContractError as exc:
+            assert str(author[0]) in str(exc), f"{why}: 拒绝消息没点名 {author}: {exc}"
+        else:
+            raise AssertionError(f"{why} 被静默收下: {vars_} + author_slots={author}")
+
+
+def t_contract_rejects_unknown_top_level_key():
+    """契约的顶层键是白名单：`[override]`（少个 s）这类拼错不会静默不生效。"""
+    import shutil
+    import tempfile
+    import vue_contracts as vc
+    tmp = Path(tempfile.mkdtemp(prefix="vue-contract-keys-"))
+    try:
+        d = tmp / "field-a"
+        d.mkdir()
+        (d / "contract.toml").write_text(
+            'role = "field"\nvariant = "a"\nground = "#0a0a0d"\n'
+            'variables = [ { id = "kicker", type = "string", label = "眉标" } ]\n'
+            '[slots]\nc0 = "#0a0a0d"\n[override]\nnews-coral = { c0 = "#0e1b36" }\n',
+            encoding="utf-8")
+        try:
+            vc.load(d / "contract.toml")
+        except vc.ContractError as exc:
+            assert "override" in str(exc), f"拒绝消息没点名拼错的键: {exc}"
+        else:
+            raise AssertionError("拼错的覆盖段被静默收下 —— 那条 override 永远不会生效")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def t_real_contracts_leave_static_entries_untouched():
+    """生产路径（自动发现真契约）下静态 7 角色必须逐字段不变。
+
+    `t_static_layout_entries_untouched_by_vue_only` 用的是临时契约；这条用盘上真的
+    `field-a/contract.toml`，两回事：前者验机制，后者验**今天这版代码 + 今天这份契约**
+    合起来没碰产线。普查 31/31 与 `t_slots_reconstruct_every_pack_byte_exact`
+    全部 keyed 在这些条目上。
+    """
+    for pack in pb.ALL_TEMPLATES:
+        static = pb.load_style_pack(pack, vue_only={})["layouts"]
+        merged = pb.load_style_pack(pack)["layouts"]
+        for role, lay in static.items():
+            assert merged[role] == lay, f"{pack}/{role} 条目被真契约改了"
 
 
 if __name__ == "__main__":

@@ -1,0 +1,43 @@
+# field · Vue-only 版式契约（地基 Task 4 的第一个使用者）
+#
+# 为什么契约在组件目录而不是各包 layouts.toml：一个组件服务 31 个包，
+# 抄 31 遍必然漂移；且 layouts.toml 自己写着「编译产物，勿手改」。
+#
+# 槽位是**字面色值**，不查 theme.toml —— 实测 31 包共 68 个 token、全包共有的为 0 个，
+# 且 0/31 包有"单一地面"（每包在 7 个版式上用多个地面），"该包的地面"这个对象不存在。
+# 想随包变就在 [overrides] 显式写一条：那是设计决定，不是推导结果。
+role = "field"
+variant = "a"
+ground = "#0a0a0d"
+
+# 变量表与组件里的 vars 一一对应。
+# `ghost` / `place` 是**事实位**，没有 default —— 发射器不许拿占位文字冒充事实
+# （frame.md 法则 6：机器切得出的话排在作者写过的话之后，而这两格机器切不出来）。
+variables = [
+  { id = "kicker",    type = "string", label = "眉标", default = "FIELD REPORT" },
+  { id = "ghost",     type = "string", label = "画面主体事实（巨号）" },
+  { id = "place",     type = "string", label = "地点行" },
+  { id = "title",     type = "string", label = "领句" },
+  { id = "onscreen",  type = "string", label = "屏句（唯一上屏整句，不进配音）" },
+  { id = "slotSeconds", type = "number", label = "本镜可见秒数", default = 4, min = 1 },
+]
+
+# 第四种取值来源：作者供料位。`ghost` / `place` 机器切不出来，只能由分镜 JSON 显式写同名键；
+# 没写就当场抛（见 resolve_variable 的 scene 分支），所以这两格**永远不许加 default**。
+# 闸：`t_every_layout_variable_id_has_a_source` 第四桶 + `t_author_slots_may_not_have_defaults`。
+author_slots = ["ghost", "place"]
+
+[slots]
+c0 = "#0a0a0d"   # 地面
+c1 = "#f5f0e8"   # 地面上的主文字
+c2 = "#ffffff"   # 眉标片底
+c3 = "#e85d5d"   # 眉标片字（共享强调色，见 §1.1：不随包变）
+c4 = "#c0392b"   # 珊瑚尺
+c5 = "#b0b0b0"   # 屏句
+c6 = "#8a8a8a"   # 地点行 —— 实测 #0a0a0d 上 5.7:1；原来写 rgba(245,240,232,.30) 只有 2.43:1，
+                 # `check --strict` 按正文判它 ⇒ 整片被拒（它是事实位，不是装饰，没有豁免）
+c7 = "#262627"   # 12% 水印（= rgba(245,240,232,.12) 落在 #0a0a0d 上的实色）—— 装饰层，
+                 # 组件里必须带 data-layout-ignore="true"，否则同样被对比度闸拦下
+
+# 随包变的显式覆盖。今天只写真正想变的那几个 —— 空表是有意状态，不是没填完。
+[overrides]

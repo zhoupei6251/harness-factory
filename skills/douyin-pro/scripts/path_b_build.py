@@ -1955,7 +1955,7 @@ def load_style_pack(style: str, vue_only: dict | None = None) -> dict:
     """读 `<pack 根>/<style>/`: 宿主骨架 + 各版式契约（根按 `PACK_ROOTS` 顺序找，见 `pack_dir`）。
 
     `vue_only` 是给自检留的**注入缝**（传 `{(role, variant): 契约}`）；不传就走
-    `vue_only_contracts()`（今天扫出来为空 —— 还没有组件带 `contract.toml`）。
+    `vue_only_contracts()`（扫 `src/web/entries/*/contract.toml`，今天是 `field-a` 一条）。
 
     ``placeholder.html`` 不进 ``layouts`` (D7): 它只是把三层目录凑齐的壳, 不是版式。
     跳掉之后若一个版式都不剩, 就在这里停 —— 报"这个 pack 还没有真版式 + 现在哪些有",
@@ -2036,11 +2036,14 @@ def load_style_pack(style: str, vue_only: dict | None = None) -> dict:
                 + ", ".join(sorted(GROUND_TONE_BY_HEX))
                 + ") —— 未登记的地面会让逐镜换色失效。")
         layouts[role] = {
-            "name": role, "file_name": None, "path": None,
+            "name": role, "file_name": None, "path": None, "pack": style,
             "composition_id": vc.composition_id_for(style, role),
             "ground_hex": ground, "ground_tone": GROUND_TONE_BY_HEX[ground],
             "variables": contract["variables"], "primitives": [],
             "vue_only": True, "bundle": f"{role}-{variant}",
+            # 作者供料位（契约里的 `author_slots`）投影到版式条目上，让"这条变量靠谁填"
+            # 在静态支与契约支是同一个读取面（`t_every_layout_variable_id_has_a_source`）。
+            "author_slots": list(contract.get("author_slots") or []),
             # 槽位**不在这里解析**：31 包的 theme 词表没归一（68 个 token、全包共有的为 0 个），
             # 合并阶段就取值会让"某个包缺 token"变成整包不可加载。留给发射时解析，
             # 那时失败只影响这一镜，且能被渲染前的预检抓到。
@@ -2636,7 +2639,8 @@ def emit_mount(mount_index: int, layout: dict, values: dict, start: float,
     # 同版式两镜共键 = 第二条注册覆盖第一条 + immediateRender 压黑首镜。
     # 未命中 ⇒ 原样走 MOUNT_TPL，composition_id 保持包级原值，一字符不改。
     import pack_slots as pks
-    pack_name = os.path.basename(os.path.dirname(os.path.dirname(layout["path"])))
+    pack_name = layout.get("pack") or os.path.basename(
+        os.path.dirname(os.path.dirname(layout["path"])))
     bundle = vue_bundle_for(pack_name, layout["name"])
     if bundle is not None and vue_bundle_built(bundle):
         # Task 3: clip 元素自带有序槽位块（作用域在 clip 内）。
@@ -2644,6 +2648,13 @@ def emit_mount(mount_index: int, layout: dict, values: dict, start: float,
         vue_common = dict(common,
                           composition_id=vue_clip_id(layout["composition_id"], mount_index))
         return VUE_MOUNT_TPL.format(bundle_name=bundle, slot_css=slot_css, **vue_common)
+    if layout.get("vue_only"):
+        # Vue-only 版式没有静态文件可回落：走到这里说明 bundle 没建出来，
+        # 继续发 MOUNT_TPL 会产出一个 data-composition-src="…/None.html" 的坏 clip，
+        # 而且它可能一路渲完都不报错 —— 静默坏掉的东西不许出厂。
+        raise EmitterError(
+            f"版式 {layout['name']}（pack {pack_name}）只有组件、没有静态文件，"
+            f"而 bundle {bundle!r} 没建出来 —— 先跑 `npm run build:templates` 再渲。")
     # 静态支每镜是独立 document（data-composition-src 各载一份），包级 id 在
     # 自己 document 内天然唯一 —— 唯一化只属于 Vue 支，这里一个字符都不能改。
     return MOUNT_TPL.format(file_name=layout["file_name"], **common)
@@ -3032,6 +3043,10 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
     dest_dir = os.path.join(work_dir, "compositions")
     os.makedirs(dest_dir, exist_ok=True)
     for layout in pack["layouts"].values():
+        # Vue-only 版式没有静态 composition 可拷: 它的产物是 work_dir/vue/<bundle>.js
+        # (+ assets/<bundle>-*.css), 已由上面的 stage_vue_assets 落进工作目录。
+        if layout.get("vue_only"):
+            continue
         shutil.copyfile(layout["path"], os.path.join(dest_dir, layout["file_name"]))
     for file_name, text in subtitle_files + schematic_files:
         write_text(os.path.join(dest_dir, file_name), text)
