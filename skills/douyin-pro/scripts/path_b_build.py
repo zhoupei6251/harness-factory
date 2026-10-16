@@ -2044,6 +2044,9 @@ def load_style_pack(style: str, vue_only: dict | None = None) -> dict:
             # 作者供料位（契约里的 `author_slots`）投影到版式条目上，让"这条变量靠谁填"
             # 在静态支与契约支是同一个读取面（`t_every_layout_variable_id_has_a_source`）。
             "author_slots": list(contract.get("author_slots") or []),
+            # 尾部可选行与量级条字段：由 vue_contracts 校验过形状，这里只投影给发射路径
+            "optional_ids": list(contract.get("optional") or []),
+            "bars": contract.get("bars"),
             # 槽位**不在这里解析**：31 包的 theme 词表没归一（68 个 token、全包共有的为 0 个），
             # 合并阶段就取值会让"某个包缺 token"变成整包不可加载。留给发射时解析，
             # 那时失败只影响这一镜，且能被渲染前的预检抓到。
@@ -2076,7 +2079,42 @@ def fill_variables(layout: dict, scene: dict, ctx: dict) -> dict:
     values = {}
     for var in layout["variables"]:
         values[var["id"]] = resolve_variable(var, layout, scene, ctx)
+    if layout.get("bars"):
+        _check_bar_units(layout, values)
     return values
+
+
+#: 量级条取数：`1188万` → (1188.0, "万")。数字与单位分开看，是因为比值只在同单位下有意义。
+_VALUE_UNIT_RE = re.compile(r"^\s*(\d+(?:\.\d+)?)\s*(.*)$")
+
+
+def _check_bar_units(layout: dict, values: dict) -> None:
+    """法则 5 的硬前置：条长 = value / max(values)，**单位不一致时这个比值没有意义**。
+
+    `3亿` 与 `1188万` 排在一起，按字面数比是 3 : 1188 —— 画出来的条会差 400 倍，
+    而屏上没有任何东西提示观众单位不同。这不是排版瑕疵，是拿图替我们说一句
+    我们没说过的话，所以拒发射而不是"组件里小心点"。
+    """
+    rows = []
+    for var_id, value in values.items():
+        if not var_id.startswith("item") or not var_id.endswith("Value"):
+            continue
+        text = str(value).strip()
+        if not text:
+            continue
+        match = _VALUE_UNIT_RE.match(text)
+        if not match:
+            raise EmitterError(
+                f"版式 {layout['name']} 的 {var_id}={text!r} 不是「数字+单位」形态 —— "
+                "量级条要按 value/max 算长度，读不出数就没法画")
+        rows.append((var_id, float(match.group(1)), match.group(2).strip()))
+    units = {unit for _, _, unit in rows}
+    if len(units) > 1:
+        detail = ", ".join(f"{name}={value:g}{unit}" for name, value, unit in rows)
+        raise EmitterError(
+            f"版式 {layout['name']} 的量级条拒发射：条目单位不一致 {sorted(units)} —— "
+            f"条长 = 相对第一名的比值，跨单位比值无意义（{detail}）。"
+            "处理：把数值统一换到同一单位再写稿，或改用不画条的版式（rail / catalog）")
 
 
 def resolve_variable(var: dict, layout: dict, scene: dict, ctx: dict):
@@ -2101,6 +2139,12 @@ def resolve_variable(var: dict, layout: dict, scene: dict, ctx: dict):
     # 2) 结构化推导
     derived = DERIVERS[var_id](scene, ctx, layout) if var_id in DERIVERS else None
     if derived is None:
+        # 尾部可选行（契约的 `optional`，vue_contracts 已校验只能是 itemN*/stepN* 的尾部）：
+        # 稿件条目数少于容量上限时落空串，由组件收行。放在这里而不是 fill_variables 里，
+        # 是因为 `missing_variables` 与预检 `check_scene_contract` 走的是同一个
+        # resolve_variable —— 三处共用一条判定，才会出现"这里可选、那里报缺"的分家。
+        if var_id in (layout.get("optional_ids") or ()):
+            return ""
         raise EmitterError(
             f"版式 {layout['name']} 的变量 “{var_id}”({var.get('label', '')}) 填不出来: "
             f"分镜文本没有足够信息, 又没在 JSON 里显式给出。"
@@ -2621,6 +2665,15 @@ def stage_vue_assets(work_dir: str, pack: dict) -> list[str]:
             log(f"  ⚠ Vue bundle {bundle} 没有 CSS 资产 —— .vue 的 <style> 会整块丢失"
                 f"（检查 dist/vue/assets/ 与 npm run build:templates）")
             continue
+        if len(found) > 1:
+            # 现场：`dist/vue/assets/` 里同时躺着 rank-a 的三代 CSS（Vite `emptyOutDir:false`
+            # 只加新 hash 不清旧的）。上面已经把 work_dir 清干净了，但**源头脏了清这里没用** ——
+            # 三份会一起挂进 host，哪份生效取决于 hash 字母序，等于随机挑一代样式。
+            # 这里不"挑最新的一个"：mtime 在拷贝后不可靠，猜错是静默的。宁可停机让人清 dist。
+            raise EmitterError(
+                f"bundle {bundle} 在 dist/vue/assets/ 里有 {len(found)} 代 CSS："
+                f"{[p.name for p in found]} —— 样式归属取决于文件名字母序，不是设计。"
+                "跑 `npm run build:templates`（prebuild 会清 dist）或手工删 dist/vue/assets/ 再渲。")
         css.extend(os.path.relpath(p, work_dir).replace(os.sep, "/") for p in found)
     return css
 

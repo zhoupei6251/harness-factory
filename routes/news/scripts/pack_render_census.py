@@ -31,8 +31,11 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parents[3]
 #: 引擎要 Node>=22。留空就用 PATH 上的 node（`--doctor` 会报版本不够）。
 N22 = os.environ.get("HF_NODE22_DIR", "")
+#: 夹具是 `census-probe-scenes.json` —— t001 那条已 fact-check 的稿子 + 两条**新结构镜**
+#: （field / rank，数据是排版探针用的虚构数，产物是 silent.mp4、不进发布链路）。
+#: 换掉 t001 单独建夹具，是为了让"新角色进没进普查"这件事在文件名上就看得见。
 SCRIPT = os.environ.get("HF_CENSUS_INPUT",
-                        str(REPO / ".harness-news-runtime/articles/t001-scenes.json"))
+                        str(REPO / ".harness-news-runtime/articles/census-probe-scenes.json"))
 KEEP = REPO / ".harness-news-runtime/tmp/render-census"
 WORKERS = 3
 

@@ -1,0 +1,277 @@
+<script setup lang="ts">
+/**
+ * rank · 带量级条的 TOP-N 榜（Vue-only 角色，地基之后的第二个结构）。
+ *
+ * 设计出处 `evidence/2026-10-16-rank-proto.md`：结论是**带 bar** —— 排行榜的核心信息是
+ * 梯度而不是名次（名次已由 01–05 表达），plain 版读不出"1188 万比 742 万多 60%"。
+ * 但 bar 值不值得它的诚实负担，答案是"值得，前提是两条负担一起设计进去"，
+ * 两条都在代码里落成机检，不是只写在注释里：
+ *
+ *   ① **条长 = 相对第一名的比值**（`ratio()`），不是"第一名满格、其余看着办"。
+ *      旧 probe 的病根是所有 bar 都 1.0 —— 那是造假。跨单位（`3亿` vs `1188万`）时
+ *      比值无意义，由发射器 `_check_bar_units` 直接拒渲染，不在组件里兜。
+ *   ② **口径标注必须在脸上**（`rk-basis`，且它是版式常量、不是契约变量 —— 能改标签就等于
+ *      允许「条按相对第一画、字写占总量」）。`check_component` 见到契约声明 `bars`
+ *      就要求这个带字面文本的节点在，缺即判红。
+ *
+ * 探针目视出的两个缺陷，这里按它的修法落：
+ *   · 口径标注原来压在第五行上（`bottom: 22.6cqh` 与行区只差 0.6cqh，代码里看不出异常）
+ *     ⇒ 挪进标题带，跟着 `rule` 走，不再与行区共用底部空间；
+ *   · 行区原来用 `space-between`，行数不足时全堆上半 ⇒ 法则 10 禁这条，改成
+ *     **固定行高 + 顶对齐**，空的就是空的，不靠拉伸把版式撑满。
+ *
+ * 容量：上限 5 行（带 bar 时 5 行已顶到字幕禁入区边缘），下限 3 行 ——
+ * `item4*` / `item5*` 在契约里声明为尾部可选行，稿件没这两条时落空串，
+ * `rows` 直接把空行收掉（不是画两行空框）。
+ *
+ * 色值一律 `var(--cNN)`；动效目标全部走模板 ref；注册键 = 传入的 compositionId。
+ */
+import { computed, onMounted, ref } from "vue";
+import { gsap } from "../../lib/gsap-runtime";
+import { readVariables } from "../../lib/hyperframes-bridge";
+
+interface RankVariables {
+  kicker: string;
+  title: string;
+  onscreen: string;
+  slotSeconds: number;
+  [row: string]: string | number;
+}
+
+const props = defineProps<{ compositionId: string; clip: HTMLElement }>();
+
+const vars = ref<Partial<RankVariables>>(readVariables(props.clip));
+const slot = computed(() => Number(vars.value.slotSeconds) || 4);
+
+/** `1188万` → 1188；读不出数就 0（发射器已保证形态，这里只是不依赖那个前提画错条）。 */
+function parseNum(text: string): number {
+  const match = /^\s*(\d+(?:\.\d+)?)/.exec(text);
+  return match ? Number(match[1]) : 0;
+}
+
+interface RankRow { label: string; value: string; num: number }
+
+const rows = computed<RankRow[]>(() => {
+  const out: RankRow[] = [];
+  for (let i = 1; i <= 5; i++) {
+    const label = String(vars.value[`item${i}Label`] ?? "").trim();
+    const value = String(vars.value[`item${i}Value`] ?? "").trim();
+    if (!label && !value) continue;         // 尾部可选行整条收起：不画空框、不占位
+    out.push({ label, value, num: parseNum(value) });
+  }
+  return out;
+});
+
+const maxNum = computed(() => rows.value.reduce((m, r) => Math.max(m, r.num), 0));
+
+/** 第一名 1.0 是**事实**（它就是最大值），其余按真实比值；max 取不到正数时一律不画条。 */
+function ratio(row: RankRow): number {
+  if (maxNum.value <= 0 || row.num <= 0) return 0;
+  return row.num / maxNum.value;
+}
+
+const chipEl = ref<HTMLElement>();
+const titleEl = ref<HTMLElement>();
+const ruleEl = ref<HTMLElement>();
+const basisEl = ref<HTMLElement>();
+const rowsEl = ref<HTMLElement>();
+const subEl = ref<HTMLElement>();
+const barEls = ref<HTMLElement[]>([]);
+
+onMounted(() => {
+  // 动量预算（frame.md §4）：入场收在 1.5s 内，之后整段持续位移，不留静止尾巴。
+  // 三个具名常数 + 至少一条用 driftDur 的补间，由 `check_component` 与静态支同一套谓词守。
+  const INTRO_END = 1.5;
+  const MIN_DRIFT = 0.6;
+  const driftStart = Math.max(0, Math.min(INTRO_END, slot.value - MIN_DRIFT));
+  const driftDur = Math.max(MIN_DRIFT, slot.value - driftStart);
+
+  const tl = gsap.timeline({ paused: true });
+
+  // 入场：自带 background 的形状一律 scaleX/scaleY（法则 8），墨才用 opacity
+  tl.fromTo(chipEl.value!, { scaleX: 0 },
+    { scaleX: 1, duration: 0.45, ease: "power2.out" }, 0);
+  tl.fromTo(titleEl.value!, { opacity: 0, y: 24 },
+    { opacity: 1, y: 0, duration: 0.5, ease: "power2.out" }, 0.15);
+  tl.fromTo(ruleEl.value!, { scaleX: 0 },
+    { scaleX: 1, duration: 0.45, ease: "power2.out" }, 0.4);
+  tl.fromTo(basisEl.value!, { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.6);
+
+  // 逐行入场；条长从 0 擦到**真实比值**（第一名 1.0 是事实，不是设计）
+  rows.value.forEach((row, i) => {
+    const at = 0.75 + i * 0.16;
+    tl.fromTo(barEls.value[i]!, { scaleX: 0 },
+      { scaleX: ratio(row), duration: 0.55, ease: "power2.out" }, at + 0.12);
+  });
+  tl.fromTo(subEl.value!, { opacity: 0, y: 18 },
+    { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 1.15);
+
+  // 呼吸：行区整体微移，保证尾段一直在动
+  tl.to(rowsEl.value!, { yPercent: -1.6, duration: driftDur, ease: "none" }, driftStart);
+  tl.to(subEl.value!, { y: 10, duration: driftDur, ease: "none" }, driftStart);
+
+  window.__timelines = window.__timelines ?? {};
+  // 注册键 = 本镜收到的 compositionId（与外层 clip 的 data-composition-id 同值）
+  window.__timelines[props.compositionId] = tl;
+});
+</script>
+
+<template>
+  <div class="rk-root">
+    <div class="rk-head">
+      <div ref="chipEl" class="rk-kicker">{{ vars.kicker }}</div>
+      <div ref="titleEl" class="rk-title">{{ vars.title }}</div>
+      <div ref="ruleEl" class="rk-rule"></div>
+        <!-- 口径标注是**版式常量**：写成契约变量就等于允许稿件改标签，
+           出现「条按相对第一名画、字写占总量比例」这种画面替我们说谎的形态。
+           `check_component` 见到契约声明 bars 就要求这个带字面文本的 rk-basis 节点在。 -->
+      <div ref="basisEl" class="rk-basis">条长 = 相对第一名，非占总量比例</div>
+      <div ref="subEl" class="rk-sub">{{ vars.onscreen }}</div>
+    </div>
+
+    <div ref="rowsEl" class="rk-rows">
+      <div v-for="(row, i) in rows" :key="i" class="rk-row">
+        <div class="rk-no" :class="{ 'rk-no-top': i === 0 }">{{ String(i + 1).padStart(2, "0") }}</div>
+        <div class="rk-name">{{ row.label }}</div>
+        <div class="rk-val">{{ row.value }}</div>
+        <div class="rk-track">
+          <div :ref="(el: any) => (barEls[i] = el)" class="rk-bar"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</template>
+
+<style>
+/* 不写 hex、不写 var() 回退值：色位由发射器按包注入在 clip 的 style 上。
+   类名一律 rk- 前缀 —— Vite 打出的 CSS 是全局的，没有 scoped 属性可依赖。 */
+@font-face {
+  /* 中文 face 必须本文件自带（`check_component` 的 MISSING_CJK_FONT_FACE）。
+     混挂时别的 bundle 里那份会遮住缺失，纯 rank 的片子会静默降档成系统默认字。 */
+  font-family: "HF CJK";
+  src:
+    local("Noto Sans SC"),
+    local("NotoSansSC-VF"),
+    local("Source Han Sans SC"),
+    local("Noto Sans CJK SC"),
+    local("Microsoft YaHei"),
+    local("PingFang SC");
+  font-weight: 100 900;
+}
+.rk-root {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  container-type: size;
+  background: var(--c0);
+  color: var(--c1);
+  font-family: "HF CJK", sans-serif;
+}
+.rk-head {
+  position: absolute;
+  left: 6cqw;
+  top: 6cqh;
+  display: flex;
+  flex-direction: column;
+  gap: 2.2cqh;
+}
+.rk-kicker {
+  align-self: flex-start;
+  background: var(--c2);
+  color: var(--c3);
+  font-family: "JetBrains Mono", monospace;
+  font-size: 2.6cqw;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  padding: 0.85cqh 1.7cqw;
+  transform-origin: 0% 50%;
+}
+.rk-title {
+  font-size: 7.6cqw;
+  font-weight: 900;
+  line-height: 1.18;
+  letter-spacing: -0.01em;
+  max-width: 88cqw;
+}
+.rk-rule {
+  width: 18cqw;
+  height: 0.55cqh;
+  background: var(--c4);
+  transform-origin: 0% 50%;
+}
+.rk-basis {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 2.0cqw;
+  color: var(--c6);
+  letter-spacing: 0.06em;
+}
+/* 行区：容器固定（32 → 78cqh，底边让开 22cqh 字幕禁入区），**每行 flex:1 等分**。
+   为什么不手写行距：前两版都是按 CSS 估行高（估 5cqh/行、实高 9.6cqh/行），
+   5 行溢出容器 —— 一版压进字幕区 85.4cqh，一版让屏句和第五行叠在一起。
+   行高由内容决定、容器由版式决定，两者对不上时溢出是必然。等分之后 N 行永远吃满
+   且不越界，法则 10 的"任何 N 下不得留 >15% 整块空白"也由同一条机制满足。 */
+.rk-rows {
+  position: absolute;
+  left: 6cqw;
+  right: 6cqw;
+  top: 32cqh;
+  bottom: 22cqh;
+  display: flex;
+  flex-direction: column;
+}
+.rk-row {
+  flex: 1 1 0;
+  min-height: 0;
+  align-content: center;
+  display: grid;
+  grid-template-columns: 9cqw 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 2.4cqw;
+  align-items: center;
+}
+.rk-no {
+  grid-row: 1 / span 2;
+  font-family: "League Gothic", sans-serif;
+  font-size: 7.4cqw;
+  line-height: 1;
+  color: var(--c5);
+}
+.rk-no-top {
+  color: var(--c3);
+}
+.rk-name {
+  font-size: 4.0cqw;
+  font-weight: 700;
+  line-height: 1.2;
+}
+.rk-val {
+  justify-self: end;
+  font-family: "League Gothic", sans-serif;
+  font-size: 5.2cqw;
+  line-height: 1;
+  color: var(--c1);
+}
+.rk-track {
+  grid-column: 2;
+  height: 0.9cqh;
+  margin-top: 1.1cqh;
+  background: var(--c7);
+  overflow: hidden;
+}
+.rk-bar {
+  height: 100%;
+  background: var(--c4);
+  transform-origin: 0% 50%;
+}
+.rk-sub {
+  font-size: 4.0cqw;
+  line-height: 1.4;
+  color: var(--c6);
+  max-width: 88cqw;
+}
+/* 阴影只给文字层，不给条/轨/尺 —— 那是形状，加阴影会把它读成文字。 */
+.rk-title, .rk-name, .rk-val, .rk-kicker, .rk-sub {
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7), 0 0 1px rgba(0, 0, 0, 0.5);
+}
+</style>

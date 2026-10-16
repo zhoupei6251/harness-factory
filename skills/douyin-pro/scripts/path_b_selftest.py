@@ -4611,9 +4611,14 @@ def t_stage_vue_assets_leaves_no_stale_generation():
             assert not (Path(work) / "vue" / "stale-chunk.js").exists(), \
                 "vue/ 根目录的上一代残留没清"
             assert first == second, f"同一包两次暂存交出的样式表不一致：{first} vs {second}"
-            # 一个 bundle 至多一条 <link>：两条就是两代同挂（本次事故的直接形态）
-            stems = [re.sub(r"-[A-Za-z0-9_-]{6,}\.css$", "", os.path.basename(p)) for p in second]
-            assert len(stems) == len(set(stems)), f"同一 bundle 发了多条 CSS: {second}"
+            # 一个 bundle 至多一条 <link>。stem 由**路由函数**给，不靠剥 hash 的正则
+            # （`-[A-Za-z0-9_-]{6,}` 会把 `a-CVY5PZqH` 整段吃掉，field-a 变 field）。
+            routed = sorted({b for b in (pb.vue_bundle_for(pack["name"], lay["name"])
+                                         for lay in pack["layouts"].values()) if b})
+            for bundle in routed:
+                hits = [p for p in second
+                        if os.path.basename(p).startswith(bundle + "-")]
+                assert len(hits) <= 1, f"bundle {bundle} 发了多条 CSS: {hits}"
             dist = pb._vue_dist_dir() / "assets"
             if dist.is_dir():
                 assert sorted(p.name for p in assets.glob("*.css")) == \
@@ -4765,6 +4770,169 @@ def t_census_wires_the_content_floor_criterion():
     assert "import content_floor" in src, "普查没引 content_floor"
     assert 'row.get("intrude", 0) == 0' in src, "字幕侵入没进 pass 判据"
     assert '"floor_worst"' in src and "thin_fill" in src, "填幅半边没落进表（只报也要看得见）"
+
+
+def t_optional_rows_must_be_a_tail():
+    """`optional`（尾部可选行）只准长在条目类 id 的**尾部**。
+
+    这是 rank 为了"3 条也能上、5 条装得下"引入的能力；一旦可以标在中间，
+    屏上就会出现跳过第 3 行只画第 4 行的洞；标在事实位上，则等于给"缺事实"开了静默通道。
+    """
+    import vue_contracts as vc
+    base = {"role": "rank", "variant": "a",
+            "variables": [{"id": "title", "type": "string", "label": "领句"},
+                          {"id": "slotSeconds", "type": "number", "label": "秒", "default": 4},
+                          {"id": "item1Label", "type": "string", "label": "1"},
+                          {"id": "item2Label", "type": "string", "label": "2"},
+                          {"id": "item3Label", "type": "string", "label": "3"}]}
+
+    def with_optional(ids):
+        return {**base, "optional": ids}
+
+    vc.validate_contract(with_optional(["item3Label"]))          # 合法：尾部一行可选
+    for ids, why in ((["title"], "非条目类 id"),
+                     (["item1Label"], "标在中间，更靠后的行还必填"),
+                     (["item9Label"], "契约里没这个 id")):
+        try:
+            vc.validate_contract(with_optional(ids))
+        except vc.ContractError as exc:
+            assert ids[0] in str(exc) or why in str(exc), f"{why}: 消息没点名: {exc}"
+        else:
+            raise AssertionError(f"非法 optional 被静默收下（{why}）: {ids}")
+
+
+def t_rank_optional_rows_fill_empty_and_capacity_stays_five():
+    """3 条稿子必须能用 5 行版式：可选行落空串，容量上限仍是 5（超行照旧警告）。
+
+    容量口径不许因为"可选"而漂 —— `row_capacity` 取的是契约里 itemN 的最大 N，
+    它决定发射器的"条目超行会静默丢数据"那条 ⚠ 判不判得准。
+    """
+    pack = pb.load_style_pack("news-coral")
+    layout = pack["layouts"]["rank"]
+    pb.register_indexed_derivers(pb.contract_ids(layout))
+    scene = {"title": "上半年新增装机", "onscreen": "风光合计超过火电",
+             "body": "上半年，三省新增装机位居全国前列。",
+             "items": [{"label": "广东", "value": "1188万"},
+                       {"label": "江苏", "value": "742万"},
+                       {"label": "山东", "value": "613万"}]}
+    ctx = base_ctx()
+    ctx["slot_seconds"] = 6.0
+    values = pb.fill_variables(layout, scene, ctx)
+    assert values["item3Value"] == "613万"
+    assert values["item4Label"] == "" and values["item5Value"] == "", \
+        f"尾部可选行没落空串: {[(k, v) for k, v in values.items() if k.startswith('item4')]}"
+    assert pb.row_capacity(layout) == 5, "容量上限被 optional 改动了"
+    six = {**scene, "items": scene["items"] + [{"label": "A", "value": "5"},
+                                               {"label": "B", "value": "4"},
+                                               {"label": "C", "value": "3"}]}
+    assert len(six["items"]) > pb.row_capacity(layout), "前提坏了：这条测不到超行"
+
+
+def t_rank_bar_refuses_mixed_units():
+    """条长 = value / max —— 跨单位的比值无意义，必须拒发射而不是画出来。
+
+    `3亿` 与 `1188万` 并排放，按字面数比是 3 : 1188，条会差 400 倍，
+    而屏上没有任何东西提示单位不同。那是拿图替我们说一句我们没说过的话。
+    """
+    pack = pb.load_style_pack("news-coral")
+    layout = pack["layouts"]["rank"]
+    pb.register_indexed_derivers(pb.contract_ids(layout))
+    scene = {"title": "上半年新增装机", "onscreen": "风光合计超过火电",
+             "body": "上半年，三省新增装机位居全国前列。",
+             "items": [{"label": "广东", "value": "3亿"},
+                       {"label": "江苏", "value": "742万"},
+                       {"label": "山东", "value": "613万"}]}
+    ctx = base_ctx()
+    ctx["slot_seconds"] = 6.0
+    try:
+        pb.fill_variables(layout, scene, ctx)
+    except pb.EmitterError as exc:
+        assert "单位不一致" in str(exc) and "亿" in str(exc) and "万" in str(exc), \
+            f"拒绝消息没点名单位: {exc}"
+    else:
+        raise AssertionError("跨单位的量级条被静默放行 —— 画出来的比值是假的")
+    # 反向：同一单位必须放行（否则这条闸只会误伤）。注意要给满 3 行 ——
+    # item3* 不是可选行，只喂 2 条会先撞"必填位填不出来"，测的就不是单位了。
+    ok = {**scene, "items": [{"label": "广东", "value": "30000万"},
+                             {"label": "江苏", "value": "742万"},
+                             {"label": "山东", "value": "613万"}]}
+    assert pb.fill_variables(layout, ok, ctx)["item1Value"] == "30000万"
+
+
+def t_rank_bar_honesty_is_wired():
+    """凡声明 `bars` 的契约，组件必须自带**字面**口径标注，且条长来自比值表达式。
+
+    两条都可反证：把标注改成插值（稿件就能改标签）或把 scaleX 写成常量 1
+    （就是旧 probe「bar 永远满格」那个造假形态），断言必须红。
+    """
+    import vue_contracts as vc
+    entries = sorted(pb.VUE_ENTRIES_DIR.glob("*/*.vue"))
+    seen = 0
+    for vue in entries:
+        contract_path = vue.parent / "contract.toml"
+        if not contract_path.is_file():
+            continue
+        contract = vc.load(contract_path)
+        if not contract.get("bars"):
+            continue
+        seen += 1
+        text = vue.read_text(encoding="utf-8")
+        basis = re.search(r'class="[^"]*basis[^"]*"[^>]*>([^<{]+)</div>', text)
+        assert basis and basis.group(1).strip(), \
+            f"{vue.name}: 声明了 bars 却没有字面口径标注（插值标签=稿件可改口的谎）"
+        assert "相对" in basis.group(1) or "比值" in basis.group(1), \
+            f"{vue.name}: 口径标注没说清条长是什么的比值: {basis.group(1)!r}"
+        # 条长必须来自比值表达式。只查 bar 那几条补间 —— 眉标片/尺也用 scaleX，
+        # 但它们的 `scaleX: 1` 是"擦入到位"，不是数据（一律禁常量会误伤）。
+        # 取整条语句（到分号），不然只截到 from 对象 `{ scaleX: 0 }` 会误判。
+        bar_tweens = re.findall(r"[.(](?:fromTo|to|set)\(\s*barEls\.value[^;]*;", text)
+        assert bar_tweens, f"{vue.name}: 声明了 bars 却找不到给 bar 元素做的补间"
+        for tween in bar_tweens:
+            assert "ratio(" in tween, \
+                f"{vue.name}: 有条的 scaleX 不是 ratio(...) —— 常量条长就是假数据: {tween[:70]}"
+    assert seen >= 1, "前提坏了：没有任何契约声明 bars，本闸空过"
+
+
+def t_stage_vue_assets_refuses_two_generations():
+    """同一 bundle 在 dist 里有两代 CSS 时必须停机 —— 不许"挑最新的一份"。
+
+    现场：`dist/vue/assets/` 一度同时躺着 rank-a 的三代 CSS（Vite `emptyOutDir:false`
+    只加新 hash 不清旧），`emit_host` 按 `<bundle>*.css` 全发 ⇒ 三份一起挂进 host，
+    **哪份生效取决于 hash 字母序**。上一轮我在 work_dir 那层修掉了同类事故，但源头
+    （dist）还漏着 —— 表现是 rank 的屏句用了最早那版的 `position:absolute; bottom:24cqh`，
+    跑到画面底部被行区盖住，代码与 CSS 单看都"正常"。
+    """
+    import tempfile
+    dist_assets = pb._vue_dist_dir() / "assets"
+    if not dist_assets.is_dir():
+        raise AssertionError("前提坏了：dist/vue/assets 不存在（先跑 npm run build:templates）")
+    pack = pb.load_style_pack("news-coral")
+    # victim 取**路由函数**给的 bundle 名，不用"剥掉 -hash 后缀"的正则猜：
+    # `[A-Za-z0-9_-]{6,}` 会把 `a-CVY5PZqH` 整段吃掉，`field-a` 被剥成 `field`，
+    # 种下去的文件 glob 不到，闸就永远不响（第一版就是这么假过的）。
+    routed = sorted({b for b in (pb.vue_bundle_for(pack["name"], lay["name"])
+                                 for lay in pack["layouts"].values()) if b})
+    have = [p.name for p in dist_assets.glob("*.css")]
+    victims = [b for b in routed if any(n.startswith(b + "-") for n in have)]
+    assert victims, f"dist/vue/assets 里没有本包会用到的 bundle: {have}"
+    victim = victims[0]
+    planted = dist_assets / f"{victim}-ZZ9stale.css"
+    planted.write_text(".zz-stale{color:#123456}", encoding="utf-8")
+    saved = pb.vue_bundle_built
+    pb.vue_bundle_built = lambda b: True
+    try:
+        with tempfile.TemporaryDirectory() as work:
+            try:
+                pb.stage_vue_assets(work, pack)
+            except pb.EmitterError as exc:
+                assert victim in str(exc), f"拒绝消息没点名 bundle: {exc}"
+            else:
+                raise AssertionError(f"两代 CSS 被静默收下 —— 谁生效将由 hash 字母序决定")
+    finally:
+        planted.unlink(missing_ok=True)
+        pb.vue_bundle_built = saved
+    # 种的那份必须清干净，否则它会把后续所有渲染都带偏
+    assert not planted.exists()
 
 
 def t_emit_host_skips_vue_loader_when_no_vue_mount():
@@ -5046,10 +5214,13 @@ def t_every_layout_variable_id_has_a_source():
     # DERIVERS 是否被发射路径灌过无关，本断言因此在干净/污染两种进程状态下都该是同一组数。
     seen = n_derivers + n_indexed + n_image + n_author + len(unknown)
     got = (n_derivers, n_indexed, n_image, n_author, len(unknown))
-    # 口径（2026-10-16 起）：静态支 2005 条 = 1147 DERIVERS + 372 条目类 + 424 取图，
-    # field 契约 ×31 包再贡献 186 条 —— kicker/title/onscreen/slotSeconds 4×31=124 落进
-    # DERIVERS（1147+124=1271），ghost/place 2×31=62 落进作者供料位。
-    want = (1271, 372, 424, 62, 0)
+    # 口径（2026-10-16 起）：静态支 2005 条 = 1147 DERIVERS + 372 条目类 + 424 取图。
+    # `field` 契约 ×31 包贡献 186 条（kicker/title/onscreen/slotSeconds 4×31=124 进 DERIVERS，
+    # ghost/place 2×31=62 进作者供料位）。
+    # `rank` 契约 ×31 包再贡献 434 条（kicker/title/onscreen/slotSeconds 4×31=124 进 DERIVERS
+    # ⇒ 1395；item1..5 的 Label/Value 10×31=310 进条目类 ⇒ 682；basis **不在契约里** ——
+    # 口径标注是版式常量，写成变量就等于允许稿件改标签，见 rank-a/contract.toml 头注）。
+    want = (1395, 682, 424, 62, 0)
     assert got == want and seen == sum(want), (
         "变量取值来源分布漂移（DERIVERS / INDEXED 语法 / imagePath+imageCredit / "
         "作者供料位 / 无来源）："

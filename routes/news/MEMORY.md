@@ -446,9 +446,30 @@ in_progress:
     finalize 把 `shots.json` 往"同一个文件的绝对路径写法"上拷 ⇒ `SameFileError`。
     危险性在位置：**片已渲完、字幕已烧、AIGC 已核验**，整轮却 exit 1。
     普查没撞上是因为它 `--skip-render`，走不到 finalize。
+  - rank_role: **第二个 Vue-only 角色已落地（2026-10-16）** —— `src/web/entries/rank-a/`，
+    设计出处 rank 探针（**带 bar**，容量上限由"带不带 bar"决定 ≤5）。三条新闸都可反证：
+    ① `optional` 尾部可选行 —— 真实榜单常只有 3 条，固定 5 行会拒掉绝大多数稿；
+      只准长在 `itemN*` 尾部（标在中间或非条目 id 直接 `ContractError`），填不出来落空串由组件收行；
+    ② 量级条**单位必须一致** —— `3亿` 与 `1188万` 并排时字面比 3:1188，条差 400 倍而屏上无提示
+      ⇒ `_check_bar_units` 拒发射，不是"组件里小心点"；
+    ③ **口径标注是版式常量、不是契约变量** —— 我第一版把 `basis` 写进 variables 被来源闸拦下，
+      那一红指出设计错了：能改标签就等于允许「条按相对第一名画、字写占总量比例」。
+      现在标注是组件里的字面文本，`t_rank_bar_honesty_is_wired` 要求有字面 `rk-basis` 节点
+      （插值即红）且 bar 用 `ratio(...)` 表达式（常量 1 即红 = 旧 probe"永远满格"那个形态）。
+    路由**不找 rank-b**：`vue_bundle_for` 先查契约（实测 news-policy 也给 `rank-a`），
+    新角色天然"一角色一组件、31 包共用"。普查夹具换成 `census-probe-scenes.json`（7 镜，2 镜 Vue-only）。
+    全文 `evidence/2026-10-16-rank-vue-only-role.md`。
   - vue_stale_css: **已修（2026-10-16）** —— `stage_vue_assets` 只拷不清，Vite CSS 名带内容 hash，
     `emit_host` 又按 `<bundle>*.css` 全发 ⇒ 复用 work_dir 时**两代样式同挂，谁赢取决于 hash 字母序**
     （普查目录跨轮复用，不是理论风险）。闸 `t_stage_vue_assets_leaves_no_stale_generation`。
+    **同类的第二层在 dist**：`vite.config` 是 `emptyOutDir:false`，裸跑 `npm run build:templates`
+    会在 `dist/vue/assets/` 攒下同一 bundle 的多代 CSS（实测 rank-a 三代），
+    `stage_vue_assets` 整目录拷 + `emit_host` 按 `<bundle>*.css` 全发 ⇒ 又是字母序定生死
+    （表现：屏句用了最早那版的 `position:absolute;bottom:24cqh`，画面上"就是没有"）。
+    已加 `prebuild:templates` 清 dist，并让 `stage_vue_assets` 见同 bundle 多条 CSS 直接抛
+    （不猜哪份新）。**清下游一层不够，源头脏了下游清完还是脏**；
+    而 `t_stage_vue_assets_leaves_no_stale_generation` 当时仍绿，因为它断言"暂存集==dist 集"，
+    dist 本身脏时这条成立 —— 闸的口径要连着问"它比的是不是同一个污染源"。
     教训：**负例要先证明"改动真的生效"再解读结果** —— 第一版字幕区负例打在没赢的那份 CSS 上，
     画面一个像素没动却报"check 通过"，那次是**假阴**；复测像素后才做出活体负例（85.6cqh 侵入，
     引擎仍报 0 finding），"引擎不拦"这句才是被证的。

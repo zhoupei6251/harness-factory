@@ -25,8 +25,10 @@ CONTRACT_NAME = "contract.toml"
 REQUIRED_VAR_FIELDS = ("id", "type", "label")
 #: 契约允许出现的顶层键。清单外的一律抛 —— 键名写错（`override` 少个 s）会静默失效，
 #: 而静默失效的槽位覆盖正是「改了没效」里最难发现的那一类。
+#: `optional` = 尾部可选行（行数可少于契约上限）；`bars` = 量级条取值字段后缀
+#: （声明它就同时背下两条诚实负担：单位必须一致 + 必须有口径标注，见 validate_contract）。
 CONTRACT_KEYS = {"role", "variant", "ground", "variables", "slots",
-                 "overrides", "author_slots"}
+                 "overrides", "author_slots", "optional", "bars"}
 
 
 class ContractError(RuntimeError):
@@ -86,7 +88,50 @@ def validate_contract(contract: dict, where: str = "<inline>") -> dict:
             raise ContractError(
                 f"{where}: {var_id!r} 声明为作者供料位，但发射器本来就能自己切出来"
                 "（DERIVERS / 条目类语法）—— 作者漏写时会被静默填上，这条登记是个谎")
+    # 尾部可选行：`rank` 这类结构的容量上限由「带不带 bar」决定（探针实测 ≤5），但真实稿件
+    # 常常只有 3、4 条 —— 固定行数会把绝大多数稿子拒掉。声明为 optional 的行填不出来时
+    # 落空串，由组件自己收行。**只准声明在条目类 id 的尾部**：
+    # 把 item3 标成可选而 item4 必填 = 屏上会出现"跳过第 3 行只画第 4 行"的洞。
+    optional = contract.get("optional") or []
+    if not isinstance(optional, list):
+        raise ContractError(f"{where}: optional 必须是字符串数组，实为 {type(optional).__name__}")
+    for var_id in optional:
+        if var_id not in by_id:
+            raise ContractError(f"{where}: optional 里的 {var_id!r} 不是本契约的变量 id")
+        if not pb.INDEXED_VAR_RE.match(var_id):
+            raise ContractError(
+                f"{where}: {var_id!r} 不是条目类 id（itemN*/stepN*）—— "
+                "事实位、屏句、标题都不许可选，缺了就该拒发射，不是悄悄不上屏")
+    for var_id in optional:
+        prefix, n, suffix = _split_indexed(var_id)
+        higher = [v for v in seen if _split_indexed(v)
+                  and _split_indexed(v)[0] == prefix and int(_split_indexed(v)[1]) > int(n)]
+        gap = [v for v in higher if v not in optional]
+        if gap:
+            raise ContractError(
+                f"{where}: optional 不是尾部 —— {var_id!r} 可选，但更靠后的 {sorted(gap)} 必填，"
+                "屏上会跳行")
+    # 量级条：声明 `bars` 就同时背下两条诚实负担（frame.md 法则 5 + rank 探针 §3）。
+    # 口径标注缺位 = 画面替我们说了一句我们没说过的话（观众默认把条长读成占总量百分比）。
+    bars = contract.get("bars")
+    if bars:
+        # 口径标注**不在这里查**：它是版式常量，写成契约变量就等于允许稿件改标签
+        # （条按「相对第一名」画、字写「占总量比例」）。标注由组件自带，
+        # 由自检 `t_rank_bar_honesty_is_wired` 见到 bars 声明时核 basis 节点在不在。
+        if not isinstance(bars, str) or not bars.endswith(("Value", "Label")):
+            raise ContractError(
+                f"{where}: bars={bars!r} 不是条目类取值字段（应以 Value 结尾）")
     return contract
+
+
+def _split_indexed(var_id: str):
+    """itemNLabel → ("item", "N", "Label")；不是条目类 id 则 None。"""
+    match = pb.INDEXED_VAR_RE.match(var_id)
+    return (match.group(1), match.group(2), match.group(3)) if match else None
+
+
+def optional_ids(contract: dict) -> list[str]:
+    return list(contract.get("optional") or [])
 
 
 def load(path: Path) -> dict:

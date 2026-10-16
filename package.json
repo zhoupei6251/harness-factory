@@ -15,6 +15,7 @@
     "skills:install": "tsx scripts/install-skills.ts",
     "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
     "typecheck:web": "node node_modules/typescript/lib/tsc.js --noEmit -p tsconfig.web.json",
+    "prebuild:templates": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
     "build:templates": "vite build",
     "build:templates:dev": "vite build --mode development",
     "preview:templates": "vite preview --port 4173",
