@@ -355,13 +355,31 @@ in_progress:
     **原计划的「发射前字数预算闸」已删**：`estimate_duration` 的 4.5 字/秒 实测偏 15–35%，
     且「字数→秒」模型本身不成立（数字/单位被读成更多音节）⇒ 没有能撑 ±10% 带宽的字数常数。
     标定与判据全文见 `routes/news/evidence/2026-10-15-30s-budget-gate-and-t003.md` §1–§2。
-  - photo_credit_false_label: **未修，需拍** —— 无图镜仍显示「图源：Wikimedia Commons」。
-    根因：`figcaption.xx-photo-credit` 在 v006 cinematic 化时被移出 `<figure>`，而隐藏规则挂在
-    `.xx-photo{display:none}` 上管不到它，HTML 里又写了默认文案 ⇒ `hasPhoto=false` 时常驻。
-    影响面实测 **227 份 composition 里 212 份中招，覆盖 31/31 个 pack、每包最多 7 个版式**。
-    不只是难看 —— 画面声称图来自第三方许可库而实际无图，是一份假的许可指向。
-    修法机械（补 `display:none` + 在 `hasPhoto` 分支点亮）但要扫 212 文件并重过四道闸，
-    属独立变更单元，未塞进本轮。详见同一证据文件 §4。
+  - photo_credit_false_label: **已修（2026-10-16，`bd7b5a7`）** —— 无图镜曾显示「图源：Wikimedia Commons」。
+    根因：`figcaption.xx-photo-credit` 在 v006 cinematic 化时被移出 `<figure>`（为破 stacking context），
+    而隐藏规则挂在 `.xx-photo{display:none}` 上管不到它，HTML 里又写了默认文案 ⇒ `hasPhoto=false` 时常驻。
+    影响面 **227 份 composition 里 212 份中招，覆盖 31/31 个 pack**。性质上不只是难看：
+    画面声称图来自第三方许可库而实际无图，是一份**假的许可指向**。
+    修法：CSS 补 `display:none` + `hasPhoto` 分支点亮，`routes/news/scripts/fix_photo_credit.py`
+    幂等机械扫（复跑报「已改=0 已到位=212」）。判据 `t_imageless_shots_never_show_photo_credit`
+    **同时覆盖静态支与 `src/web/**/*.vue`** —— 第一轮只扫了 templates/，`hook-a` 漏网被用户问出来。
+  - new_structures_probe: **四个新结构探针已做完，设计问题全部有答案**
+    （`evidence/2026-10-16-{field,rank,versus,cause}-proto.md`）：
+    `field` 只做 **none 单态**（示意图 0/9 可用，且角标对冲不了画面的断言力）；
+    `rank` **带 bar**，容量由"带不带 bar"决定（≤5 / ≤7 行）；
+    `versus` 采 **table 形态** —— 等权分屏会让观众读成"旧规现在还是那样"，
+    属性列 + 旧规状态标 + 生效日属**判据级**装置不是装饰；
+    `cause` 采 **chain 形态**，但**分类词（背景/措施/结果）本身就算因果断言**，
+    机检必须审关系词表而非只审箭头。
+    另沉淀**法则 10**：清单行区禁用 `space-between` 撑固定区高，且任何 N 下不得留 >15% 整块空白
+    —— 这条是**被"照法则写出来的正确实现"证伪一次后**才修订的（`layers` 版 N=3 仍留 40% 空）。
+  - composition_id_legacy_debt: **未修，独立口子** —— 30 个包的 `hook`/`quote`/`story`
+    的 `composition_id` 全是 `nc-night-*`（v008 批量从 `news-coral-night` 复制骨架留下），
+    即 `news-alert/hook` 与 `news-coral/hook` **共用同一个 id 字符串**。
+    静态支每镜独立 document 所以没炸；Vue 支一个 host 共享一份 `window.__timelines`，
+    Task 4 加唯一后缀绕开的就是它 —— **这笔债是被绕过一次，不是不存在**。
+    新角色已用 `f"{role}-{pack}"` 彻底避开（`vue_contracts.composition_id_for`）。
+    修它要重跑 `layout_selfcheck` 规则 2 + 31 包普查 + `vue_pixel_ab`，**别顺手改**。
   - collect_no_source: **未修** —— 今日 top 12 候选**全部**来自百度实时榜且只带一个百度搜索页 URL，
     无任何媒体出处；`thepaper` RSS 最旧条目 304.1 天、`zaobao` 55.2 天，两个源当日零供货。
     ⇒ 「热门」与「可核实」目前是两件事：fact-check 的 5 个源全是手工搜出来的，采集没给。

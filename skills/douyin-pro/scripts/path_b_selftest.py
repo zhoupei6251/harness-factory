@@ -5013,6 +5013,89 @@ def t_imageless_shots_never_show_photo_credit():
     assert not offenders, "无图时会露出假图源署名:\n  " + "\n  ".join(offenders)
 
 
+# ---------------- Vue-only 版式地基（Task 1：契约发现 + pack slug） ----------------
+
+def t_new_composition_ids_collide_with_nothing():
+    """新角色的 composition_id = f"{role}-{pack}"，必须与包内任何已有 id 不撞。
+
+    刻意**不**从已有 layout 的 id 反推包前缀：那样做会踩到一笔历史债 ——
+    30 个包的 hook/quote/story 的 id 全是 `nc-night-*`（v008 批量复制骨架留下），
+    即 `news-alert/hook` 与 `news-coral/hook` 的 composition_id 是同一个字符串。
+    静态支每镜独立 document 所以没炸；Vue 支一个 host 共享一份 `window.__timelines`，
+    Task 4 被迫加唯一后缀撞上的就是它。新角色不该续这笔债（见 `vue_contracts.composition_id_for`）。
+    """
+    import vue_contracts as vc
+    for pack in pb.ALL_TEMPLATES:
+        ids = {l["composition_id"] for l in pb.load_style_pack(pack)["layouts"].values()}
+        for role in ("field", "rank", "versus", "cause"):
+            want = vc.composition_id_for(pack, role)
+            assert want not in ids, f"{pack}: 新 id {want} 与已有 composition_id 撞车"
+            assert want == f"{role}-{pack}", f"{want} 不符合约定"
+
+
+def t_slot_values_come_from_theme_and_fail_loudly():
+    """槽位必须来自 theme.toml；token 名写错要当场抛，不许悄悄退回默认色 ——
+    那是拿假常数当判据（`estimate_duration` 的 4.5 字/秒 就是这么把时长闸废掉的）。"""
+    import vue_contracts as vc
+    contract = {"role": "field", "variant": "a",
+                "slots": {"c0": "cream", "c1": "ink"},
+                "variables": [{"id": "kicker", "type": "string", "label": "眉标"}]}
+    got = vc.slot_values("news-coral", contract)
+    assert len(got) == 2 and all(h.startswith("#") for h in got), f"槽位取值异常: {got}"
+    bad = {"role": "field", "variant": "a",
+           "slots": {"c0": "no-such-token-xyz"}, "variables": []}
+    try:
+        vc.slot_values("news-coral", bad)
+    except vc.ContractError as exc:
+        assert "no-such-token-xyz" in str(exc), f"没点名缺哪个 token: {exc}"
+    else:
+        raise AssertionError("theme 里不存在的 token 被静默放行了")
+
+
+def t_contract_variables_match_schema():
+    """每条变量必须有 id/type/label，且 id 在契约内唯一 —— 契约与 HTML 的
+    data-composition-variables 同 schema，否则 resolve_variable 会在发射阶段才炸。"""
+    import vue_contracts as vc
+    ok = {"role": "field", "variant": "a",
+          "variables": [{"id": "kicker", "type": "string", "label": "眉标"}]}
+    vc.validate_contract(ok)
+    for bad, why in (({"role": "field", "variant": "a", "variables": [{"id": "kicker"}]}, "缺字段"),
+                     ({"role": "field", "variant": "a",
+                       "variables": [{"id": "a", "type": "string", "label": "x"},
+                                     {"id": "a", "type": "string", "label": "y"}]}, "id 重复"),
+                     ({"role": "field", "variant": "c",
+                       "variables": [{"id": "a", "type": "string", "label": "x"}]}, "variant 非法")):
+        try:
+            vc.validate_contract(bad)
+        except vc.ContractError:
+            pass
+        else:
+            raise AssertionError(f"契约校验没拦住「{why}」: {bad}")
+
+
+def t_discover_is_keyed_by_role_and_variant():
+    """路由按 f"{role}-{variant}" 推导 ⇒ 同一 (role, variant) 出现两个组件必然静默选错。"""
+    import shutil, tempfile
+    import vue_contracts as vc
+    tmp = Path(tempfile.mkdtemp(prefix="vue-contracts-"))
+    try:
+        for name, variant in (("field-a", "a"), ("field-a2", "a")):
+            d = tmp / name
+            d.mkdir()
+            (d / "contract.toml").write_text(
+                f'role = "field"\nvariant = "{variant}"\n'
+                'variables = [ { id = "kicker", type = "string", label = "眉标" } ]\n'
+                '[slots]\nc0 = "paper"\n', encoding="utf-8")
+        try:
+            vc.discover(tmp)
+        except vc.ContractError as exc:
+            assert "field" in str(exc) and "a" in str(exc), f"撞车消息没点名: {exc}"
+        else:
+            raise AssertionError("同 (role, variant) 的两个契约被静默收下")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]
