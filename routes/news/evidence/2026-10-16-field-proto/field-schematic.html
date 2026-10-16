@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* field · schematic 态原型 —— 图来自 Commons，地理/年代/主体与本事件无关
+         （拉脱维亚 2008 年的空置楼配宁波 2026 年的新闻），所以它**不是现场照片**。
+         三条硬约束：
+           ① 常驻「示意画面 · 非事件现场」标 —— 不靠观众自己判断；
+           ② 不做 Ken Burns —— 推镜会把示意图读成纪实镜头；
+           ③ 轻微降饱和 —— 视觉上与真现场区分开。
+         署名照授权要求上屏（CC BY 3.0 必须署名）。 */
+      @font-face {
+        font-family: "HF CJK";
+        src: local("Noto Sans SC"), local("Source Han Sans SC"),
+             local("Noto Sans CJK SC"), local("Microsoft YaHei"), local("PingFang SC");
+        font-weight: 100 900;
+      }
+      html, body { margin: 0; background: #0a0a0d; }
+      #root {
+        position: relative; width: 100%; height: 100%;
+        overflow: hidden; container-type: size;
+        background: #0a0a0d; color: #f5f0e8;
+        font-family: "HF CJK", sans-serif;
+      }
+      .clip { position: absolute; inset: 0; }
+      .fd-stage { position: absolute; left: 0; right: 0; top: 0; height: 62cqh; overflow: hidden }
+      .fd-img {
+        position: absolute; inset: 0; width: 100%; height: 100%;
+        object-fit: cover; object-position: 50% 42%;
+        filter: saturate(.72) contrast(.96);
+      }
+      /* 底部压字用的暗渐变 —— 不算"对比度下层"，亮底图上浅字仍须自带底片 */
+      .fd-stage::after {
+        content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 22cqh;
+        background: linear-gradient(to top, rgba(10,10,13,.92), rgba(10,10,13,0));
+      }
+      /* ① 示意图标 —— 常驻，不淡出 */
+      .fd-tag {
+        position: absolute; left: 6cqw; top: 6cqh; z-index: 3;
+        background: rgba(10,10,13,.82); color: #ffffff;
+        border: 1px solid rgba(232,93,93,.85);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 2.5cqw; font-weight: 700; letter-spacing: .12em;
+        padding: .85cqh 1.7cqw;
+      }
+      /* 授权要求的署名（CC BY 3.0）—— 小但可读，自带暗底片 */
+      .fd-credit {
+        position: absolute; left: 0; right: 0; bottom: 62cqh; z-index: 3;
+        padding: .7cqh 6cqw; background: rgba(10,10,13,.72);
+        font-family: "JetBrains Mono", monospace;
+        font-size: 1.9cqw; color: #dcdcdc; letter-spacing: .04em;
+      }
+      .fd-copy {
+        position: absolute; left: 6cqw; right: 6cqw; bottom: 22cqh;
+        display: flex; flex-direction: column; gap: 2.2cqh; z-index: 2;
+      }
+      .fd-rule { width: 18cqw; height: .55cqh; background: #c0392b; transform-origin: 0% 50% }
+      .fd-head { font-size: 8.4cqw; font-weight: 900; line-height: 1.2; letter-spacing: -.01em }
+      .fd-sub { font-size: 4.1cqw; font-weight: 400; color: #b0b0b0; line-height: 1.45 }
+      .fd-head, .fd-sub { text-shadow: 0 1px 3px rgba(0,0,0,.7), 0 0 1px rgba(0,0,0,.5) }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="field-proto-schematic"
+         data-width="1080" data-height="1920" data-duration="5">
+      <div class="clip" data-start="0" data-duration="5" data-track-index="1"
+           data-width="1080" data-height="1920">
+        <div class="fd-stage">
+          <img class="fd-img" id="im" src="site.jpg" alt="" />
+        </div>
+        <div class="fd-tag" id="tg">示意画面 · 非事件现场</div>
+        <div class="fd-credit" id="cr">图：Methem (Mikko J. Putkonen) · CC BY 3.0</div>
+        <div class="fd-copy">
+          <div class="fd-rule" id="rl"></div>
+          <div class="fd-head" id="hd">女儿还没住过一天</div>
+          <div class="fd-sub" id="sb">精装被整屋拆回毛坯</div>
+        </div>
+      </div>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      // ② 无 Ken Burns：图只做一次淡入定住，不推不摇 —— 运动会被读成纪实素材
+      tl.fromTo("#im", { opacity: 0 }, { opacity: 1, duration: .7, ease: "power2.out" }, .05);
+      tl.fromTo("#tg", { opacity: 0, y: -14 }, { opacity: 1, y: 0, duration: .45 }, .5);
+      tl.fromTo("#cr", { opacity: 0 }, { opacity: 1, duration: .5 }, .7);
+      tl.fromTo("#rl", { scaleX: 0 }, { scaleX: 1, duration: .55, ease: "power2.out" }, .8);
+      tl.fromTo("#hd", { opacity: 0, y: 26 }, { opacity: 1, y: 0, duration: .5 }, .95);
+      tl.fromTo("#sb", { opacity: 0, y: 18 }, { opacity: 1, y: 0, duration: .45 }, 1.2);
+      // 呼吸只给文字带，图不动
+      tl.to(".fd-copy", { yPercent: -1.1, duration: 3.6, ease: "none" }, 1.4);
+      window.__timelines["field-proto-schematic"] = tl;
+    </script>
+  </body>
+</html>
