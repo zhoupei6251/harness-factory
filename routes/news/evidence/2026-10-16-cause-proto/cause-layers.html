@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* cause · 分层无箭头版 —— 与 chain/index.html 同一三句话，只改两件事：
+           ① 去掉箭头与「导致/于是」；
+           ② 每层挂**关系类型标签**（背景 / 措施 / 结果），并在底部写口径。
+         要回答的是：去掉箭头会损失多少可读性，换来多少"不替证据说话"。 */
+      @font-face {
+        font-family: "HF CJK";
+        src: local("Noto Sans SC"), local("Source Han Sans SC"),
+             local("Noto Sans CJK SC"), local("Microsoft YaHei"), local("PingFang SC");
+        font-weight: 100 900;
+      }
+      html, body { margin: 0; background: #0a0a0d; }
+      #root {
+        position: relative; width: 100%; height: 100%; overflow: hidden;
+        container-type: size; background: #0a0a0d; color: #f5f0e8;
+        font-family: "HF CJK", sans-serif;
+      }
+      .clip { position: absolute; inset: 0; }
+      .cs-kicker {
+        position: absolute; left: 6cqw; top: 6cqh;
+        background: #ffffff; color: #e85d5d;
+        font-family: "JetBrains Mono", monospace; font-size: 2.6cqw; font-weight: 700;
+        letter-spacing: .16em; padding: .85cqh 1.7cqw; transform-origin: 0% 50%;
+      }
+      .cs-title { position: absolute; left: 6cqw; top: 13cqh; font-size: 7.2cqw;
+                  font-weight: 900; line-height: 1.18 }
+      .cs-rule { position: absolute; left: 6cqw; top: 24.5cqh; width: 18cqw; height: .55cqh;
+                 background: #c0392b; transform-origin: 0% 50% }
+      /* 行区：固定行高 + 顶对齐 —— 遵守 §7.8 那条（不许 space-between 撑固定区高） */
+      .cs-layers { position: absolute; left: 6cqw; right: 6cqw; top: 30cqh;
+                   display: flex; flex-direction: column }
+      .cs-layer { display: grid; grid-template-columns: 16cqw 1fr; column-gap: 2.6cqw;
+                  align-items: start; padding: 2.2cqh 0;
+                  border-top: 1px solid rgba(245,240,232,0.12) }
+      .cs-layer:last-child { border-bottom: 1px solid rgba(245,240,232,0.12) }
+      .cs-tag { font-family: "JetBrains Mono", monospace; font-size: 2.4cqw;
+                letter-spacing: .12em; color: #b0b0b0; padding-top: .5cqh }
+      .cs-layer.is-action .cs-tag { color: #e85d5d }
+      .cs-txt { font-size: 4.0cqw; line-height: 1.4 }
+      /* 口径行 —— 没有它，分层照样会被读成因果链（人脑自动补箭头） */
+      .cs-basis { position: absolute; left: 6cqw; right: 6cqw; bottom: 22cqh;
+                  font-family: "JetBrains Mono", monospace; font-size: 2.2cqw;
+                  color: rgba(245,240,232,0.62); letter-spacing: .05em; line-height: 1.5 }
+      .cs-probe { position: absolute; right: 6cqw; top: 6.4cqh;
+                  font-family: "JetBrains Mono", monospace; font-size: 2.0cqw;
+                  color: rgba(245,240,232,0.40); letter-spacing: .1em }
+      .cs-title, .cs-txt, .cs-kicker {
+        text-shadow: 0 1px 3px rgba(0,0,0,.7), 0 0 1px rgba(0,0,0,.5) }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="cause-proto-layers"
+         data-width="1080" data-height="1920" data-duration="5">
+      <div class="clip" data-start="0" data-duration="5" data-track-index="1"
+           data-width="1080" data-height="1920">
+        <div class="cs-kicker" id="kb">科普 · 为什么</div>
+        <div class="cs-title" id="tt">大巴又坐满了</div>
+        <div class="cs-rule" id="rl"></div>
+        <div class="cs-probe">探针·内容为虚构·请勿发布</div>
+        <div class="cs-layers" id="ly">
+          <div class="cs-layer"><div class="cs-tag">背景</div>
+            <div class="cs-txt">高铁成网，大巴客源流失</div></div>
+          <div class="cs-layer is-action"><div class="cs-tag">措施</div>
+            <div class="cs-txt">客运降价、站点搬进地铁口</div></div>
+          <div class="cs-layer"><div class="cs-tag">结果</div>
+            <div class="cs-txt">短途乘客回流，班次加密</div></div>
+        </div>
+        <div class="cs-basis" id="bs">三件事同时被报道；本镜未证其因果链</div>
+      </div>
+    </div>
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      tl.fromTo("#kb", { scaleX: 0 }, { scaleX: 1, duration: .45, ease: "power2.out" }, .1);
+      tl.fromTo("#rl", { scaleX: 0 }, { scaleX: 1, duration: .5, ease: "power2.out" }, .3);
+      tl.fromTo("#tt", { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: .45 }, .45);
+      tl.fromTo(".cs-layer", { opacity: 0, y: 18 },
+        { opacity: 1, y: 0, duration: .4, stagger: .18, ease: "power2.out" }, .8);
+      tl.fromTo("#bs", { opacity: 0 }, { opacity: 1, duration: .45 }, 1.5);
+      tl.to("#ly", { yPercent: -1.2, duration: 2.8, ease: "none" }, 2.0);
+      window.__timelines["cause-proto-layers"] = tl;
+    </script>
+  </body>
+</html>
