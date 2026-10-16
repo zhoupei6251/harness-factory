@@ -230,6 +230,14 @@ SFC 版检查 = `check_component`，复用抽出来的 `check_momentum_budget` /
 `--target-seconds 30` 渲一条含 `field` 镜的片；要求 `check --strict` 0/0、零 WARN、
 逐镜尾段动量达标，并出 before/after 联络表交用户目视（spec §2 最后一条判据）。
 
+**落地记录（2026-10-16）**：四条判据全过 —— 29.568s 落带内、`check --strict` 0 finding、
+888/888 帧零 WARN、逐镜尾段动量 0.0370/0.0029/0.0166。
+before/after 用**逐字相同的正文**只换第 2 镜版式：story 58.70cqh → field **77.40cqh**，
+`field` 是整批量唯一过法则 17 的版式。顺带修掉 finalize 的 `SameFileError`
+（相对 `--work-dir` 才触发，位置在成片已产出之后）。
+"有图态会不会吃掉空带"今天测不了：三镜全部降级无图（供货 0/3）。
+全文 `evidence/2026-10-16-task6-field-render.md`。
+
 ## 顺带挖出的一笔历史债（本计划刻意不修，但必须留名）
 
 Task 1 原本打算"从已有 layout 的 `composition_id` 反推包前缀"，跑完全 31 包量出 **92 个少数派**：

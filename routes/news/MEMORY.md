@@ -324,6 +324,19 @@ videos:
           ⇒ 第一支**两支混排**的真片，`check --strict` 通过、三镜尾段动量 0.0875/0.0157/0.0263 达标。
           ⚠️ 观感未达成：三镜全部降级无图，却**三镜右上角都挂「图源：Wikimedia Commons」**——
           结构性缺陷（227 份版式里 212 份中招），见 `evidence/2026-10-15-30s-budget-gate-and-t003.md` §4。
+  - id: v010
+    topic_id: t004
+    template: news-coral
+    render_status: done
+    output: .harness-news-runtime/tmp/t004-after/final.mp4
+    spec: 1080×1920 / **29.568s** / 1.28MB / h264+aac / 字幕 7 条 + aigc.json + contact-sheet.jpg
+    voice: zh-CN-XiaoxiaoNeural
+    aigc_label: verified         # ② 元数据读回一致; ① 按姿态 no-badge 不烧, 发布须带 ③
+    note: **第一条含 Vue-only 角色（`field`）的真片**，也是第一条 before/after 同稿对照：
+          第 2 镜 story→field 买到 **+18.7cqh 填幅**（58.70 → 77.40），`field` 是整批量里
+          唯一过法则 17 的版式。`check --strict` 0 finding、888/888 帧、零 WARN、
+          三镜尾段动量 0.0370/0.0029/0.0166 达标。三镜仍全部降级无图（供货 0/3）。
+          证据 `evidence/2026-10-16-task6-field-render.md`；对照片 `t004-before/`。
           另两处 3 镜片才暴露的版式问题：story 的 title 与 support 被填成**同一句话**
           （「两次提示，一句没事」/「两次提示一句没事」），以及 ordinal「02」独占上半屏、
           与正文之间大片留白 —— 30s/3 镜时这个镜号没有任何上下文。
@@ -414,6 +427,15 @@ in_progress:
     要拍的是：按法则 17 把无图态版式往下推（动 31 包 × 7 版式骨架），还是承认"无图态
     上半部构图 + 下半部留给字幕"并把口径改成按有图态判。数据全文
     `evidence/2026-10-16-content-floor-pixel-gate.md`。
+    **2026-10-16 追加两个数据点**（`evidence/2026-10-16-task6-field-render.md`）：
+    ① 同稿同正文只换版式，story 58.70cqh → `field` **77.40cqh** ⇒ "往下推"做得到，
+      买到 +18.7cqh，`field` 是整批量唯一过线的；
+    ② "有图态会不会吃掉空带"今天**无法测量** —— 三镜全部降级无图（供货 0/3），
+      前提不成立，要等影像供给。
+  - finalize_same_file: **已修（2026-10-16）** —— `--work-dir` 传相对路径时（普查与本地都这么用），
+    finalize 把 `shots.json` 往"同一个文件的绝对路径写法"上拷 ⇒ `SameFileError`。
+    危险性在位置：**片已渲完、字幕已烧、AIGC 已核验**，整轮却 exit 1。
+    普查没撞上是因为它 `--skip-render`，走不到 finalize。
   - vue_stale_css: **已修（2026-10-16）** —— `stage_vue_assets` 只拷不清，Vite CSS 名带内容 hash，
     `emit_host` 又按 `<bundle>*.css` 全发 ⇒ 复用 work_dir 时**两代样式同挂，谁赢取决于 hash 字母序**
     （普查目录跨轮复用，不是理论风险）。闸 `t_stage_vue_assets_leaves_no_stale_generation`。

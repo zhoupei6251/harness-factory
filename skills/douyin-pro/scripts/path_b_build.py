@@ -4040,8 +4040,13 @@ def main():
             write_text(os.path.join(work, "shots.json"),
                        json.dumps(shots, ensure_ascii=False, indent=2))
             if args.work_dir:
-                shutil.copyfile(os.path.join(work, "shots.json"),
-                                os.path.join(os.path.dirname(os.path.abspath(final)), "shots.json"))
+                # `--work-dir` 给相对路径时（普查与本地跑法都这样），work 与 final 所在目录
+                # 是同一条路径的两种写法 —— 直接 copyfile 会 SameFileError，
+                # 而它发生在**全链路最后一步**：片已经渲完、字幕已经烧完，
+                # 却被一句"same file"判成整轮失败。所以比绝对路径，同址即跳过。
+                dst = os.path.join(os.path.dirname(os.path.abspath(final)), "shots.json")
+                if os.path.abspath(os.path.join(work, "shots.json")) != dst:
+                    shutil.copyfile(os.path.join(work, "shots.json"), dst)
         log(f"✅ 完成! 最终视频: {os.path.abspath(final)}")
     except (EmitterError, FileNotFoundError, OSError) as exc:
         log(f"❌ {exc}")
