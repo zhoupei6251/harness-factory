@@ -456,7 +456,7 @@ in_progress:
       那一红指出设计错了：能改标签就等于允许「条按相对第一名画、字写占总量比例」。
       现在标注是组件里的字面文本，`t_rank_bar_honesty_is_wired` 要求有字面 `rk-basis` 节点
       （插值即红）且 bar 用 `ratio(...)` 表达式（常量 1 即红 = 旧 probe"永远满格"那个形态）。
-    路由**不找 rank-b**：`vue_bundle_for` 先查契约（实测 news-policy 也给 `rank-a`），
+    路由**不找 rank-b**：`vue_bundle_for` 先查契约（实测 news-policy 也给 `rank-a`），新角色天然一角色一组件 31 包共用。⚠ 行区首版用 `flex:1` 等分**违反法则 10**（N=3 时三行被推到 15.4cqh 一行，不像表）；固定行距又会在 N=5 溢出到 81.7cqh。两头错过才落到法则 10 的第三条路：`gap = max(0.8, min(2.6, (46−N×7.4)/(N−1)))` + 顶对齐，N=5 实测 78.80cqh 过线、N=3 余量留底部。全文 `evidence/2026-10-16-rank-vue-only-role.md`。
     新角色天然"一角色一组件、31 包共用"。普查夹具换成 `census-probe-scenes.json`（7 镜，2 镜 Vue-only）。
     全文 `evidence/2026-10-16-rank-vue-only-role.md`。
   - vue_stale_css: **已修（2026-10-16）** —— `stage_vue_assets` 只拷不清，Vite CSS 名带内容 hash，

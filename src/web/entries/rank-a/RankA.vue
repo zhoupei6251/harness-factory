@@ -64,6 +64,30 @@ const rows = computed<RankRow[]>(() => {
 
 const maxNum = computed(() => rows.value.reduce((m, r) => Math.max(m, r.num), 0));
 
+/** 行区可用高度（cqh）：`.rk-rows` 从 32cqh 铺到 78cqh。 */
+const ROWS_H_CQH = 46;
+/** 一行的实测内容高（名称行 + 条轨），N=5 帧上量出来的，不是按 CSS 估的。 */
+const ROW_H_CQH = 7.4;
+/** 行距上限：再大就不像一张表了（rank 探针 §2 的"拉散"就是这个）。 */
+const GAP_MAX_CQH = 2.6;
+
+/**
+ * 行距按 N 算、并设上限 —— frame.md 法则 10 给的第三条路。
+ *
+ * 为什么不是 `flex:1` 等分：等分保证不溢出，但 N=3 时三行被推到 15cqh 一行，
+ * 读起来是三条独立陈述不是一张表（探针 §2 批评 space-between 用的正是这句话）。
+ * 为什么不是固定行距顶对齐：N=5 时 5×7.4+4×2.6=47.4cqh > 46，实测溢到 81.7cqh
+ * 压进字幕禁入区。两头都错过，才落到这条"余量一律留底部、但大 N 时自动收"上。
+ * ROW_H_CQH 估错不会静默：溢出由普查判据 6（`intrude`）当场拦，不靠人盯。
+ */
+const rowGapCqh = computed(() => {
+  const n = rows.value.length;
+  if (n <= 1) return GAP_MAX_CQH;
+  const spread = (ROWS_H_CQH - n * ROW_H_CQH) / (n - 1);
+  return Math.max(0.8, Math.min(GAP_MAX_CQH, spread));
+});
+
+
 /** 第一名 1.0 是**事实**（它就是最大值），其余按真实比值；max 取不到正数时一律不画条。 */
 function ratio(row: RankRow): number {
   if (maxNum.value <= 0 || row.num <= 0) return 0;
@@ -129,7 +153,7 @@ onMounted(() => {
       <div ref="subEl" class="rk-sub">{{ vars.onscreen }}</div>
     </div>
 
-    <div ref="rowsEl" class="rk-rows">
+    <div ref="rowsEl" class="rk-rows" :style="{ gap: rowGapCqh + 'cqh' }">
       <div v-for="(row, i) in rows" :key="i" class="rk-row">
         <div class="rk-no" :class="{ 'rk-no-top': i === 0 }">{{ String(i + 1).padStart(2, "0") }}</div>
         <div class="rk-name">{{ row.label }}</div>
@@ -219,11 +243,9 @@ onMounted(() => {
   bottom: 22cqh;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start;   /* 余量一律留底部（法则 10） */
 }
 .rk-row {
-  flex: 1 1 0;
-  min-height: 0;
-  align-content: center;
   display: grid;
   grid-template-columns: 9cqw 1fr;
   grid-template-rows: auto auto;
