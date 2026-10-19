@@ -1,5 +1,9 @@
 # core/ENTRY.md - governance doc index
 
+> This file is itself the 8th governance doc. The table below names the other
+> seven. `scripts/structure-audit.ts` asserts that all eight exist; updating the
+> list and the file together is the only safe way to change either.
+
 | Doc | Read when |
 |-----|-----------|
 | `intent-routing.md` | Task start: decide what to load |
@@ -12,8 +16,8 @@
 
 ## Loading strategy
 
-Do not read all 7 every session. Read by intent:
+Do not read all 8 every session. Read by intent:
 - Coding task: `NEVER.md` + `karpathy-guidelines.md` + `routing.md`
 - Design task: `principles.md` + `routing.md`
 - Bug fix: `NEVER.md` + `runbooks.md`
-- New project: all 7 once
+- New project: all 8 once

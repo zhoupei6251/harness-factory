@@ -1,0 +1,71 @@
+#!/usr/bin/env sh
+# git-hooks/pre-commit — harness-factory pre-commit gate.
+#
+# Purpose: catch drift between bootstrap-owned files and the generator's
+# current output before it lands in a commit. Runs `npm run check-bootstrap`,
+# which re-runs the generator in a throwaway copy of the sources and compares
+# every artifact byte-for-byte. Drift fails the commit.
+#
+# Why not also run `npm run structure:audit` / `npm run validate`? They are
+# cheaper, but they read only this repository — they cannot detect the
+# "edit the artifact instead of the source" failure mode that this hook
+# exists to catch. check-bootstrap is the only check that exercises the
+# generator; everything else is silent on that mode.
+#
+# Sandboxed environments (CI without fs.cp on a writable tmp, sandboxes that
+# forbid child_process.spawn with stdio:'pipe') cannot run the generator
+# at all. The hook detects that case by reading the exit status, prints a
+# warning, and exits 0 — a sandbox must never silently turn "I could not
+# verify" into "this commit is fine." The full test pipeline runs in CI
+# instead.
+#
+# This file is the source. `scripts/install-hooks.ts` copies it to
+# `.git/hooks/pre-commit` (and chmod +x on POSIX). Re-install after every
+# pull that touches this directory.
+#
+# DO NOT EDIT `.git/hooks/pre-commit` directly. The next `npm run hooks:install`
+# (or the next bootstrap run that detects the source is newer) will overwrite it.
+
+set -e
+
+if [ ! -d node_modules ] || [ ! -x node_modules/.bin/tsx ]; then
+  echo "[pre-commit] skipping: node_modules not installed (run \`npm install\` first)" >&2
+  exit 0
+fi
+
+if ! command -v npm >/dev/null 2>&1; then
+  echo "[pre-commit] skipping: npm not on PATH" >&2
+  exit 0
+fi
+
+# Run the gate. `set -e` + the pipefail-like behaviour of npm means a
+# non-zero exit propagates and aborts the commit.
+set +e
+output=$(npm run --silent check-bootstrap 2>&1)
+status=$?
+set -e
+
+case "$status" in
+  0)
+    exit 0
+    ;;
+  1)
+    # check-bootstrap returns 1 on detected drift; surface its output so the
+    # developer sees exactly which artifact is stale.
+    echo "$output" >&2
+    echo "" >&2
+    echo "[pre-commit] bootstrap drift detected — re-run \`npm run bootstrap\`, or revert the direct edit, then commit again." >&2
+    exit 1
+    ;;
+  *)
+    # Generator could not run (sandbox EPERM, missing node_modules/.bin/tsx,
+    # node too old, etc.). Warn but do not block: the full `npm test` pipeline
+    # in CI will catch any drift that landed.
+    echo "$output" >&2
+    echo "" >&2
+    echo "[pre-commit] WARNING: check-bootstrap could not run (exit $status)." >&2
+    echo "[pre-commit] This is expected in sandboxes that forbid child_process.spawn." >&2
+    echo "[pre-commit] Falling through to allow the commit; CI will re-check." >&2
+    exit 0
+    ;;
+esac

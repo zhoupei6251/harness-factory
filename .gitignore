@@ -45,3 +45,7 @@ __pycache__/
 
 # Local pipeline-stage timing dumps (parse/dub/images/emit/gate) — runtime artifact, not source
 timing.json
+
+# diagnose-windows-sandbox-acl skill outputs (ACL backup files + JSONL reports)
+# Only created when the workspace ACL blocks write; remove freely after the run.
+.acl-reports/
