@@ -1,7 +1,7 @@
 # News domain · 整合架构（v2 单轨 · 零云费）
 
 > 单条线, 一条到底: 选题 → 模板 → 脚本 → 核查 → 渲染 → 发布。
-> 视频是唯一产物; Path A 已不在新闻域使用; 12 pack 是视觉正交轴。
+> 视频是唯一产物; Path A 已不在新闻域使用; 12 个 master pack 是视觉正交轴（派生变体另计）。
 
 ---
 
@@ -34,9 +34,9 @@ news-curate (Step 0b · 台账去重 + 免费热度排序)
    ↓ 台账: routes/news/ledger.jsonl（追加，已发/在途事件永不再作新选题）
 hot-topic-content-maker (Step 1 · 只做裁决/脚本导向，不调它的付费热榜)
    ↓ 产出: 选题 + 简报
-media-short-video-copy / viral-script-writer (Step 2)
+media-short-video-copy 入口 → 三选一 (Step 2)
    ↓ 产出: 口播稿 (.harness-news-runtime/articles/<id>-script.md)
-12 pack 决策树 (Step 2.5)
+master pack 决策树 (Step 2.5)
    ↓ 产出: videos[].template (news-coral | news-ink | ...)
 fact-check (Step 3, 硬门禁)
    ↓ 产出: drafts[].fact_check = passed
@@ -89,7 +89,7 @@ skills/douyin-pro/                   ← 渲染器 (Path B)
 │   │                                  + 三道闸各自的假绿负例: 色板种错数 / 版式传空目录 / 草稿与缺侧车与没交代的 ①)
 │   ├── commons_media.py             ← 图片层 (path B 当前未启用, 留作图片型模板扩展)
 │   └── install_path_b_deps.py       ← 依赖一键装
-├── templates/hyperframes_path_b/   ← 12 个节目包
+├── templates/hyperframes_path_b/   ← 12 个 master pack + 派生变体
 │   ├── news-coral/                  ← 完整 (frame + host + 7 compositions)
 │   ├── news-policy/                 ← 完整 (frame + host + 5 compositions)
 │   ├── news-ink/                    ← frame + host + placeholder (待补 composition)
@@ -100,17 +100,19 @@ skills/douyin-pro/                   ← 渲染器 (Path B)
                                          不在仓库 skills/ 顶层）
 skills/douyin-upload/                 ← 发布 (`sau` CLI 包装)
 skills/fact-check/                    ← 事实核查 (硬门禁)
-skills/media-short-video-copy/        ← 视频脚本生成器 (主)
-skills/viral-script-writer/           ← 视频脚本生成器 (备)
+skills/media-short-video-copy/        ← 脚本入口（按需路由到下面三个之一，不串联）
+skills/short-video-script-creator/    ← 口吻定制生成器（参数化，支持 PDF/Word）
+skills/cn-video-script-writer/        ← 多平台模板生成器
+skills/viral-script-writer/           ← 快速口播生成器（黄金 3 秒）
 skills/news-collect/                  ← 步骤 0 采集层（stdlib-only：百度热搜 board + feedx RSS；无 key 无付费）
 skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询在本域禁用**）
 ```
 
-**核心发射器 `path_b_build.py`**——支持 12 pack + `--template`，交付轨产出 AIGC 标识并读回核验：**full 档**烧 ① 画面角标 + 写 ② mp4 元数据 + `aigc.json` 侧车，**no-badge 档**（D14 新增）只写 ②，产物依旧可发布、代价是发布必须带 ③；草稿轨（旗标 `--draft` 或姿态文件 `render=draft`）不烧不写，代价由 `check_publishable.py` 结算：草稿发不出去。② 两档都不许缺，缺侧车的老成片一律重渲。走哪一档由 `aigc_mode.py` 一处裁决（旗标 `--deliver` / `--no-badge` / `--draft` 三选一 > `routes/news/aigc-mode.json` > 代码默认 full），见 D11/D12/D14。
+**核心发射器 `path_b_build.py`**——支持 12 个 master pack + 派生变体 + `--template`，交付轨产出 AIGC 标识并读回核验：**full 档**烧 ① 画面角标 + 写 ② mp4 元数据 + `aigc.json` 侧车，**no-badge 档**（D14 新增）只写 ②，产物依旧可发布、代价是发布必须带 ③；草稿轨（旗标 `--draft` 或姿态文件 `render=draft`）不烧不写，代价由 `check_publishable.py` 结算：草稿发不出去。② 两档都不许缺，缺侧车的老成片一律重渲。走哪一档由 `aigc_mode.py` 一处裁决（旗标 `--deliver` / `--no-badge` / `--draft` 三选一 > `routes/news/aigc-mode.json` > 代码默认 full），见 D11/D12/D14。
 
 ---
 
-## 4. 12 pack 模板（视觉正交轴）
+## 4. 12 个 master pack 模板（视觉正交轴）
 
 | # | pack | 视觉气质 | 适用稿件特征词 |
 |---|---|---|---|

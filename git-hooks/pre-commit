@@ -16,15 +16,15 @@
 # forbid child_process.spawn with stdio:'pipe') cannot run the generator
 # at all. The hook detects that case by reading the exit status, prints a
 # warning, and exits 0 — a sandbox must never silently turn "I could not
-# verify" into "this commit is fine." The full test pipeline runs in CI
-# instead.
+# verify" into "this commit is fine." Run the full `npm test` pipeline
+# manually; this repo ships no CI configuration.
 #
 # This file is the source. `scripts/install-hooks.ts` copies it to
 # `.git/hooks/pre-commit` (and chmod +x on POSIX). Re-install after every
 # pull that touches this directory.
 #
-# DO NOT EDIT `.git/hooks/pre-commit` directly. The next `npm run hooks:install`
-# (or the next bootstrap run that detects the source is newer) will overwrite it.
+# DO NOT EDIT `.git/hooks/pre-commit` directly. `npm run hooks:install`
+# overwrites it.
 
 set -e
 
@@ -41,7 +41,7 @@ fi
 # Run the gate. `set -e` + the pipefail-like behaviour of npm means a
 # non-zero exit propagates and aborts the commit.
 set +e
-output=$(npm run --silent check-bootstrap 2>&1)
+output=$(npm run --silent check-bootstrap -- --require-generated 2>&1)
 status=$?
 set -e
 

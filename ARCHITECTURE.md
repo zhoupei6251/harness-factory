@@ -14,7 +14,7 @@ What the counts are *of*:
 - **Routes**: code, novel, news — each with a `MEMORY.md` template.
 - **Capability verticals**: java, typescript, common.
 - **MCP servers**: codebase-memory only, wired via the committed root `.mcp.json` plus the `mcp-config/` snippet (see `references/tooling.md`).
-- **Web templates**: `src/web/` — Vue compositions for the news route, built by `vite build` into `dist/`, consumed by `skills/douyin-pro/scripts/path_b_build.py`. Which compositions actually go through Vue is decided by the `VUE_COMPOSITIONS` table in that script — the single source; no count is recorded here.
+- **Web templates**: `src/web/` — Vue compositions for the news route, built by `vite build` into `dist/`, consumed by `skills/douyin-pro/scripts/path_b_build.py`. Which compositions go through Vue is declared by each entry's `contract.toml` (`role` + `variant`); `path_b_build.py` derives the bundle name as `{role}-{variant}`, uses `VUE_ROUTES` only for explicit overrides (currently empty), and `CUTOVER_ROLES` to decide which roles are switched over. No count is recorded here.
 
 ## The 6 layers
 
@@ -79,7 +79,7 @@ session end
 - **Platform**: see `skills/add-platform/SKILL.md`
 - **Route**: see `skills/add-route/SKILL.md`
 - **Language rule**: add file under `capabilities/rules/<lang>/` (e.g., `python/hooks.md`)
-- **Vue composition**: add `src/web/entries/<name>/` (`main.ts` + `<Name>.vue`, `main.html` optional), then add its `composition_id` to `VUE_COMPOSITIONS` in `skills/douyin-pro/scripts/path_b_build.py`. `vite.config.ts` needs no edit — it enumerates `src/web/entries/*/main.ts` and generates the rollup input and HTML-flatten plugin per directory. Registering in `VUE_COMPOSITIONS` is what actually switches a shot over — a built-but-unregistered bundle renders nothing.
+- **Vue composition**: add `src/web/entries/<name>/` (`main.ts` + `<Name>.vue` + `contract.toml` declaring `role` and `variant`; `main.html` optional). `vite.config.ts` needs no edit — it enumerates `src/web/entries/*/main.ts` and generates the rollup input and HTML-flatten plugin per directory. `path_b_build.py` derives the bundle as `{role}-{variant}`; add a `VUE_ROUTES` override only when derivation cannot express the mapping, and add the role to `CUTOVER_ROLES` to switch a shot over. A built-but-uncutover bundle renders nothing.
 
 ## Bootstrap contract
 

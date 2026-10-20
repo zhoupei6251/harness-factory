@@ -37,6 +37,9 @@ verify_code.txt
 __pycache__/
 *.py[cod]
 
+# short-video-script-creator default output (was a hardcoded absolute path)
+skills/short-video-script-creator/out_put/
+
 # code-route runtime artifacts (see core/routing.md runtime dir)
 .ai-runtime-artifacts/
 

@@ -82,7 +82,7 @@ tests/                 Real tests only: bootstrap.test.ts (smoke, temp root),
 src/web/entries/<name>/   One Vue composition = main.html (Vite html entry) + main.ts
                           (exports mount(target, compositionId)) + <Name>.vue.
 src/web/lib/              Shared by entries: gsap-runtime.ts, hyperframes-bridge.ts,
-                          data.contract.ts, tokens/<pack>.ts. This sharing is a reason the
+                          data.contract.ts. This sharing is a reason the
                           layer is NOT under skills/ — see ARCHITECTURE.md.
 src/web/vue-shims.d.ts    declare module "*.vue" — needed because .vue type checking is
                           unavailable (vue-tsc × TypeScript 7, see below).
@@ -136,7 +136,7 @@ sources and compares bytes, so a stale or hand-edited artifact fails. `npm test`
 | A new language rule | `capabilities/rules/<lang>/<topic>.md` | this file |
 | A new npm script | `scripts/<name>.ts` + `package.json` entry | existing scripts for style |
 | A new test | `tests/<name>.test.ts` (web-layer: `tests/web/<name>.test.ts`) | `tests/bootstrap.test.ts` for style |
-| A new Vue composition | `src/web/entries/<name>/` (`main.ts` exporting `mount`, optional `main.html`) + one line in `VUE_COMPOSITIONS` | `ARCHITECTURE.md` → "How to add things" — `vite.config.ts` is directory-driven, no edit needed |
+| A new Vue composition | `src/web/entries/<name>/` (`main.ts` exporting `mount`, `contract.toml` declaring `role`/`variant`, optional `main.html`) | `ARCHITECTURE.md` → "How to add things" — `vite.config.ts` is directory-driven; add a `VUE_ROUTES` override only if the derived `{role}-{variant}` name is not enough |
 | A new design doc | `docs/superpowers/specs/YYYY-MM-DD-<topic>-design.md` | existing specs |
 | A new implementation plan | `docs/superpowers/plans/YYYY-MM-DD-<topic>.md` | existing plans — **not** `docs/plans/`, see the duplicate-home warning above |
 | A new evidence/verification | `routes/<route>/evidence/YYYY-MM-DD-<topic>.md` | existing evidence |

@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 49 active + 51 archived = 100 skills
+Total: 48 active + 52 archived = 100 skills
 
-## Active (49)
+## Active (48)
 
 | Skill | Description |
 |-------|-------------|
@@ -25,13 +25,13 @@ Total: 49 active + 51 archived = 100 skills
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |
 | get-callers | 获取调用指定符号的所有代码。触发：想知道谁在调用某个方法、分析依赖、评估影响。 |
 | git-xywh | 组织级 Git 工作流：三主干（main / test / develop）、五类临时分支、多环境隔离、Angular 提交与 MR 流程；涵盖合并、变基、冲突、恢复。任务涉及分支、提测、热修、版本标 |
-| harness-health | 系统健康度检查 Skill — 一键输出所有子系统的健康状态 |
+| harness-health | 运行仓库现有门禁并汇总健康状态 — 不另建一套检测，不维护第二份判据 |
 | hot-topic-content-maker | 把一个热点，变成今天就能发出去的内容。热点、事件、节日节点由你带来，也可以让它去读抖音热榜、TikTok 与 X 的热搜榜与趋势，或者你报一个话题，让它去搜小红书和抖音上正在发的相关内容，把值得接的话 |
 | humanizer | Remove signs of AI-generated writing from text. Use when editing or reviewing |
 | humanizer-zh | 中文 AI 文风清洗，消除 AI 生成特征，去套路化，句式重构，人物声音分化 |
 | index-project | 为项目建立代码索引。触发：大型项目、需要精准定位符号、快速查找调用关系。 |
 | lsp-query | 通过 Language Server Protocol（typescript-language-server / pyright / gopls 等）做结构化代码查询：定义、引用、悬停信息、符号、代码 |
-| media-short-video-copy | 短视频文案工作流 skillset 入口：竞品文案提取 → 多平台脚本创作 → 爆款标题生成，串联 6 个技能完成短视频文案生产 |
+| media-short-video-copy | 短视频文案工作流入口（skillset 路由器）：可选竞品文案提取，按任务只路由到三个脚本生成器之一（口吻定制 / 快速口播 / 多平台模板），可选爆款标题生成。当用户要写短视频脚本、口播稿、多平台脚 |
 | news-collect | 零成本热点采集：百度热搜 board API + feedx 中文媒体 RSS，一条命令把"今天什么在热"落成选题线索 JSON，喂给 news-workflow 步骤 0。stdlib-only，无 |
 | news-curate | 选题策展层：按台账去重已发/在途事件（零成本，不重复生成），只用免费信号给线索排序，产出带理由的今日候选清单。route=news 且采集跑完、选稿之前使用。产出是候选，不是已核实事实。 |
 | news-generator | 新闻写作技能包：根据热点/素材生成新闻稿件 |
@@ -47,7 +47,6 @@ Total: 49 active + 51 archived = 100 skills
 | requesting-code-review | Use when completing tasks, implementing major features, or before merging |
 | ripgrep-search | 使用 ripgrep（rg）做高速文本搜索，定位引用、字符串、关键字。触发：grep、find、搜索文本、定位字符串、查找引用、查找 TODO/FIXME、查找实现、查找日志、搜索代码。 |
 | self-improving | Self-reflection + Self-criticism + Self-learning + Self-organizing memory. |
-| short-video-script | 短视频脚本创作技能。用于生成抖音、快手、B站、视频号等平台的短视频脚本、标题、封面建议。适用于自媒体运营、内容创作需求。 |
 | short-video-script-creator | 短视频核心脚本创作，通过专属参数清晰区分产品信息、口吻对标、内容对标及历史文案，批量生成高质量脚本，原生支持PDF/Word。 |
 | simplify | Refactor code for clarity, consistency, and maintainability without changing |
 | skill-vetter | Security-first skill vetting for AI agents. Use before installing any |
@@ -57,7 +56,7 @@ Total: 49 active + 51 archived = 100 skills
 | viral-title-generator | 根据文章主题、关键词或内容摘要，一键生成多个平台的高点击率爆款标题，内置「数字+痛点+悬念」等爆款公式，输出10个标题并标注预估点击率。当用户提到爆款标题、标题生成、起标题、取标题、取个标题、帮我起个 |
 | writing-plans | Use when you have a spec or requirements for a multi-step task, before |
 
-## Archived (51)
+## Archived (52)
 
 > Not in active use. Restore via: `git mv skills/archive/<name> skills/<name>`
 
@@ -106,6 +105,7 @@ Total: 49 active + 51 archived = 100 skills
 | archive/prompt-engineering-expert | Advanced expert in prompt engineering, custom instructions design, and |
 | archive/qidian-writing | 起点中文网写作技能 — 慢热品质专项：设定硬、人物真、每章信息增量。基于《黑龙醒》前100章实战 + 起点读者行为分析。触发场景：写起点小说、慢热品质文、群像展开。 |
 | archive/security-auditor | Use when reviewing code for security vulnerabilities, implementing authentication |
+| archive/short-video-script | 短视频脚本创作技能。用于生成抖音、快手、B站、视频号等平台的短视频脚本、标题、封面建议。适用于自媒体运营、内容创作需求。 |
 | archive/summarize | Summarize URLs or files with the summarize CLI (web, PDFs, images, audio, |
 | archive/superdesign | Expert frontend design guidelines for creating beautiful, modern UIs. |
 | archive/ui-ux-pro-max | UI/UX design intelligence and implementation guidance for building polished |

@@ -75,6 +75,31 @@ SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 TEMPLATE_ROOT = os.path.join(os.path.dirname(SCRIPT_DIR), "templates", "hyperframes_path_b")
 DEFAULT_STYLE = "news-coral"
 
+
+def _resolve_repo_root() -> Path:
+    """harness-factory 仓库根 —— Vue 产物、node_modules/vue 与运行目录都以它为锚。
+
+    `npm run skills:install` 用 junction/symlink 安装，`__file__` 解析回仓库内；
+    把 skill **复制**到仓库外时上溯不到，这里当场报错并给出两条修复路径，而不是
+    把 `.harness-news-runtime` 悄悄写到用户主目录或磁盘根。
+    """
+    override = os.environ.get("HARNESS_FACTORY_ROOT")
+    candidates = [Path(override).resolve()] if override else Path(__file__).resolve().parents
+    for parent in candidates:
+        if ((parent / "scripts" / "bootstrap.ts").is_file()
+                and (parent / "src" / "web" / "entries").is_dir()):
+            return parent
+    where = (f"HARNESS_FACTORY_ROOT={override}" if override
+             else f"脚本位置 {Path(__file__).resolve()}")
+    raise RuntimeError(
+        "定位不到 harness-factory 仓库根（需要 scripts/bootstrap.ts + src/web/entries）："
+        f"{where}。douyin-pro 的 Vue 产物与 .harness-news-runtime 都相对仓库根。"
+        "修复：用 `npm run skills:install` 以 junction/symlink 方式安装（不要复制），"
+        "或设置 HARNESS_FACTORY_ROOT=<harness-factory 根>。")
+
+
+REPO_ROOT = _resolve_repo_root()
+
 #: 节目包 (设计系统 = 模板 = style; 三者同义, --template 与 --style 都接这同一组值)。
 #: **这里不写总数** —— 数量一律 `len(ALL_TEMPLATES)` 现算 (决策 D20: 手抄 pack 数会悄悄过期)。
 #: 顺序按"用途+情绪"二维分组, 默认 DEFAULT_STYLE 仍为 news-coral (人物故事型, 兼容存量稿件)。
@@ -479,7 +504,7 @@ VUE_ROUTES: dict[tuple[str, str], str] = {}
 CUTOVER_ROLES: set[str] = {"hook"}
 
 #: 组件目录：`contract.toml` 放在这里，声明"只有组件、没有静态文件"的版式。
-VUE_ENTRIES_DIR = Path(__file__).resolve().parents[3] / "src" / "web" / "entries"
+VUE_ENTRIES_DIR = REPO_ROOT / "src" / "web" / "entries"
 
 #: 扫出来的 {(role, variant): 契约}。`None` = 还没扫（懒扫，见 `vue_only_contracts`）；
 #: 自检直接赋一个 dict 当注入缝 —— 懒扫一旦跑过就缓存，测试若靠"先后顺序"覆盖它会漂。
@@ -545,9 +570,8 @@ def vue_clip_id(cid: str, mount_index: int) -> str:
 
 
 def _vue_dist_dir() -> Path:
-    """Vite 产物目录。path_b_build.py 在 skills/douyin-pro/scripts/，上溯 3 级到仓库根。"""
-    return (Path(os.path.dirname(os.path.abspath(__file__))).resolve()
-            .parent.parent.parent / "dist" / "vue")
+    """Vite 产物目录（锚在显式解析出的仓库根，不按脚本层级硬上溯）。"""
+    return REPO_ROOT / "dist" / "vue"
 
 
 def vue_bundle_built(bundle: str) -> bool:
@@ -2629,8 +2653,7 @@ def stage_vue_assets(work_dir: str, pack: dict) -> list[str]:
     if not bundles:
         return []
     os.makedirs(vue_dst, exist_ok=True)
-    # 仓库根：path_b_build.py 在 skills/douyin-pro/scripts/, 上溯 3 级到 harness-factory/
-    repo_root = Path(os.path.dirname(os.path.abspath(__file__))).resolve().parent.parent.parent
+    repo_root = REPO_ROOT
 
     # 拷 Vite build 产物（dist/vue/<bundle>.js 与 assets/<bundle>.css）到 work_dir/vue/
     # 用递归遍历 —— dist/vue/assets/ 是子目录, shutil.copyfile 不接受目录源
@@ -3702,7 +3725,7 @@ def parse_resolution(text: str) -> tuple[int, int]:
 
 
 #: 渲染工作目录的默认根（2026-10-08 起，理由见 default_work_dir 的 docstring）
-DEFAULT_WORK_ROOT = Path(__file__).resolve().parents[3] / ".harness-news-runtime" / "work"
+DEFAULT_WORK_ROOT = REPO_ROOT / ".harness-news-runtime" / "work"
 
 #: 跨 work_dir 的 Commons 取图持久缓存根（口径 A：同稿必须同片）。默认落在 work 根的兄弟目录
 #: `.harness-news-runtime/commons-cache/` —— 与 work_dir 同域（.gitignore 覆盖、不被系统清理），

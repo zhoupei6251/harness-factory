@@ -17,8 +17,12 @@ if sys.platform == "win32":
 
 # 模型 API 地址
 API_URL = "https://api2.aigcbest.top/v1/chat/completions"
-API_KEY = "sk-uXiErnJimD8brHcWWzeL7tW5ILogfSFcNnTLGgel66j8y5c9"
-DEFAULT_OUTPUT_DIR = Path(r"C:\Users\EDY\.openclaw\skills\short-video-script-creator\out_put")
+# 密钥只从环境变量读：写进仓库等于公开（本仓库有远端）。缺失时 --call-model 直接报错。
+API_KEY = os.environ.get("SHORT_VIDEO_API_KEY", "")
+DEFAULT_OUTPUT_DIR = Path(os.environ.get(
+    "SHORT_VIDEO_OUTPUT_DIR",
+    Path(__file__).resolve().parent.parent / "out_put",
+))
 
 
 def clean_text(text):
@@ -176,6 +180,8 @@ def main():
 
     args = parser.parse_args()
     print("args0",args)
+    if args.call_model and not API_KEY:
+        parser.error("--call-model 需要环境变量 SHORT_VIDEO_API_KEY（密钥不得写进仓库）")
     try:
         prompt = build_prompt(args)
 

@@ -38,6 +38,11 @@ brew install ffmpeg node pip && pip3 install edge-tts && python3 scripts/install
 
 > 全绿 → 直接出片。有红 → 按提示装缺失项。**Path B 只需这 3 样东西，2 分钟搞定。**
 
+> 📦 **安装方式（重要）**：脚本以 **harness-factory 仓库根**为锚定位 `dist/vue/`、`node_modules/vue` 与 `.harness-news-runtime/`。
+> 用 `npm run skills:install` 以 junction/symlink 安装（`__file__` 解析回仓库内）即可正常跑；
+> **不要复制** skill 目录到仓库外 —— 复制后上溯不到仓库根，脚本会直接报错。
+> 确需在别处运行：设 `HARNESS_FACTORY_ROOT=<harness-factory 根>`。
+
 ---
 
 ## 两条路径怎么选

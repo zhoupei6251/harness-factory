@@ -23,12 +23,20 @@
  *   7. Every active skill has SKILL.md + _meta.json (skills-audit.ts already
  *      reports this; we re-assert it here so the structure gate cannot be
  *      "green" while bit-rot quietly accumulates).
- *   8. Forbidden homes per STRUCTURE.md §"Forbidden homes":
+ *   8. Skillset frontmatter (`skills:` in a SKILL.md) names only active skills.
+ *      An archived/removed skill left in a workflow's list is a route to a
+ *      dead end — the workflow looks complete while the step cannot load.
+ *   9. Forbidden homes per STRUCTURE.md §"Forbidden homes":
  *        - scripts/<name>.md     (scripts are .ts)
  *        - tests/<name>.md or tests/<name-without-.test>.ts
  *        - bootstrap-owned paths tracked under a runtime dir (already
  *          covered by validate-schemas.ts; we re-check it so structure-audit
  *          catches it when run before validate).
+ *  10. Dependency direction at the skills/routes boundary: the render engine
+ *      (skills/douyin-pro/scripts) must not import product code
+ *      (routes/news/scripts). Product scripts may import the engine — that is
+ *      the supported direction. path_b_selftest.py is exempt: it is the shared
+ *      test harness and loads both sides on purpose.
  *
  * Exit 0 = clean. Exit 1 = at least one assertion failed. The script does not
  * repair anything — it reports, the human (or another script) decides.
@@ -234,7 +242,33 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
   if (badCount === 0) ok(`every active skill has SKILL.md + _meta.json`);
 }
 
-// ---------- 8. forbidden homes ----------
+// ---------- 8. skillset frontmatter points at active skills only ----------
+{
+  const active = new Set((await listDirs("skills")).filter((n) => n !== "archive"));
+  const offenders: string[] = [];
+  let entries = 0;
+  for (const name of active) {
+    const text = await readFile(resolve(ROOT, "skills", name, "SKILL.md"), "utf-8");
+    const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+    if (!fm) continue;
+    const lines = fm[1].split(/\r?\n/);
+    const start = lines.findIndex((l) => /^skills:\s*$/.test(l));
+    if (start < 0) continue;
+    for (let i = start + 1; i < lines.length; i++) {
+      const m = /^\s*-\s*["']?([^"'\s]+)["']?\s*$/.exec(lines[i]);
+      if (!m) break;
+      entries++;
+      if (!active.has(m[1])) offenders.push(`skills/${name}/SKILL.md → ${m[1]}`);
+    }
+  }
+  if (offenders.length === 0) {
+    ok(`skillset frontmatter references only active skills (${entries} entries)`);
+  } else {
+    for (const o of offenders) bad(`${o} — skillset entry must name an active skill; archived/removed skills cannot be routed to`);
+  }
+}
+
+// ---------- 9. forbidden homes ----------
 {
   // scripts/<name>.md (scripts are .ts runnable)
   const scriptsEntries = await readdir(resolve(ROOT, "scripts"), { withFileTypes: true });
@@ -295,6 +329,27 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
     ok(`no tracked files under runtime dirs (${RUNTIME_DIRS.join(", ")})`);
   } else {
     for (const p of runtimeOffenders) bad(`runtime content must not be tracked: ${p}`);
+  }
+}
+
+// ---------- 10. skills/routes dependency direction ----------
+{
+  const engineFiles = await listFiles("skills/douyin-pro/scripts", ".py");
+  const offenders: string[] = [];
+  for (const name of engineFiles) {
+    if (name === "path_b_selftest.py") continue;
+    const text = await readFile(resolve(ROOT, "skills/douyin-pro/scripts", name), "utf-8");
+    // Import plumbing only. Prose/error messages may legitimately name product files.
+    const importsProduct = /(?:from|import)\s+[^\n]*routes[\\/]news[\\/]scripts/.test(text)
+      || text.split(/\r?\n/).some((line) => /sys\.path/.test(line) && /routes[\\/]news[\\/]scripts/.test(line));
+    if (importsProduct) offenders.push(name);
+  }
+  if (offenders.length === 0) {
+    ok(`douyin-pro engine (${engineFiles.length - 1} non-selftest scripts) does not import routes/news code`);
+  } else {
+    for (const f of offenders) {
+      bad(`skills/douyin-pro/scripts/${f} imports routes/news/scripts — dependency must point product → engine`);
+    }
   }
 }
 

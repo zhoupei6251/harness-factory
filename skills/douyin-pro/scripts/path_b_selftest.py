@@ -5792,6 +5792,37 @@ def t_real_contracts_leave_static_entries_untouched():
             assert merged[role] == lay, f"{pack}/{role} 条目被真契约改了"
 
 
+def t_install_boundary_reports_repo_root_requirement():
+    """复制安装不许静默落盘：无仓库根时点名 HARNESS_FACTORY_ROOT，显式给出后可解析。"""
+    import shutil
+    import subprocess
+    src = Path(__file__).resolve().parent
+    tmp = Path(tempfile.mkdtemp(prefix="douyin-copy-install-"))
+    try:
+        for path in src.glob("*.py"):
+            shutil.copy2(path, tmp / path.name)
+        code = (
+            "import sys\n"
+            f"sys.path.insert(0, {str(tmp)!r})\n"
+            "import path_b_build as pb\n"
+            "print(pb.REPO_ROOT)\n"
+        )
+        env = {k: v for k, v in os.environ.items() if k != "HARNESS_FACTORY_ROOT"}
+        denied = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                                text=True, env=env)
+        assert denied.returncode != 0, "复制安装竟解析出了仓库根"
+        assert "HARNESS_FACTORY_ROOT" in denied.stderr, (
+            f"报错没给修复路径: {denied.stderr[-300:]}")
+        env["HARNESS_FACTORY_ROOT"] = str(pb.REPO_ROOT)
+        allowed = subprocess.run([sys.executable, "-c", code], capture_output=True,
+                                 text=True, env=env)
+        assert allowed.returncode == 0, f"显式根仍失败: {allowed.stderr[-300:]}"
+        assert Path(allowed.stdout.strip()).resolve() == pb.REPO_ROOT.resolve(), (
+            f"解析出的根不对: {allowed.stdout.strip()}")
+    finally:
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
 if __name__ == "__main__":
     tests = [(name, fn) for name, fn in sorted(globals().items())
              if name.startswith("t_") and callable(fn)]

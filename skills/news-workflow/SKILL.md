@@ -119,12 +119,14 @@ feedx 三个源新鲜度从「当天」到「297 天前」都有 → 按 `feed_s
 
 ## 步骤 2：脚本生成
 
-两个脚本生成器二选一（同一份稿件可以两版对比）：
+脚本生成统一从 **media-short-video-copy** 入口进；它在三个生成器里 **只选一个**，不串联：
 
-| 用哪个 | 适用场景 |
+| 入口/生成器 | 适用场景 |
 |---|---|
-| **media-short-video-copy** | skillset（6 个技能），含竞品文案提取 + 多平台脚本 + 爆款标题；适合系统化创作 |
-| **viral-script-writer** | 单一脚本生成器，黄金 3 秒口播稿方法论；适合快速出稿 |
+| **media-short-video-copy** | skillset 路由器：竞品提取 → 三选一生成 → 可选标题；适合系统化创作 |
+| **short-video-script-creator** | 口吻定制：品牌 IP/专家声音、作战地图、PDF/Word、批量 |
+| **viral-script-writer** | 快速口播：黄金 3 秒钩子，热点快发 |
+| **cn-video-script-writer** | 多平台/多类型：知识、测评、直播话术、分镜，带平台模板 |
 
 产物：`.harness-news-runtime/articles/<topic_id>-script.md`，回填 MEMORY `drafts[]`。
 

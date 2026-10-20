@@ -11,6 +11,8 @@
     "index": "tsx scripts/build-index.ts",
     "stats": "tsx scripts/stats.ts",
     "check-bootstrap": "tsx scripts/check-bootstrap.ts",
+    "structure:audit": "tsx scripts/structure-audit.ts",
+    "hooks:install": "tsx scripts/install-hooks.ts",
     "skills:audit": "tsx scripts/skills-audit.ts",
     "skills:install": "tsx scripts/install-skills.ts",
     "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
@@ -20,7 +22,7 @@
     "build:templates:dev": "vite build --mode development",
     "preview:templates": "vite preview --port 4173",
     "test:web": "tsx tests/web/vue-build.test.ts",
-    "test": "npm run validate && npm run typecheck && npm run typecheck:web && npm run check-bootstrap && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts && tsx tests/downstream-render.test.ts && npm run test:web"
+    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run typecheck:web && npm run check-bootstrap && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts && tsx tests/install-roundtrip.test.ts && tsx tests/downstream-render.test.ts && npm run test:web"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

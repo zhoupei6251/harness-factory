@@ -39,6 +39,13 @@ python scripts/main.py `
     --call-model
 ```
 
+## 环境变量
+
+| 变量 | 必填 | 说明 |
+| :--- | :--- | :--- |
+| `SHORT_VIDEO_API_KEY` | 用 `--call-model` 时必填 | 模型 API 密钥。**不写进仓库**（本仓库有远端），缺省时 `--call-model` 直接报错退出 |
+| `SHORT_VIDEO_OUTPUT_DIR` | 否 | 输出目录，默认 `skills/short-video-script-creator/out_put/`（已 gitignore） |
+
 ## 参数说明
 
 | 参数                         | 必填 | 说明                                                  |
