@@ -33,8 +33,14 @@ tags: [Rules, Runbook]
 | Route | Load | Project to |
 |-------|------|-----------|
 | `code` | `routes/code/MEMORY.md` + `capabilities/rules/` | `./MEMORY.md` |
-| `novel` | `routes/novel/MEMORY.md` | `./MEMORY.md` |
-| `news` | `routes/news/MEMORY.md` + `capabilities/rules/` | `./MEMORY.md` |
+| `novel` **(archived)** | `routes/novel/MEMORY.md` — 归档件，不再自动装载 | `./MEMORY.md` 仅显式 `--route novel` |
+| `news` **(archived)** | `routes/news/MEMORY.md` + `capabilities/rules/` — 归档件，不再自动装载 | `./MEMORY.md` 仅显式 `--route news` |
+
+> **2026-10-22 退役中**：news 与 novel 两域整体迁往独立仓库 `D:\zhoupei\heron`（规格见其
+> `docs/plans/2026-10-22-heron-news-webapp-design.md`，本仓库的域内件另有快照 `heron/reference/from-harness-factory/`）。
+> 归档期内的口径：目录与脚本**此刻仍可运行**（它们还是 heron 的 oracle 与视觉尺子），但意图路由不再指向它们。
+> 分两步退：先摘路由（本次），摘目录与 schema/投影/package 脚本另起一次提交，等新闻域在 heron 侧
+> 用 `fixtures/` 对完账再做。详见 `core/intent-routing.md`。
 
 ## Platform mapping
 
