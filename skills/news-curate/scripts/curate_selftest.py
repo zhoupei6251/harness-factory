@@ -574,6 +574,56 @@ def t_memory_decision_table_lists_every_template():
         f"表里 {len(listed)} 行 vs 真实 {len(cu.ALL_TEMPLATE_NAMES)} 个")
 
 
+#: 两条文档闸共用：`NEGATION` 词表 —— **引用被推翻的旧数字**不算声明
+#: （"旧文档的「⏳ 10 pack 待补」是错的"是 D15 的一部分，删掉它反而丢失"这里曾经错过"的信息）。
+_DOC_NEGATION = ("是错的", "已作废", "推翻", "作废", "旧文档", "旧记录", "原写", "曾经")
+
+#: 会被"跑出来的数"污染的文档（D26）。`routes/news/evidence/` 与 `docs/` 不在列 ——
+#: 证据文件按定义就是一次真跑的字面记录，不该被"现算"闸追着改。
+_RUN_COUNT_TARGETS = (
+    "routes/news/ARCHITECTURE.md",
+    "routes/news/MEMORY.md",
+    "routes/news/RUNBOOK-first-run.md",
+    "routes/news/DESIGN-lsh.md",
+    "routes/news/DESIGN-dedup.md",
+    "routes/news/pack-decision.md",
+    "skills/news-workflow/SKILL.md",
+    "scripts/test-render.ts",
+)
+
+#: 「跑出来的数」的形状 —— 只列真会漂的那几种，宁窄勿宽（宽了就逼人开豁免，见 D20 的翻车记录）。
+#: 「通过：N」一律要求 **非零**：`版式自检通过：0 个文件` 是 D13 那条** bug 的症状**
+#: （什么都没查），不是抄下来的规模 —— 把它算进来只会让每条讲 D13 的散文都翻红。
+_RUN_COUNT_PATTERNS = (
+    r"全绿\s*\d+/\d+",
+    r"自检\s*\d+/\d+",
+    r"版式自检通过[：:]\s*[1-9]\d*",
+    r"版式\s*[1-9]\d*\s*(?:个)?文件",
+    r"对比度审计通过[：:]\s*[1-9]\d*",
+    r"\d+/\d+\s*(?:成功|通过)",
+    r"\[selftest\]\s*\d+\s*项",
+    r"\d+\s+assertions",
+)
+
+
+def _run_count_hits(text: str):
+    """扫出散文里抄下来的闸门计数，产出 (行号, 整行, 命中文本)。
+
+    ``` 围栏**内**不检：那是某一次真跑的字面转录（如 ARCHITECTURE §8 的 D14 凭据），
+    改它等于伪造凭据。围栏外（散文、表格、引用）才是"当前状态主张"。
+    """
+    inside_fence = False
+    for i, line in enumerate(text.splitlines(), 1):
+        if line.lstrip().startswith("```"):
+            inside_fence = not inside_fence
+            continue
+        if inside_fence:
+            continue
+        for pat in _RUN_COUNT_PATTERNS:
+            for m in re.finditer(pat, line):
+                yield i, line, m.group(0)
+
+
 def t_no_doc_claims_a_wrong_pack_count():
     """凡是说"**全部/总共有** N 个 pack"的地方，N 必须等于真实数量（D20 护栏）。
 
@@ -590,9 +640,6 @@ def t_no_doc_claims_a_wrong_pack_count():
     # 总量口吻的限定词 —— 命中才核对数字。
     # 「共」单列：写「共计」漏掉了「共 10 pack」这种最自然的写法（负例实测）。
     TOTAL_MARKERS = ("全部", "总共", "共计", "共", "分类表", "个 pack 系统", "pack 系统里")
-    # **引用被推翻的旧数字**不算声明（"旧文档的「⏳ 10 pack 待补」是错的"是 D15 的一部分，
-    #   删掉它反而丢失"这里曾经错过"的信息）
-    NEGATION = ("是错的", "已作废", "推翻", "作废", "旧文档", "旧记录", "原写", "曾经")
     targets = [
         "routes/news/MEMORY.md",
         "routes/news/pack-decision.md",
@@ -607,7 +654,7 @@ def t_no_doc_claims_a_wrong_pack_count():
         for i, line in enumerate(p.read_text(encoding="utf-8").splitlines(), 1):
             if not any(k in line for k in TOTAL_MARKERS):
                 continue
-            if any(k in line for k in NEGATION):
+            if any(k in line for k in _DOC_NEGATION):
                 continue
             for m in re.finditer(r"(?<!\d)(\d{1,2})\s*(?:个\s*)?(?:pack|模板|节目包)",
                                  line, re.I):
@@ -615,6 +662,98 @@ def t_no_doc_claims_a_wrong_pack_count():
                     problems.append(f"{rel}:{i} 「{m.group(0)}」（总量口吻但数字≠{total}）")
     assert not problems, (
         f"文档里的总包数与真实数量({total})不符:\n  " + "\n  ".join(problems))
+
+
+def t_no_doc_copies_a_gate_run_count():
+    """文档散文里不许抄"跑出来的数"（D26）—— pack 数之外的那一半手抄病。
+
+    2026-10-22 实测：同一件"自检多少项"在新闻文档里有五个版本，**全错，且没有一个被断言过** ——
+      - `全绿 78/78`（ARCHITECTURE §4 与 RUNBOOK-first-run.md 各一份）
+      - `[selftest] 73 项` + `全绿 73/73`（§8 转录）
+      - `234 文件`（`layout_selfcheck.py` 全量真跑是 227）
+      - `load_style_pack 31/31 成功`（四处，其中两处早已随 D23 删包漂成 32/32）
+      - `scripts/test-render.ts` 注释里的 `251 assertions`（真跑 253）
+    D20 那条闸只认 `N 个 pack|模板|节目包`，结构上管不到这些形状，所以补这一条。
+    判据见 `_run_count_hits`：只看 ``` 围栏外的散文，沿用 `_DOC_NEGATION` 认"引用被推翻的旧数字"，
+    **不新增豁免词**。
+
+    本条还**双向锁扫描器自己**（D13：一条什么都不查的绿闸比红危险）：
+    围栏外的两种形状必须抓得到，围栏内必须不抓（否则 §8 那份凭据会被逼着改数）。
+    """
+    problems = []
+    for rel in _RUN_COUNT_TARGETS:
+        p = _REPO_ROOT / rel
+        if not p.is_file():
+            continue
+        for i, line, frag in _run_count_hits(p.read_text(encoding="utf-8")):
+            if any(k in line for k in _DOC_NEGATION):
+                continue
+            problems.append(f"{rel}:{i} 「{frag}」")
+    assert not problems, (
+        "文档抄了闸门跑出来的计数（改法：只写命令，数由现跑给。见 ARCHITECTURE D26）:\n  "
+        + "\n  ".join(problems))
+
+    probe = "散文说 全绿 7/7\n```\n[selftest] 全绿 9/9\n```\n散文说 load 8/8 成功\n"
+    caught = [frag for _, _, frag in _run_count_hits(probe)]
+    assert "全绿 7/7" in caught, f"扫描器抓不到围栏外的「全绿 N/N」（这条闸是假的）: {caught}"
+    assert "8/8 成功" in caught, f"扫描器抓不到「N/N 成功」: {caught}"
+    assert "全绿 9/9" not in caught, "围栏内的字面转录不该算主张（那是凭据，见 D26 边界①）"
+    # 目标清单不许空转：一个文件都没扫到 = 路径写错也照样"全绿"
+    scanned = [rel for rel in _RUN_COUNT_TARGETS if (_REPO_ROOT / rel).is_file()]
+    assert len(scanned) == len(_RUN_COUNT_TARGETS), (
+        f"闸门清单里有不存在的文件（会静默少扫）: "
+        f"{sorted(set(_RUN_COUNT_TARGETS) - set(scanned))}")
+
+
+#: 决策树唯一事实源闸（D27）：入口文件只许**指路**，不许**自带一份表**。
+#: pack 名一律现算自 `cu.ALL_TEMPLATE_NAMES`，没有豁免名单 —— 名字从真实模板来，
+#: 所以 `news-collect` / `news-curate` / 已退役的 `news-polish` 这些**技能名**天然不会被误伤。
+_WORKFLOW_SKILL = "skills/news-workflow/SKILL.md"
+_TREE_POINTERS = ("routes/news/MEMORY.md", "decide_pack.py")
+
+
+def _pack_names_in_table_rows(text: str):
+    """产出 markdown 表格行里出现的真实 pack 名 (行内容, 名字)。"""
+    for line in text.splitlines():
+        if not line.lstrip().startswith("|"):
+            continue
+        for name in cu.ALL_TEMPLATE_NAMES:
+            if name in line:
+                yield line, name
+
+
+def t_workflow_skill_does_not_own_a_template_tree():
+    """`news-workflow/SKILL.md` 不许有第二份「形态 → pack」表（D27）。
+
+    病：MEMORY 的树被 D20 强制列全（每个 pack 一行），而入口 SKILL.md 里另存着一张
+    **只覆盖 12 个 master** 的手抄表。选包时人第一眼看的是入口文件 —— 表里没有的
+    派生变体/主题包**永远选不到**，这不是"文档重复"，是**能力被文档_shape_掉了**。
+    第二份表还必然过期：删一个 pack（D23）只动 MEMORY，入口那张没人动。
+
+    判据两条，都是现算、不开豁免：
+      1. 负向 —— SKILL.md 的**表格行**里不许出现任何真实 pack 名（指针文字不算表）。
+      2. 正向 —— 必须同时指到 `routes/news/MEMORY.md`（唯一的那份树）和 `decide_pack.py`
+         （命令行兜底）。只删表不留指针 = 把决策树删了，闸门不许这么"简化"。
+    """
+    p = _REPO_ROOT / _WORKFLOW_SKILL
+    assert p.is_file(), f"入口文件不见了: {p}"
+    text = p.read_text(encoding="utf-8")
+
+    hits = list(_pack_names_in_table_rows(text))
+    assert not hits, (
+        f"{_WORKFLOW_SKILL} 里又长出第二份决策树（表格行点名 pack）—— 删表、留指针，"
+        f"树只有一份在 routes/news/MEMORY.md:\n  "
+        + "\n  ".join(f"{name} ← {line.strip()[:80]}" for line, name in hits))
+
+    missing = [q for q in _TREE_POINTERS if q not in text]
+    assert not missing, (
+        f"{_WORKFLOW_SKILL} 步骤 1 必须把选包指向唯一事实源，缺指针: {missing}")
+
+    # 双向锁扫描器（D13：什么都不查的绿闸比红危险）
+    probe = "| 形态 | pack |\n|---|---|\n| 故事 | `%s` |\n" % sorted(cu.ALL_TEMPLATE_NAMES)[0]
+    assert list(_pack_names_in_table_rows(probe)), "表行扫描器抓不到 pack 名（这条闸是假的）"
+    assert not list(_pack_names_in_table_rows("- 都不命中用 `news-coral`（DEFAULT）\n")), \
+        "散文里指一次默认包不该被拦 —— 只拦表格，别把指针也逼没"
 
 
 # ── 23 · 台账主键唯一性（2026-10-08 真 bug: 同批新增全部撞成同一个 id） ──

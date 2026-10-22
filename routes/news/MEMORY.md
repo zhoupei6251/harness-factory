@@ -63,9 +63,9 @@ drafts:
 
 按稿件特征词选视觉气质。t001（拾荒老人）= 人物故事型 → `news-coral`。
 
-**31/31 全部可渲染**（2026-10-08 实测，本节原写的「2/12 可渲染 + 其余 10 包仅占位」
-以及「18 个派生变体骨架未独立填实」**均已作废**）：每个包 `compositions/` 7 个真 composition、
-`load_style_pack` 31/31 成功、
+**全部真实 pack 都可渲染**（2026-10-08 实测；包数由 `path_b_build.ALL_TEMPLATES` 现算，本节原写的
+「2/12 可渲染 + 其余 10 包仅占位」以及「18 个派生变体骨架未独立填实」**均已作废**）：每个包
+`compositions/` 7 个真 composition、`load_style_pack` 逐个成功（现算见 `t_full_loadability_progress`）、
 `layout_selfcheck.py` 逐包 0 违规（检查的文件数由命令现报，不抄在这里）。派生变体与主题包都补了
 `frame.md`（含 `derived_from` 派生声明）。
 
@@ -196,7 +196,7 @@ python skills/douyin-pro/scripts/path_b_build.py \
 videos:
   - id: v001
     topic_id: t001
-    template: news-coral         # 32 个 pack 之一 (见上方决策树)
+    template: news-coral         # 决策树选出的 pack（全集见上方「模板决策树」）
     render_status: done
     output: .harness-news-runtime/videos/t001/final.mp4
     spec: 1080×1920 / h264+aac / 60.9s / 2.32MB / 字幕轨 10 条（ASS 内嵌烧录）
@@ -306,7 +306,7 @@ videos:
           news-coral-night = 从 news-coral 完整复制 7 comp + host, 替换 ground (#1a1a1a→#0a0a0d / #f5f0e8→#ece8df) +
           accent (#e85d5d→#c0392b 暗红), data-composition-id 加 `night-` 前缀。check --strict 0/0, 4/5 镜真实图。
           视觉差异: 整体偏冷、夜店感更强(深蓝黑底 + 暗红强调)。**剩余变体已于 2026-10-08 全部填实**
-          （实测 32/32 全部有 7 个真版式、load 32/32 成功，见"模板决策树"段的 D15 说明）。
+          （实测当时每一个 pack 都有 7 个真版式、load 逐个成功，见"模板决策树"段的 D15 说明）。
           填实流程见「模板决策树」段尾(每 pack ≈ 半天)。
           **文字 inline opacity 入场 + 自带 background 会触发 SURFACE_OPACITY_TWEEN** —— 改 scaleX。
           同样教训见 v005 note 的「code-side vs data-side」, cinematic 化是「设计层数据」(版式细节),不是「内容层数据」——
@@ -343,7 +343,7 @@ videos:
           caveat: `--aigc-producer` 仍是默认值 harness-news-pathb，发布前须定主体名重渲（同 v004.caveat）
   # - id: v001
   #   topic_id: t001
-  #   template: <12 选 1, 见上方决策树>
+  #   template: <决策树选出的 pack, 见上方「模板决策树」>
   #   render_status: (scripting | dubbing | rendering | done | failed)
   #   output: (成片文件路径, 产出后回填)
   #   aigc_label: (none | verified)   # none = 发布门禁不放行
@@ -357,7 +357,7 @@ in_progress:
   - pack_census: 31 个 pack 的画面轨真渲染普查（回答「这些模板到底都能跑通吗」）：
     `HF_NODE22_DIR=<node22 目录> python routes/news/scripts/pack_render_census.py` → 产物落
     `.harness-news-runtime/tmp/render-census/<pack>/`，汇总 `_summary.md`。五条判据全绿才算通过。
-    2026-10-14 首跑 **31/31 通过**（1309 帧 / 零 WARN / 零配音），证据与「静态版式可无损槽位化」的证明见
+    2026-10-14 首跑 **全部 pack 通过**（1309 帧 / 零 WARN / 零配音；包数与逐包结果见证据文件），证据与「静态版式可无损槽位化」的证明见
     `routes/news/evidence/2026-10-14-render-census-and-lossless-theme-slots.md`。不走 `batch_render.py`：
     它的 `build_command` 不支持 `--skip-render`，每条任务必走配音。（**2026-10-15 更新**：edge-tts
     403 当天实测已恢复 —— 探针 `zh-CN-XiaoxiaoNeural` 出 15840 字节，落
@@ -412,7 +412,8 @@ in_progress:
     落地时 `reused 11 · moved 4 · 洞 2`（现况见下一条）。接线方式：把规则 6/8/9 抽成 `check_momentum_budget` /
     `check_font_rules` / `check_px_typography`，新增 `check_component(SFC)` 调**同一批谓词**，
     只换两处口子（取 SFC 的 `<style>`/`<script>`；补间目标 `xEl.value!` → 同标签 class）。
-    静态支回归 227 + 7 文件 0 违规。**接线当场抓到 `field-a` 缺中文 @font-face**
+    静态支回归 **0 违规**（文件数由 `layout_selfcheck.py` 末行现报，不抄，见 ARCHITECTURE D26）。
+    **接线当场抓到 `field-a` 缺中文 @font-face**
     （混挂时被 hook-a 的全局面遮住，纯 field 片子会静默降档成系统默认字）。
   - vue_only_holes_left: **已清零（2026-10-16）** —— ① `CAPTION_RESERVE_INTRUDED` 改由像素口径守：
     `routes/news/scripts/content_floor.py`（墨 = 对本帧地面 ≥3:1；界现取自

@@ -23,7 +23,7 @@ skills:
 # 新闻域总工作流（v2 单轨 · 零云费）
 
 > 单条线，一气呵成：选题 → 模板决策 → 脚本 → 事实核查 → 成片 → 发布。
-> 视频是唯一产物；Path A（付费）不在新闻域使用；12 个节目包（template）覆盖视觉形态。
+> 视频是唯一产物；Path A（付费）不在新闻域使用；视觉形态由决策树选出的 pack 决定（清单见步骤 1）。
 
 状态记在 `routes/news/MEMORY.md`（topics / drafts / videos / in_progress 槽位），每完成一步回填状态。架构说明见 `routes/news/ARCHITECTURE.md`。
 
@@ -66,36 +66,37 @@ feedx 三个源新鲜度从「当天」到「297 天前」都有 → 按 `feed_s
 
 ---
 
-## 步骤 1：模板决策（12 节目包）
+## 步骤 1：模板决策（选 pack）
 
 **在写脚本之前先选模板**——脚本里的 `屏:` 行 / `quote` / `items` 都要对齐到模板的版式契约。
 
-**决策树**（按新闻形态的特征词选；都不命中用 `news-coral`）：
+**决策树只有一份，在 `routes/news/MEMORY.md` 的「模板决策树」**（按稿件特征词给主选 + 备选 + 视觉气质）。
+本节**不再另抄一份**：这里曾有一张只有 12 行的形态表，而另外那批派生变体/主题包只在 MEMORY 出现 ——
+选包时人第一眼看的是本文件，等于多出来的包永远选不到（见 `routes/news/ARCHITECTURE.md` D27）。
 
-| 形态 | 特征词 | pack 名 | 视觉气质 |
-|------|--------|---------|----------|
-| 单主角 + 反转 + 召唤 | 故事、人物、钩子、召唤 | `news-coral` | 暖火带 + 无衬线 |
-| 调查 + 卧底 + 长文 | 调查、深度、揭露、追踪 | `news-ink` | 烫金报纸 + 全衬线 |
-| 政策 + 法规 + 施行 | 新规、政策、办法、通知、施行 | `news-policy` | 公文蓝 + 烫金 |
-| 数据 + 排行 + 数字 | 排行、TOP、数据、第一、同比 | `news-stat` | 米白纸 + 衬线巨号 |
-| 突发 + 现场 + 时间码 | 突发、现场、直击、抢险、灾害 | `news-onsite` | 黑底 + PRESS 黄 |
-| 多事件 + 速报 + 编号 | 今日要闻、整点、合辑、盘点 | `news-bulletin` | 编号条目 + 极简 |
-| 科普 + 原理 + 图解 | 为什么、原理、科普、图解、解读 | `news-explainer` | 钢笔蓝 + 衬线 + SVG |
-| 警示 + 应急 + 行动 | 紧急、务必、不要、立即、预警 | `news-alert` | 黑底 + 警示红 + 黄三角 |
-| 节日 + 纪念 + 致敬 | 纪念、致敬、清明、国庆、周年 | `news-thread` | 国旗红 + 烫金 + 仪式 |
-| 观点 + 评论 + 专栏 | 观点、评论、专栏、我观察 | `news-takes` | 单墨 + 浅米 + drop cap |
-| 体育 + 比分 + 实时 | 比赛、比分、进球、加时、绝杀 | `news-blast` | 球场绿 + 比分红 |
-| 国际 + 战况 + 地理 | 国际、战况、边境、外交、联合国 | `news-world` | 深海军蓝 + 经纬白 |
+两种取法，挑一种：
+
+```bash
+python routes/news/scripts/decide_pack.py "<热点关键词>"   # 推荐 pack + 备选 + 理由，并按 --length 给镜数
+python routes/news/scripts/decide_pack.py --list           # 全量清单，包数从真实模板现算
+```
+
+- 查表：`routes/news/MEMORY.md` 模板决策树；分类细则与「长度 → 镜数」见 `routes/news/pack-decision.md`
+- **都不命中 → `news-coral`**（它同时是 `DEFAULT_TEMPLATE`，见步骤 4）
+- 那张表由 `routes/news/scripts/fix_decision_table.py` 从 `path_b_build.ALL_TEMPLATES` 生成，
+  并由 `curate_selftest.py` 的 `t_memory_decision_table_lists_every_template` 锁"必须列全" ——
+  所以**新加 pack 不必在本文件登记**（本文件的"表格行不许出现 pack 名"由
+  `t_workflow_skill_does_not_own_a_template_tree` 上闸）
 
 回填 MEMORY `videos[].template: <pack_name>`。
 
-**当前进度**（2026-10-09 复核，31 个 pack 全部齐全；原 32 个，删了零独有色的 `news-coral-night`，见 ARCHITECTURE D23）：
-- **31/31 全部有真版式**：12 master + 19 派生变体/主题包，每个 `compositions/` 7 个真 composition
-- `load_style_pack` 31/31 成功；`layout_selfcheck.py` 逐包 0 违规（检查文件数由命令现报，不抄在这里）
+**当前进度**（每一个真实 pack 都可渲染；包数由 `path_b_build.ALL_TEMPLATES` 现算，别在这里抄）：
+- **每个 pack 的 `compositions/` 都是真版式**（原 32 个里删过零独有色的 `news-coral-night`，见 D23）
+- `load_style_pack` 对每一个真实 pack 都成功（包数与结果由 `path_b_selftest.py` 的 `t_full_loadability_progress` 现算）；`layout_selfcheck.py` 逐包 0 违规（检查文件数由命令现报，不抄在这里）
 - ⚠️ 本节原写「`placeholder.html` 全删」**不准确**：10 个 master 包各留 1 个，它是惰性的
   （`load_style_pack` 跳过 `PLACEHOLDER_LAYOUT`，不影响渲染），但别把它当"已清理"的证据
 - 19 个派生变体/主题包都补了 `frame.md`（含 `derived_from` 派生声明）
-- **决策树可以放心用** —— 命中任何一格都渲得出来，不再需要"不可渲染就 fallback"那套绕路
+- **树里每一个 pack 都渲得出来** —— 不再需要"不可渲染就 fallback"那套绕路
 - ⚠️ 本节原写「2/12 可渲染、其余 10 包仅占位」是**陈旧数据已作废**（见 ARCHITECTURE.md D15）
 - ⚠️ **改版式用色时**：`audit_pack_contrast.py` 口径是「本包色板 ∪ 共享 token 层」，
   `SHARED_TOKENS` 是跨包公共角色色（实测出现 ≥6 次）、**不许手抄** ——
@@ -103,8 +104,14 @@ feedx 三个源新鲜度从「当天」到「297 天前」都有 → 按 `feed_s
   约束，改它等于改整片的底。
 - 校验（三道闸
   - `path_b_selftest.py` → 末行 `[selftest] 全绿 N/N`（**项数以脚本输出为准**，别在文档里抄数：
-    61→63→66 这三级台阶全是加断言造成的手抄漂移），并报告 `可渲染 pack (有真版式): X/12`
-  - `audit_pack_contrast.py` → `对比度审计通过：12 个 pack 的 frame.md 色板与文档一致`
+    61→63→66 这三级台阶全是加断言造成的手抄漂移），并报告 `可渲染 pack (有真版式): X/Y` ——
+    **分母也是现算的**（`path_b_selftest.py` 打印 `len(real)/len(pb.available_templates())`），
+    所以它**不是** `/12`：写死 12 的那一刻就是本文件那张已删的 12 行表留下的疤（D27）
+  - `audit_pack_contrast.py` → 末行 `对比度审计不过：N 个 pack 里 K 条违规（另有 0 条警告）`（N、K 都现算，别抄）。
+    **2026-10-22 实测：K 非零且该脚本 exit 1** —— D19 那批是刻意保留项（自动改色会把 ~16:1 的白字换成 ~1.1:1）。
+    它们的验收口径是 `path_b_selftest.py` 的 `t_no_pack_has_off_palette_after_repair`
+    （锁"不许有第四类未解释越界"，**不是**"必须 0 条"），所以这道闸的"过"看那条断言、不看这个脚本的退出码
+    —— 两者口径不同，别把"审计不过"四个字直接当闸门失败
   - `layout_selfcheck.py <版式目录…>` → `版式自检通过：N 个文件，0 条违规`。参数是**含
     `compositions/*.html` 的目录**（`skills/douyin-pro/templates/hyperframes_path_b/news-coral`），
     不是 pack 名：显式传入的目录里没有版式文件 = 用法错误，当场 exit 1 并点名该目录
@@ -184,7 +191,7 @@ python skills/douyin-pro/scripts/path_b_build.py \
 **9 步硬链路**（Path B 内部）：
 1. 解析输入（.md 或 .json 场景）
 2. edge-tts 配音（每段 .mp3 + .vtt）
-3. 发射合成 HTML（读 12 pack 之一 + 逐镜挂子合成；只有占位壳的包在此停机）
+3. 发射合成 HTML（读步骤 1 选中的 pack + 逐镜挂子合成；只有占位壳的包在此停机）
 4. layout_selfcheck（17 条结构不变量，渲前拦截）
 5. hyperframes check --strict（引擎门禁）
 6. HyperFrames 渲染 → silent.mp4
@@ -248,7 +255,7 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
 3. **模板决策先于脚本**：不知道选哪个模板就不开始写脚本（避免返工）
 4. **产物写 `.harness-news-runtime/`**：稿件/成片落 `articles/`、`videos/`，**不要**写 `.ai-runtime-artifacts/`（code 域）
 5. **Path B only**：本工作流只使用 Path B（`--template` 即可）；不要尝试 Path A（付费路径，不在新闻域使用）
-6. **12 pack 自检先行**：新加的 pack 必须先有 frame.md + host.html + 真 composition 才提交；三道闸必绿
+6. **新 pack 自检先行**：新加的 pack 必须先有 frame.md + host.html + 真 composition 才提交；三道闸必绿
    （`path_b_selftest.py` 全量断言 + `audit_pack_contrast.py` 色板复算 + `layout_selfcheck.py` 结构不变量；
    项数以脚本输出为准，见步骤 1），
    且版式文件名只许落 `AUTO_LAYOUT_STEMS`（见步骤 1 的重映射提示）
@@ -295,7 +302,7 @@ sau douyin upload-video --account <name> --file <abs>/final.mp4 \
 | 步骤数 | 7（含两轨切换）| 6 |
 | 产物 | 文字 / 视频 | 仅视频 |
 | 路径选择 | Path A / Path B | Path B only |
-| 模板 | 单一 PPT 模板 | 12 pack 决策树 |
+| 模板 | 单一 PPT 模板 | pack 决策树（唯一一份在 `routes/news/MEMORY.md`）|
 | 单独 polish 阶段 | news-polish + humanizer-zh | 不设阶段（脚本生成器自带）|
 
 详细架构：`routes/news/ARCHITECTURE.md`。

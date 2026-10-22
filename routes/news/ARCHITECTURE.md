@@ -114,6 +114,10 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 
 ## 4. 12 个 master pack 模板（视觉正交轴）
 
+> ⚠️ **本表是 master 轴，不是选包全集**（D27）。选包唯一看 `routes/news/MEMORY.md` 的「模板决策树」——
+> 由 `routes/news/scripts/fix_decision_table.py` 从 `path_b_build.ALL_TEMPLATES` 生成、被
+> `t_memory_decision_table_lists_every_template` 锁"必须列全"的那一份。本节只用来理解派生关系。
+
 | # | pack | 视觉气质 | 适用稿件特征词 |
 |---|---|---|---|
 | 1 | `news-coral` | 暖火带 + 无衬线 | 单主角 / 反转 / 故事 / 钩子 |
@@ -136,7 +140,7 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 
 **当前状态**（2026-10-08 实测，**推翻旧文档的 2/12 说法**）:
 - **31 个 pack 全部有真版式**：12 master + 19 派生变体/主题包，每个 `compositions/` 7 个真 composition
-- `load_style_pack` **31/31 成功**；`layout_selfcheck.py` 逐包 **0 条违规**（检查文件数由命令现报，不抄在这里）
+- `load_style_pack` 对**每一个**真实 pack 都成功（由 `path_b_selftest.py` 的 `t_full_loadability_progress` 现算，不抄数）；`layout_selfcheck.py` 逐包 **0 条违规**（检查文件数由命令现报，不抄在这里）
 - 19 个派生变体/主题包都补了 `frame.md`（含 `derived_from` 派生声明，D16）
 - ⚠️ **`placeholder.html` 并没有"全删"**（2026-10-09 实测纠正本节的旧说法）：10 个 master 包
   （alert/blast/bulletin/explainer/ink/onsite/stat/takes/thread/world）各留 1 个。它是**惰性**的
@@ -145,8 +149,12 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 - ⚠️ **色板审计仍有 24 条 OFF_PALETTE_HEX，是刻意保留的**：这些色自动替换会让对比度从
   ~16:1 掉到 ~1.1:1（把白字换成深底），属于"该补进 frame.md 算设计补全"而非"改色"。
   `t_no_pack_has_off_palette_after_repair` 锁的是"不许有第四类未解释越界"，基线 24（D19）
-- 三道闸现状：`path_b_selftest.py` 全绿 78/78 · `layout_selfcheck.py` 234 文件 0 违规 ·
-  `audit_pack_contrast.py` 24 条（D19 刻意保留项）
+- 三道闸现状一律**现跑现报**，文档里不留计数（D26）：`path_b_selftest.py` 末行 `[selftest] 全绿 N/N` ·
+  `layout_selfcheck.py <全部版式目录>` 末行 `版式自检通过：N 个文件，0 条违规` ·
+  `audit_pack_contrast.py` 的 OFF_PALETTE 条数（要这个数就跑它，别抄）。**2026-10-22 实测口径不一**：
+  那台脚本现在打印「审计不过」并 **exit 1**，而 `t_no_pack_has_off_palette_after_repair` 全绿 ——
+  前者按"0 条越界"判、后者按"不许有第四类未解释越界"判（D19 的保留项本来就是非零）。
+  **新闻域的"闸门绿不绿"以断言为准**，脚本退出码留给人工读数
 
 ---
 
@@ -166,9 +174,11 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 | D24 | **不接入 Agnes 视频 API**（2026-10-14，用用户 Key 实测；证据 `evidence/2026-10-14-agnes-video-api-probe.md`） | 用户问「能否接入生视频」，并给了 Key。**结论：不接**，三条独立否决任一成立：<br>**① 与「零云费」口径冲突。** 平台回 `403 insufficient_user_quota, remaining: ＄0.000000`（**2K 按美元计价**），另有 `429 rate_limit_exceeded`「free users … Upgrade to a **Token Plan**」⇒ lcy362 README 那句「完全免费、没有用量限制」**不成立**，以 API 回复为准。<br>**② 免费档内拿不到竖屏。** `aspect_ratio:"9:16"` 的产物容器 720×1280 但**像素横躺**且无 rotation 元数据，事后 `transpose=2` 转正得 **1280×720 横屏**（`transpose=1` 上下颠倒）—— 上游 U3 缺陷，作者 `_needs_portrait_rotation_fix` 的"修复"也只是转正、转完仍是横的。我们要 1080×1920，**一次都没拿到竖屏画面**。<br>**③ 产能倒挂 35 倍。** 端到端 200s（排队 30s + 生成 170s）换 **4.48s** 素材；现状 `batch_render --jobs 3` 是 28.7s 出**整片**。<br>**顺带钉死三件易混事实**：三个链接是**一个项目 + 一个手工转投**（`video.lichuanyang.top` = lcy362 托管版；`uglylee/free-video-generator` 非 fork、5 commit 全在 2026-07-08 当天、12 issue 无人回）；`agnes-video-v2.0` **已不在模型列表**（lcy362 的 `DEFAULT_VIDEO_MODEL` 失效，只能走 2.5 协议）；**它治不了 edge-tts 403** —— 它自己 `core/audio/tts.py` 也 `import edge_tts` + 同一音色，失败后退化成静音占位。<br>**闸按端点/模型分池**（视频 503/429/403 的同时 image 仍 200），所以"这个服务通不通"是错问题，正确问法是"哪一格有额度"。<br>**未证与代价**：2K 能否出正立竖屏**未验证**（撞 403，免费档内不可验证），"aspect_ratio 被忽略"只对 720P+text+2.5 这一格成立；429 出现在 12 次 503 重试之后，无法区分池饱和与我打满额度；**本轮消耗了该账号的免费视频额度**，只换回一条 4.5s 素材。<br>**重开条件**（四条同时满足才重测）：确认并接受 Token Plan 价格 → 实测 2K+9:16 是否正立竖屏 → 用途限 `news-explainer`（突发/现场/调查永不适用）→ ① 角标从 `no-badge` 回 `full`（产物无水印无 C2PA，标识责任全在我们侧） |
 | D25 | **静态支的填幅债走 fix-forward，不去扫 227 份将删文件**（2026-10-16，证据 `evidence/2026-10-16-content-floor-pixel-gate.md` + `evidence/2026-10-16-task6-field-render.md`；**前提被 D25.1 修正了一半，先读那条**） | 像素闸第一次全量就量出：31 包的**无图镜**最底墨线全在 54.7–58.0cqh，法则 17 要 ≥71.5 ⇒ **0/31 达标**。诱惑是立刻去改模板。**不改静态支**，两条理由仍成立：① Phase 3 的既定动作就是删掉这 227 份 `compositions/*.html`，在将删的工件上做设计修正是本项目最差的力气分配（D23 删 `news-coral-night` 已验证过一次"复制骨架"的代价）；② 字幕区那半边 31/31 干净，已开成硬判据（普查 `intrude == 0`），填幅半边**只报不判** —— 把没人过的线开成闸等于把闸改成装饰。<br>**原理由②（"field 证明修法已被证明"）作废，见 D25.1。**<br>**两次自我纠正**：(a) 我一度怀疑 bottom-only 口径会把"垂直居中构图"误判成空带（`.h-field` 确实是 `justify-content: center`），实测顶边有墨（火带 0.0cqh 起）⇒ 口径成立，怀疑作废；(b) 我说过"Task 5 的闸能看见空带"是错的 —— 17 条不变量里**根本没有填幅**，法则 17 过去只在 `hf_compile` 的配方几何上实现 |
 | D25.1 | **短文本版式的空带是按法则 1 主动留的，不是缺陷 —— D25 的移植理由由此作废**（2026-10-16，准备移植 `closer` 时读到源注释才发现） | 我把"0/31 达标"读成"31 份版式有缺陷"。读 `closer.html` / `story.html` 的几何注释，作者**算过并刻意留着**：<br>`closer.html`「内容高度 = 23.2cqh；区高 58cqh 居中 → 上下各余 17.4cqh，漂移 `yPercent -3` 只吃掉 1.7cqh → **距字幕禁入区始终有一整块余量**」<br>`story.html`「居中后上下各余 12.2cqh … **距底部 20cqh 字幕禁入区始终有一整块余量(法则 1)**」<br>⇒ 真问题是 **法则 1（别怼字幕区）与法则 17（要填满）在短文本版式上互相拉扯**：path_b 当年按法则 1 选了居中，而法则 17 是后来只为 path_c 配方写的、从没说它管单行 CTA 的收口镜。<br>**这条改了什么**：`field` 77.40cqh 不是"修好了空带"，是**另一种结构自带更高填充**（巨号事实 + 下沿锚定文案块）—— 它填幅好不等于它比 `closer` 正确。**因此不做**：以"补填幅"为理由移植 `closer`（前提错，且 closer 有 a/b 两簇 = 30+1 包，要两个组件才不触发 `t_cutover_bundle_has_a_component_entry` 的"路由指向 Vue 但组件不存在"）。<br>**要拍的是**（三选一）：(a) 法则 17 只适用于有图/多行版式，单行书挡镜豁免并把口径写进 frame.md；(b) 两者共存 ⇒ 内容必须**放大到填满**（改字号，不是移位 —— 移位只把空洞从下挪到上）；(c) 承认居中是终态，填幅半边连"报"都撤。<br>**闸不动**：填幅半边今天仍是"只报不判"，所以这个未拍的冲突没把任何一条线变成假红 <br>**探针实测把 (b) 划掉一半**：只改 `news-coral/closer.html`（CTA 10.5→13.5cqw、gap 3.2→6cqh、来源行 3→4cqw），下沿 58.02 → **66.77cqh**，仍差 4.7；再放大就撞上 8 字 CTA 在 88cqw 内换行（探针帧已是两行 + 反相块自成一行）。⇒ 法则 17 的 8cqh 线与「三元素书挡镜」在 9:16 上**几何不相容**，不是执行没做到位。(b) 对 `closer` 作废，对多行的 `story`/`rail`/`stat` 是另一道题。模板已回退并重渲核对（`floor_worst` 回到 58.02、`thin_fill` 回到 5）。数据见 `evidence/2026-10-16-content-floor-pixel-gate.md` 末节 <br>**范围再缩**：按角色重量（不解析 id，取 `data-composition-src` / `data-vue-bundle`）⇒ `rail` 其实是**填充最好的版式**（21/31 包下沿正好 80.0cqh；我此前引的 66.3 是单包数被当成全体）；真失败面是 **`story` 58.7 / `closer` 58.0 / `hook` 62.9 三个角色**，`stat` 68.7 只差 2.8。所以这不是「227 份模板」的工程，是三个角色的口径问题。另记一条脆点：`rail` 卡在 80.0 贴线上，`intrude` 用严格 >80.0 才没翻红 —— 字幕硬闸与填幅软线之间没有余量带 <br>**这条自己也被推回一步（口径错配在我这边）**：`MAX_BOTTOM_DEAD_CQH` 的注释明写 「口径是配方的**最坏占位**…这条闸只管『设计意图上就不打算填幅』的那一类，短文本要填幅得改配方」。它判的是**配方**，我拿它去判**成片实文**，于是「0/31 达标 = 31 份缺陷」这句从头就是假的 —— 三选一里的 (a) 不是「要不要豁免书挡镜」，而是那条规则**本来就没打算管它们**。已把普查列名改成「下沿余量>8cqh 镜数（报，不判）」并在 `content_floor.fill_only` 的 docstring 里写死这个边界。**真问题只剩一个**：要不要另立一条管真实文本的填幅规则 —— 那是新设计决定，不是修 bug，而 closer 探针（+29% 字号只换 +8.75cqh、再大就换行）已经说明它对短内容版式不成立。
+| D26 | **闸门计数也不许手抄，口径扩到"跑出来的数"**（2026-10-22） | D20/D23 定下「没人断言的数字就是死数字」，但那条闸只管 **pack 总数**，闸门自己的计数漏在外面：本轮实测 `path_b_selftest.py` 真跑 **253 项全绿**，而文档里同时存在 `全绿 78/78`（§4 与 `RUNBOOK-first-run.md:4`）、`[selftest] 73 项 / 全绿 73/73`（§8）、`234 文件`（应为 **227**）、`load_style_pack 31/31 成功`（四处，含两处已经随删包漂成 32/32）与 `scripts/test-render.ts` 注释里的 `251 assertions` —— **同一件事五个版本，全错，没有一个数被断言过**。修法是删数不补数：文档只写命令与 `N/N` 占位，真数由现跑给。新增 `curate_selftest.t_no_doc_copies_a_gate_run_count` 拦八种散文形状（`全绿 N/N`、`自检 N/N`、`版式自检通过：N`、`版式 N 文件`、`对比度审计通过：N`、`N/N 成功|通过`、`N 项`、`N assertions`）。**两条边界**：① 跳过 ``` 围栏内的内容 —— §8 那段是 2026-09-29 的字面转录（D14 三档产物 + `ffprobe` 对比的凭据），改它等于伪造凭据，所以它在闸外、但加一行"数字是快照"的头注；② 沿用 D20 的 `NEGATION` 豁免（引用被推翻的旧数字不算声明），**不新增豁免名单** —— 一开名单这条闸就又变成装饰。凭据与双向锁：`routes/news/evidence/2026-10-22-doc-run-count-no-copy-gate.md`。 |
+| D27 | **模板决策树收口成一份，入口文件只指路**（2026-10-22，计划二） | 病不是"文档重复"，是**能力被文档的形状吃掉**：`routes/news/MEMORY.md` 的树被 D20 强制列全（每个真实 pack 一行），而入口 `skills/news-workflow/SKILL.md` 步骤 1 另存着一张**只列 12 个 master** 的手抄形态表 —— 选包时人第一眼看的是入口文件，于是派生变体/主题包在那一刻就是"选不到"（缺口 = `len(ALL_TEMPLATES)` 减去 12，用命令现算）。第二张表还必然过期：D23 删 `news-coral-night` 只动了 MEMORY，没人动入口那张。**修法：删表、不留表**。SKILL.md 步骤 1 换成指针（树在 `routes/news/MEMORY.md`；命令行兜底 `decide_pack.py "<关键词>"` 或 `--list`；细则在 `pack-decision.md`），默认包 `news-coral` 那行留着 —— 它是 `DEFAULT_TEMPLATE`，散文里点名一次不叫"自带一份表"。闸 `t_workflow_skill_does_not_own_a_template_tree` 两条判据都现算、**不开豁免名单**：① 负向 —— SKILL.md 的**表格行**里不许出现任何真实 pack 名（名单取 `cu.ALL_TEMPLATE_NAMES`，所以 `news-collect` / `news-curate` / 已退役的 `news-polish` 这些**技能名**天然不误伤；这正是"按 `news-` 前缀扫"会翻车的地方）；② 正向 —— 指向 MEMORY 树与 `decide_pack.py` 的两条指针必须在，只删表不留路等于把决策树删了。**双向锁**用 `git show HEAD:` 的旧版喂扫描器：旧版报 12 行命中且缺 `decide_pack.py` 指针，现版 0 命中、指针齐。指路一并改口：`path_b_build.py` 的两处注释/`--help` 不再指向 SKILL.md 的树，ARCHITECTURE §4 的 master 表加"非选包全集"标注，MEMORY 里 `<12 选 1>` 与 `# 32 个 pack 之一` 两处陈旧注释改成"决策树选出的 pack"（它们在 ``` 围栏内，D26 那条闸按设计不追围栏内，所以只能手改）。**不管**：MEMORY 的树（唯一事实源）、`pack-decision.md` 的分类细则、§4 的 master 轴 —— 三者回答的是不同问题（怎么选 / 怎么归类 / 从谁派生），硬合成一份只会做出一个没人敢改的巨型文件。凭据：`routes/news/evidence/2026-10-22-decision-tree-single-source.md`。 |
 | D1 | 单条线 (视频 only) | 用户最终产物是视频；text track 是 dead-end 投入 |
 | D2 | Path B only | 用户只做免费；Path A 留在 `douyin-pro/SKILL.md` 标注为"非新闻领域可启用"，不在新闻工作流中 |
-| D3 | 12 pack 决策树 | 一份脚本可对应 12 种视觉气质；决策由稿件特征词驱动，不靠人挑 |
+| D3 | 12 pack 决策树 | 一份脚本可对应 12 种视觉气质；决策由稿件特征词驱动，不靠人挑。**这条管的是 master 轴**：选包全集在 MEMORY 的树里，且全库只许那一份（D20 列全 / D27 收口）|
 | D5 | fact-check 硬门禁 | 不通过 = 不发；多源交叉验证（澎湃/工人日报/搜狐/官方回应）|
 | D6 | 屏句 ≠ 配音 | `onscreen:` 行单独成屏上屏上整句，配音未授权走正文；这条结构保证来自 path_b_build.py 的 `check_onscreen` 闸门 |
 | D7 | placeholder 不参与选择 | 11 个新 pack 的 placeholder composition 被 `load_style_pack` **直接跳过**；只剩占位壳的包视为不可渲染，在加载阶段停机点名替代包（2026-09-29 审计后收紧，旧口径"只是让加载通过"会误导到渲染期才崩）|
@@ -240,6 +250,10 @@ skills/hot-topic-content-maker/       ← 选题裁决（**其付费热榜查询
 ---
 
 ## 8. 当前进度 (2026-09-29)
+
+> **下面是 2026-09-29 那一次真跑的字面转录**（D14 三档产物、`ffprobe` 对比、发布闸门四种调用的凭据），
+> 所以保留原样、不改数 —— 改它等于伪造凭据。但**里面每一个计数都是快照**：自检项数、文件数、pack 数
+> 一律以现跑输出为准，别把这里的数字当"当前状态"抄进别的文档（D26）。
 
 ```
 $ python skills/douyin-pro/scripts/path_b_selftest.py
