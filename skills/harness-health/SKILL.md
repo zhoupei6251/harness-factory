@@ -5,7 +5,7 @@ tags:
 - Skill
 - Observability
 - Meta
-version: 1.1.0
+version: 1.2.0
 when_to_use: 用户说 /health、健康检查、检查系统状态，或发版前要一份门禁汇总时
 status: peripheral
 domain: shared
@@ -30,10 +30,11 @@ category: workflow
 | 3 | `npm run check-bootstrap -- --require-generated` | 生成物是否等于新 bootstrap 结果；缺失也算失败（与 pre-commit 同口径） |
 | 4 | `npm run typecheck` | TS 7 类型检查 |
 | 5 | `npm run typecheck:web` | Vue 模板类型检查 |
-| 6 | `npm run doctor` | 外部工具：Node 版本、codebase-memory-mcp、其客户端接线、ponytail |
-| 7 | `npm run stats` | 只作上下文：实时计数 + git 状态 + 运行时目录大小 |
+| 6 | `npm run test:render` | Python 渲染引擎自测（251 条，stdlib-only 离线） |
+| 7 | `npm run doctor` | 外部工具：Node 版本、codebase-memory-mcp、其客户端接线、ponytail |
+| 8 | `npm run stats` | 只作上下文：实时计数 + git 状态 + 运行时目录大小 |
 
-`npm test` 覆盖 1–5 加集成测试与 web 构建，但不含 `doctor`；它内部的 check-bootstrap 用默认模式（缺产物 `[skip]`），严格口径仍需单跑第 3 条。想跑全链时用 `npm test`，再单跑 `doctor`，**不要**在技能里重抄一份命令清单。
+`npm test` 覆盖 1–6 加集成测试与 web 构建，但不含 `doctor` / `stats`；它内部的 check-bootstrap 用默认模式（缺产物 `[skip]`），严格口径仍需单跑第 3 条。CI（`.github/workflows/verify.yml`）在 push main / PR 上跑同一份 `npm test`（Node 20.9.0 + Python 3.12）；想跑全链时本地用 `npm test`，再单跑 `doctor`，**不要**在技能里重抄一份命令清单。
 
 ## 判读规则
 
@@ -54,6 +55,7 @@ category: workflow
 | check-bootstrap (require-generated) | ok — 17 artifacts + MEMORY.md |
 | typecheck | ok |
 | typecheck:web | ok |
+| test:render | ok — 251/251 |
 | doctor | FAIL — codebase-memory-mcp 未接线 |
 | stats | 参考：N tracked files，工作区 M modified |
 
@@ -68,6 +70,7 @@ category: workflow
 | structure:audit | 文档声明与文件系统对齐；不要只改数字不改文件（或反之） |
 | check-bootstrap | `npm run bootstrap` 重新生成；**不要直接编辑生成物**（`AGENTS.md` / `CLAUDE.md` / `.qoder/rules/*` 等） |
 | typecheck / typecheck:web | 修类型错误；`<script setup>` 当前不被 vue-tsc 检查是已知依赖限制，不是本闸的信号 |
+| test:render | 读第一个 `FAIL` / `ERROR` 行；找不到 Python 解释器时先装 3.11+（自测导入 `tomllib`） |
 | doctor | 按输出里的 fix 行；完整安装路径见 `references/tooling.md` |
 | 集成测试 | 读失败断言；先判断是生成器回归还是测试假设过期 |
 

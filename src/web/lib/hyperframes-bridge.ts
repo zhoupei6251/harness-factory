@@ -61,3 +61,54 @@ export function readVariables(clip: Element): HookVariables {
     );
   }
 }
+
+/** 动效签名：同一个 Vue 角色在不同包族下用不同的动效语言。
+ *  `calm` = 不叠加（未实现签名的包族保持原时间轴，画面与 off 一致）。 */
+export type MotionSignature = "calm" | "coral" | "alert" | "blast";
+
+/** 包 → 签名。只登记已实现的三个族及其派生变体；其余包一律 calm。
+ *  派生变体共用母版语言是设计口径：`news-coral-mono` 与 `news-coral` 只差色，
+ *  动效换一套反而会让"同气质"的包看起来是三套模板。 */
+const SIGNATURE_BY_PACK: Record<string, MotionSignature> = {
+  "news-coral": "coral",
+  "news-coral-mono": "coral",
+  "news-mosaic": "coral",
+  "news-dusk": "coral",
+  "news-noir": "coral",
+  "news-alert": "alert",
+  "news-alert-warning": "alert",
+  "news-polarity": "alert",
+  "news-blast": "blast",
+  "news-blast-score": "blast",
+};
+
+/** 从 clip 读动效开关与包名。
+ *
+ *  缺 `data-motion` = off（老发射器/手工预览的既有行为，不是错误）。
+ *  `data-motion="on"` 却没有 `data-pack` = 发射器违约 —— 当场报错，
+ *  不许把整条片子的动效静默降级成 calm。
+ */
+export function readMotionSignature(clip: Element): {
+  enabled: boolean;
+  pack: string;
+  signature: MotionSignature;
+} {
+  if (!clip) {
+    throw new Error(
+      "[hyperframes-bridge] readMotionSignature(clip) 需要一个 clip 元素"
+    );
+  }
+  const enabled = clip.getAttribute("data-motion") === "on";
+  const pack = clip.getAttribute("data-pack") ?? "";
+  if (enabled && !pack) {
+    throw new Error(
+      `[hyperframes-bridge] clip ${clip.id || "(无 id)"} 开了 data-motion 但没有 data-pack —— ` +
+        "包名缺失时无法选动效签名（path_b_build 未发射该属性?）"
+    );
+  }
+  return {
+    enabled,
+    pack,
+    signature: enabled ? SIGNATURE_BY_PACK[pack] ?? "calm" : "calm",
+  };
+}

@@ -1,4 +1,4 @@
-# 抖音短视频生产专家团 (douyin-video-skill)
+# 抖音短视频生产专家团 (douyin-pro)
 
 > 抖音短视频一站式生产体系：**一条 Skill，两条路**。
 > **Path A（高质量·自配）**：大脑定方向 → 采集 → 脚本优化 → 图像采编 → AI 配音与多通道渲染出片，五模块串行。
@@ -81,7 +81,7 @@ python scripts/path_b_build.py --input 脚本.txt --output final.mp4
 ## 目录结构
 
 ```
-douyin-video-skill/
+douyin-pro/
 ├── SKILL.md                         # 根 · 主理人层（双路径编排 / 模块路由 / SOP / handoff）
 ├── settings.json                    # 版本号 (5.2.2)
 ├── README.md
@@ -125,13 +125,13 @@ douyin-video-skill/
 
 ## 安装与注册
 
-这是**单 Skill**，安装 = 把 `douyin-video-skill/` 整个目录放到 WorkBuddy 的 skills 目录：
+这是**单 Skill**，安装 = 把 `douyin-pro/` 整个目录放到 WorkBuddy 的 skills 目录：
 
 ```
 # Windows 示例
-C:\Users\<你>\.workbuddy\skills\douyin-video-skill\
+C:\Users\<你>\.workbuddy\skills\douyin-pro\
 # macOS / Linux
-~/.workbuddy/skills/douyin-video-skill/
+~/.workbuddy/skills/douyin-pro/
 ```
 
 重启 WorkBuddy 后，用自然语言触发即可（如"帮我做条抖音短视频"）。发布到 SkillHub 的说明见 `references/skillhub-listing.md`。

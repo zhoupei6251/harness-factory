@@ -2574,6 +2574,42 @@ def t_caption_norm_is_the_only_shape_words_and_script_share():
     assert pb.caption_norm("10月）全国") == "10月全国"
 
 
+def t_decimal_figures_are_words_not_punctuation():
+    """`11.35%` 是一个词，也是一个人能读的数字 —— 归一化/折行/切片三处必须同一口径。
+
+    t005 实测的三处同源事故：归一化把小数点删了 ⇒ 词表比稿子多一个字、整镜退到字符时序；
+    `caption_lines` 把 `.` 当 token 边界 ⇒ 字幕断成 `4.` / `90%`；切片把 `.` 当句读 ⇒
+    下一个词的首字并进上一片。三处都不会让任何门禁变红，只能靠断言盯住。
+    """
+    text = "SK海力士跌11.35%，三星电子跌9.7%。"
+    raw = [(1000000, 2000000, "SK"), (3000000, 2000000, "海力士"),
+           (5000000, 2000000, "跌"), (7000000, 6000000, "11.35%"),
+           (13000000, 2000000, "三星"), (15000000, 2000000, "电子"),
+           (17000000, 2000000, "跌"), (19000000, 6000000, "9.7%")]
+    events = [{"type": "WordBoundary", "offset": o, "duration": d, "text": t}
+              for o, d, t in raw]
+    words = pb.words_from_events(events, 25.0)
+    assert pb.caption_norm(text) == "".join(w["w"] for w in words), \
+        "小数点被当标点删掉：归组会抛『词表与稿子不是同一份』"
+
+    cue = pb.cues_from_words(text, words, 25.0)[0]
+    display = pb.caption_display_text(text)
+    assert display == "SK海力士跌11.35%，三星电子跌9.7%", display
+    pieces = pb._subtitle_pieces(cue, display)
+    assert "".join(t for _, t in pieces) == display
+    assert [w["w"] for w, _ in pieces] == [w["w"] for w in words]
+    assert pieces[3][1] == "11.35%，", \
+        f"小数点被当成句读：下一片会吞掉下一个词的首字（{pieces[3][1]!r}）"
+
+    # 折行：数字不拆；宽度不够时让到句读后断，不把 `三星` 硬拆成 `三`/`星`
+    assert pb.caption_lines(display, 15) == ["SK海力士跌11.35%，", "三星电子跌9.7%"]
+    rank = pb.caption_display_text(
+        "同一天收盘，日经225跌4.90%；A股北证50、创业板指、科创综指跌幅紧随其后。")
+    lines = pb.caption_lines(rank, 15)
+    assert all(not re.search(r"\d\.$", line) for line in lines), f"数字被拆断: {lines}"
+    assert all(line not in "。；！？" for line in lines), f"标点单独成行: {lines}"
+
+
 def t_word_events_become_monotonic_second_based_words():
     """取数面负责 tick→秒 + 夹单调 + 丢空词与越界词。
 
@@ -4329,6 +4365,39 @@ def t_static_branch_composition_id_untouched():
         "静态支混进 Vue 的唯一后缀"
 
 
+def t_vue_mount_carries_pack_and_motion_signature():
+    """动效签名的两个属性只挂在 Vue mount 上：静态支必须逐字节不变。
+
+    组件自己不知道被哪个包路由到 —— 让它去猜包名等于把「哪套模板配哪套动效」
+    写死在组件里，与 (pack, role) 路由的单一事实源分家。所以 pack 名随 clip 发射。
+    默认必须是 off：不带旗标的渲染是既有基线，画面一个像素都不该换。
+    """
+    pack = pb.load_style_pack("news-coral")
+    hook = pack["layouts"]["hook"]
+    off = pb.emit_mount(1, hook, {"kicker": "A"}, 0.0, 4.0, 1080, 1920)
+    on = pb.emit_mount(1, hook, {"kicker": "A"}, 0.0, 4.0, 1080, 1920,
+                       motion_signature="on")
+    assert 'data-vue-mount="1"' in off and 'data-vue-mount="1"' in on
+    assert 'data-pack="news-coral"' in off and 'data-pack="news-coral"' in on, \
+        "Vue mount 必须带包名 —— 组件靠它选动效签名"
+    assert 'data-motion="off"' in off, "默认必须是 off：不带旗标的渲染不能换画面"
+    assert 'data-motion="on"' in on
+
+    stat_pack = pb.load_style_pack("news-policy")
+    stat = pb.emit_mount(3, stat_pack["layouts"]["stat"], {"value": "1"},
+                         0.0, 4.0, 1080, 1920, motion_signature="on")
+    assert "data-motion" not in stat and "data-pack" not in stat, \
+        "静态支不许长出新属性：31/31 普查的逐字节基线建立在它上面"
+
+    try:
+        pb.emit_mount(1, hook, {"kicker": "A"}, 0.0, 4.0, 1080, 1920,
+                      motion_signature="sometimes")
+    except pb.EmitterError:
+        pass
+    else:
+        raise AssertionError("未知动效签名值必须当场停机，不许静默当 off")
+
+
 def t_route_lookup_is_pack_and_role_not_composition_id():
     assert pb.vue_bundle_for("news-alert", "hook") == "hook-a"
     assert pb.vue_bundle_for("news-policy", "hook") == "hook-b"
@@ -4458,12 +4527,16 @@ def t_cutover_bundle_has_a_component_entry():
 
 
 def t_component_slot_indices_match_declaration_order():
-    """组件里 `var(--cNN)` 的序号序列必须等于源版式的**声明槽**序列，且不留声明 hex。
+    """组件首次用到的 `var(--cNN)` 必须按源版式的**声明槽**顺序出现，且不得用未声明槽。
 
     承重前提：`slot_css` 按 hex 出现序号编号，而静态版式的 CSS 注释里也写着色值，
     于是声明槽**不连续** —— `news-coral/hook` 的 h-sup 是 c10，c8/c9 被注释占掉。
     按位置一一替换会错位一位，组件就拿到注释里那支废弃色。这条把映射从"人眼对"变成机检，
     Phase 2 其余 6 角色复用同一形状。
+
+    判的是**首次出现顺序**而不是全量序列：组件新增规则（如动效签名层）复用一个已声明槽
+    并不改变「第 k 个新槽 = 源里第 k 个声明」这层映射；把重复也算错，只会逼人给装饰层
+    硬编码色值。错位一位（h-sup 取 c9）或引用未声明槽仍然会红。
     """
     problems = []
     for role in sorted(pb.CUTOVER_ROLES):
@@ -4480,8 +4553,13 @@ def t_component_slot_indices_match_declaration_order():
             outside = lambda pos: not any(s <= pos < e for s, e in spans)
             got = [int(m.group(1)) for m in re.finditer(r"var\(--c(\d+)\)", style)
                    if outside(m.start())]
-            if got != want:
-                problems.append(f"{bundle}: var 序列 {got} ≠ 源声明槽 {want} (源 {src})")
+            first_use = list(dict.fromkeys(got))
+            if first_use != want:
+                problems.append(
+                    f"{bundle}: var 首次出现顺序 {first_use} ≠ 源声明槽 {want} (源 {src})")
+            undeclared = sorted(set(got) - set(want))
+            if undeclared:
+                problems.append(f"{bundle}: 使用了未声明槽 {undeclared} (源声明槽 {want})")
             leftover = [m.group() for m in pks.HEX_RE.finditer(style) if outside(m.start())]
             if leftover:
                 problems.append(f"{bundle}: 仍有声明色值未槽位化 {leftover}")

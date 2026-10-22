@@ -22,7 +22,8 @@
     "build:templates:dev": "vite build --mode development",
     "preview:templates": "vite preview --port 4173",
     "test:web": "tsx tests/web/vue-build.test.ts",
-    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run typecheck:web && npm run check-bootstrap && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts && tsx tests/install-roundtrip.test.ts && tsx tests/downstream-render.test.ts && npm run test:web"
+    "test:render": "tsx scripts/test-render.ts",
+    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run typecheck:web && npm run check-bootstrap && npm run test:render && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts && tsx tests/install-roundtrip.test.ts && tsx tests/downstream-render.test.ts && npm run test:web"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

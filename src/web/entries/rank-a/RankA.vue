@@ -28,7 +28,7 @@
  */
 import { computed, onMounted, ref } from "vue";
 import { gsap } from "../../lib/gsap-runtime";
-import { readVariables } from "../../lib/hyperframes-bridge";
+import { readVariables, readMotionSignature } from "../../lib/hyperframes-bridge";
 
 interface RankVariables {
   kicker: string;
@@ -42,6 +42,7 @@ const props = defineProps<{ compositionId: string; clip: HTMLElement }>();
 
 const vars = ref<Partial<RankVariables>>(readVariables(props.clip));
 const slot = computed(() => Number(vars.value.slotSeconds) || 4);
+const sig = readMotionSignature(props.clip).signature;
 
 /** `1188万` → 1188；读不出数就 0（发射器已保证形态，这里只是不依赖那个前提画错条）。 */
 function parseNum(text: string): number {
@@ -101,6 +102,11 @@ const basisEl = ref<HTMLElement>();
 const rowsEl = ref<HTMLElement>();
 const subEl = ref<HTMLElement>();
 const barEls = ref<HTMLElement[]>([]);
+const rowEls = ref<HTMLElement[]>([]);
+const coverEls = ref<HTMLElement[]>([]);
+const glowEl = ref<HTMLElement>();
+const scanEl = ref<HTMLElement>();
+const speedEl = ref<HTMLElement>();
 
 onMounted(() => {
   // 动量预算（frame.md §4）：入场收在 1.5s 内，之后整段持续位移，不留静止尾巴。
@@ -122,13 +128,50 @@ onMounted(() => {
   tl.fromTo(basisEl.value!, { opacity: 0 }, { opacity: 1, duration: 0.5 }, 0.6);
 
   // 逐行入场；条长从 0 擦到**真实比值**（第一名 1.0 是事实，不是设计）
+  // 签名只换缓动/位移，不改终点：条长的终点永远 = ratio(row)，动效不许把事实带偏。
+  // blast 用 back.out 会让条长在动画中途超过 ratio(row)（瞬时画出比事实更长的条），
+  // 这里只许位置回弹，长度一律不越过终点。
+  const barEase = sig === "blast" ? "power4.out"
+    : sig === "alert" ? "power4.out" : "power2.out";
+  const barDur = sig === "blast" ? 0.62 : 0.55;
   rows.value.forEach((row, i) => {
     const at = 0.75 + i * 0.16;
+    if (sig !== "calm") {
+      const enterAt = 0.35 + i * 0.12;
+      if (sig === "blast") {
+        tl.fromTo(rowEls.value[i]!, { opacity: 0, x: 56 },
+          { opacity: 1, x: 0, duration: 0.5, ease: "back.out(1.8)" }, enterAt);
+      } else if (sig === "alert") {
+        tl.fromTo(rowEls.value[i]!, { opacity: 0, x: 20 },
+          { opacity: 1, x: 0, duration: 0.32, ease: "power4.out" }, enterAt);
+      } else {
+        tl.fromTo(rowEls.value[i]!, { opacity: 0, y: 16 },
+          { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, enterAt);
+      }
+      // 数值被地面色片盖住后按行序擦开：不经过任何"中间错误的数字"（不数数）
+      tl.fromTo(coverEls.value[i]!, { scaleX: 1 },
+        { scaleX: 0, duration: sig === "blast" ? 0.42 : 0.5,
+          ease: sig === "blast" ? "power4.out" : "power2.inOut" }, at + 0.1);
+    }
     tl.fromTo(barEls.value[i]!, { scaleX: 0 },
-      { scaleX: ratio(row), duration: 0.55, ease: "power2.out" }, at + 0.12);
+      { scaleX: ratio(row), duration: barDur, ease: barEase }, at + 0.12);
   });
   tl.fromTo(subEl.value!, { opacity: 0, y: 18 },
     { opacity: 1, y: 0, duration: 0.45, ease: "power2.out" }, 1.15);
+
+  if (sig === "coral") {
+    tl.fromTo(glowEl.value!, { scale: 0.8 },
+      { scale: 1.08, duration: 1.4, ease: "power2.out" }, 0);
+    tl.to(glowEl.value!, { yPercent: -6, duration: driftDur, ease: "none" }, driftStart);
+  } else if (sig === "alert") {
+    tl.fromTo(scanEl.value!, { yPercent: -12 },
+      { yPercent: 12, duration: 1.3, ease: "steps(9)" }, 0);
+    tl.to(scanEl.value!, { yPercent: 55, duration: driftDur, ease: "none" }, driftStart);
+  } else if (sig === "blast") {
+    tl.fromTo(speedEl.value!, { xPercent: -30 },
+      { xPercent: 30, duration: 1.35, ease: "power3.out" }, 0);
+    tl.to(speedEl.value!, { xPercent: 110, duration: driftDur, ease: "none" }, driftStart);
+  }
 
   // 呼吸：行区整体微移，保证尾段一直在动
   tl.to(rowsEl.value!, { yPercent: -1.6, duration: driftDur, ease: "none" }, driftStart);
@@ -154,15 +197,28 @@ onMounted(() => {
     </div>
 
     <div ref="rowsEl" class="rk-rows" :style="{ gap: rowGapCqh + 'cqh' }">
-      <div v-for="(row, i) in rows" :key="i" class="rk-row">
+      <div v-for="(row, i) in rows" :key="i" :ref="(el: any) => (rowEls[i] = el)" class="rk-row">
         <div class="rk-no" :class="{ 'rk-no-top': i === 0 }">{{ String(i + 1).padStart(2, "0") }}</div>
         <div class="rk-name">{{ row.label }}</div>
-        <div class="rk-val">{{ row.value }}</div>
+        <div class="rk-val">
+          <span class="rk-val-text">{{ row.value }}</span>
+          <span
+            v-if="sig !== 'calm'"
+            :ref="(el: any) => (coverEls[i] = el)"
+            class="rk-cover"
+            aria-hidden="true"
+          ></span>
+        </div>
         <div class="rk-track">
           <div :ref="(el: any) => (barEls[i] = el)" class="rk-bar"></div>
         </div>
       </div>
     </div>
+
+    <!-- 动效签名叠加层：纯装饰、不承载信息；z-index 低于文字层。 -->
+    <div v-if="sig === 'coral'" ref="glowEl" class="rk-sig-glow" data-layout-allow-overflow aria-hidden="true"></div>
+    <div v-if="sig === 'alert'" ref="scanEl" class="rk-sig-scan" data-layout-allow-overflow aria-hidden="true"></div>
+    <div v-if="sig === 'blast'" ref="speedEl" class="rk-sig-speed" data-layout-allow-overflow aria-hidden="true"></div>
 
   </div>
 </template>
@@ -199,6 +255,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2.2cqh;
+  z-index: 2;
 }
 .rk-kicker {
   align-self: flex-start;
@@ -244,6 +301,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   justify-content: flex-start;   /* 余量一律留底部（法则 10） */
+  z-index: 2;
 }
 .rk-row {
   display: grid;
@@ -268,11 +326,24 @@ onMounted(() => {
   line-height: 1.2;
 }
 .rk-val {
+  position: relative;
   justify-self: end;
   font-family: "League Gothic", sans-serif;
   font-size: 5.2cqw;
   line-height: 1;
   color: var(--c1);
+}
+.rk-val-text {
+  position: relative;
+  z-index: 1;
+}
+/* 数值擦开的遮片：与地面同色，scaleX 1→0；不是叠加半透明面，不碰文字对比度。 */
+.rk-cover {
+  position: absolute;
+  inset: -10% -5%;
+  background: var(--c0);
+  transform-origin: 100% 50%;
+  pointer-events: none;
 }
 .rk-track {
   grid-column: 2;
@@ -295,5 +366,42 @@ onMounted(() => {
 /* 阴影只给文字层，不给条/轨/尺 —— 那是形状，加阴影会把它读成文字。 */
 .rk-title, .rk-name, .rk-val, .rk-kicker, .rk-sub {
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7), 0 0 1px rgba(0, 0, 0, 0.5);
+}
+
+/* ── 动效签名叠加层（纯装饰；z-index 低于文字层） ── */
+.rk-sig-glow {
+  position: absolute;
+  inset: 26cqh 0 18cqh 0;
+  background: radial-gradient(
+    52% 44% at 70% 36%,
+    color-mix(in srgb, var(--c4) 24%, transparent),
+    transparent 72%
+  );
+  transform-origin: 70% 36%;
+  z-index: 1;
+  pointer-events: none;
+}
+.rk-sig-scan {
+  position: absolute;
+  inset: -15cqh 0;
+  background: repeating-linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--c4) 16%, transparent) 0 0.3cqh,
+    transparent 0.3cqh 2.6cqh
+  );
+  z-index: 1;
+  pointer-events: none;
+}
+.rk-sig-speed {
+  position: absolute;
+  inset: 24cqh -30cqw 12cqh -30cqw;
+  background: repeating-linear-gradient(
+    100deg,
+    transparent 0 5cqw,
+    color-mix(in srgb, var(--c4) 14%, transparent) 5cqw 5.4cqw,
+    transparent 5.4cqw 10cqw
+  );
+  z-index: 1;
+  pointer-events: none;
 }
 </style>

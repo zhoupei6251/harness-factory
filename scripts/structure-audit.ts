@@ -23,16 +23,19 @@
  *   7. Every active skill has SKILL.md + _meta.json (skills-audit.ts already
  *      reports this; we re-assert it here so the structure gate cannot be
  *      "green" while bit-rot quietly accumulates).
- *   8. Skillset frontmatter (`skills:` in a SKILL.md) names only active skills.
+ *   8. Active skill frontmatter `name` equals its directory name. Platforms
+ *      key discovery by the declared name; a mismatch registers one skill under
+ *      two identities (3 of 48 had drifted by 2026-10-21).
+ *   9. Skillset frontmatter (`skills:` in a SKILL.md) names only active skills.
  *      An archived/removed skill left in a workflow's list is a route to a
  *      dead end — the workflow looks complete while the step cannot load.
- *   9. Forbidden homes per STRUCTURE.md §"Forbidden homes":
+ *  10. Forbidden homes per STRUCTURE.md §"Forbidden homes":
  *        - scripts/<name>.md     (scripts are .ts)
  *        - tests/<name>.md or tests/<name-without-.test>.ts
  *        - bootstrap-owned paths tracked under a runtime dir (already
  *          covered by validate-schemas.ts; we re-check it so structure-audit
  *          catches it when run before validate).
- *  10. Dependency direction at the skills/routes boundary: the render engine
+ *  11. Dependency direction at the skills/routes boundary: the render engine
  *      (skills/douyin-pro/scripts) must not import product code
  *      (routes/news/scripts). Product scripts may import the engine — that is
  *      the supported direction. path_b_selftest.py is exempt: it is the shared
@@ -242,7 +245,31 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
   if (badCount === 0) ok(`every active skill has SKILL.md + _meta.json`);
 }
 
-// ---------- 8. skillset frontmatter points at active skills only ----------
+// ---------- 8. active skill frontmatter name matches its directory ----------
+{
+  const active = (await listDirs("skills")).filter((n) => n !== "archive");
+  const offenders: string[] = [];
+  for (const name of active) {
+    const text = await readFile(resolve(ROOT, "skills", name, "SKILL.md"), "utf-8").catch(() => null);
+    if (text === null) continue; // missing SKILL.md is check 7's failure, not a crash here
+    const fm = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text);
+    const declared = fm ? /^name:\s*["']?([^"'\s]+)["']?\s*$/m.exec(fm[1])?.[1] : undefined;
+    if (!declared) {
+      offenders.push(`skills/${name}/SKILL.md → missing frontmatter name`);
+    } else if (declared !== name) {
+      offenders.push(`skills/${name}/SKILL.md → name: ${declared}`);
+    }
+  }
+  if (offenders.length === 0) {
+    ok(`active skill frontmatter names match their directories (${active.length})`);
+  } else {
+    for (const o of offenders) {
+      bad(`${o} — the declared name and the directory must match; platforms otherwise register one skill under two identities`);
+    }
+  }
+}
+
+// ---------- 9. skillset frontmatter points at active skills only ----------
 {
   const active = new Set((await listDirs("skills")).filter((n) => n !== "archive"));
   const offenders: string[] = [];
@@ -268,7 +295,7 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
   }
 }
 
-// ---------- 9. forbidden homes ----------
+// ---------- 10. forbidden homes ----------
 {
   // scripts/<name>.md (scripts are .ts runnable)
   const scriptsEntries = await readdir(resolve(ROOT, "scripts"), { withFileTypes: true });
@@ -332,7 +359,7 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
   }
 }
 
-// ---------- 10. skills/routes dependency direction ----------
+// ---------- 11. skills/routes dependency direction ----------
 {
   const engineFiles = await listFiles("skills/douyin-pro/scripts", ".py");
   const offenders: string[] = [];

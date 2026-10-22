@@ -66,7 +66,13 @@ async function listMdFiles(rel: string): Promise<string[]> {
 
 async function dirSizeMiB(rel: string): Promise<number> {
   try {
-    const out = execFileSync("du", ["-sm", rel], { cwd: ROOT, encoding: "utf-8" });
+    const out = execFileSync("du", ["-sm", rel], {
+      cwd: ROOT,
+      encoding: "utf-8",
+      // execFileSync forwards the child's stderr by default. A missing
+      // runtime dir is a normal state here, not a reason to print du noise.
+      stdio: ["ignore", "pipe", "pipe"],
+    });
     return Number(out.split(/\s+/)[0] ?? 0);
   } catch {
     return 0;
@@ -143,6 +149,11 @@ try {
 
 const runtimeRows: Array<[string, string]> = [];
 for (const d of RUNTIME_DIRS) {
+  const present = await stat(resolve(ROOT, d)).then(() => true).catch(() => false);
+  if (!present) {
+    runtimeRows.push([d, "absent"]);
+    continue;
+  }
   const mib = await dirSizeMiB(d);
   const flag = mib > RUNTIME_SIZE_WARN_MB ? " ⚠" : "";
   runtimeRows.push([d, `${mib} MiB${flag}`]);

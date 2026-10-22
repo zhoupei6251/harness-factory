@@ -348,7 +348,7 @@ def t_l2_lsh_excludes_self_norm():
 1. ✅ 本合并文档已写（`DESIGN-lsh.md` 落盘）
 2. ✅ 用户确认「开始实现」（"开始实现吧"）
 3. ✅ 主 Agent 改完 + 内联断言（§4.3 逐条核）—— 见 [evidence/2026-10-12-datasketch-lsh-integration-verification-lite.md](evidence/2026-10-12-datasketch-lsh-integration-verification-lite.md)
-4. ✅ `curate_selftest.py` 末行输出 `全绿 39/39`
+4. ✅ `curate_selftest.py` 末行打印 `全绿 N/N`（N 由脚本现算，别抄，见 ARCHITECTURE D26）
 5. ✅ `evidence/2026-10-12-datasketch-lsh-integration-verification-lite.md` 落盘
 6. ⏳ 可以 commit（push 由用户决定）
 

@@ -31,6 +31,22 @@ const entryNames = readdirSync(ENTRIES_SRC, { withFileTypes: true })
 
 const bundlePath = (name: string): string => resolve(DIST, "vue", `${name}.js`);
 
+/** dist 下所有 JS 拼成一份文本：Vite 会把共享模块（如 hyperframes-bridge）提到 chunks/，
+ *  只读入口 chunk 会把"桥接在共享块里"误判成"组件没读签名开关"。 */
+const allDistJsText = (): string => {
+  const parts: string[] = [];
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(dir)) {
+      const p = join(dir, entry);
+      const s = statSync(p);
+      if (s.isDirectory()) walk(p);
+      else if (entry.endsWith(".js")) parts.push(readFileSync(p, "utf8"));
+    }
+  };
+  walk(DIST);
+  return parts.join("\n");
+};
+
 /** 有 main.html 的入口 = 有独立预览页，产物必须落到 dist/<name>.html */
 const previewNames = entryNames.filter((name) =>
   existsSync(resolve(ENTRIES_SRC, name, "main.html")),
@@ -44,6 +60,23 @@ const DIST_HTML = resolve(DIST, `${HOOK}.html`);
 const DIST_ENTRY_JS = bundlePath(HOOK);
 
 const FAILURES: Array<[string, string]> = [];
+
+type MotionSignature = "calm" | "coral" | "alert" | "blast";
+type MotionReader = (clip: Element) => {
+  enabled: boolean;
+  pack: string;
+  signature: MotionSignature;
+};
+// 动态 import：函数还没实现时，静态 named import 会让整个测试文件在链接期直接崩，
+// 后面的产物断言一条都跑不到。这里把「导出缺失」降级成一条可读的 FAIL。
+let readMotionSignature: MotionReader | null = null;
+try {
+  ({ readMotionSignature } = (await import("../../src/web/lib/hyperframes-bridge")) as {
+    readMotionSignature: MotionReader;
+  });
+} catch {
+  readMotionSignature = null;
+}
 
 function check(name: string, fn: () => void): void {
   try {
@@ -139,6 +172,58 @@ check(`${HOOK}: composition 身份不写死（注册键与根 id 都用传入 co
     !/window\.__timelines\[\s*["']/.test(js),
     '发现 window.__timelines["<字面量>"] 形态 —— 注册键必须是传入的 compositionId'
   );
+});
+
+check("readMotionSignature: 默认 off / on 按包族解析 / 缺 pack 立即报错", () => {
+  assert(readMotionSignature, "hyperframes-bridge 没有导出 readMotionSignature");
+  const fake = (attrs: Record<string, string>): Element =>
+    ({ getAttribute: (name: string) => attrs[name] ?? null }) as unknown as Element;
+
+  const off = readMotionSignature(fake({}));
+  assert(!off.enabled && off.signature === "calm", "无属性时必须默认 off/calm");
+
+  const cases: Array<[string, MotionSignature]> = [
+    ["news-coral", "coral"],
+    ["news-alert", "alert"],
+    ["news-blast", "blast"],
+    ["news-coral-mono", "coral"],
+    ["news-alert-warning", "alert"],
+    ["news-blast-score", "blast"],
+    ["news-policy", "calm"],
+  ];
+  for (const [pack, expected] of cases) {
+    const got = readMotionSignature(fake({ "data-motion": "on", "data-pack": pack }));
+    assert(got.enabled, `${pack}: data-motion=on 没被读到`);
+    assert(got.signature === expected, `${pack} → ${got.signature}（应为 ${expected}）`);
+  }
+
+  let threw = false;
+  try {
+    readMotionSignature(fake({ "data-motion": "on" }));
+  } catch {
+    threw = true;
+  }
+  assert(threw, "motion=on 但没有 data-pack 必须报错 —— 包名缺失不能让动效静默降级");
+});
+
+check("动效签名叠加层已编进 hook-a/rank-a/field-a bundle", () => {
+  const expects: Array<[string, string[]]> = [
+    [
+      "hook-a",
+      ["hk-sig-glow", "hk-sig-sweep", "hk-sig-scan", "hk-sig-frame", "hk-sig-speed", "hk-sig-streak"],
+    ],
+    ["rank-a", ["rk-sig-glow", "rk-sig-scan", "rk-sig-speed", "rk-cover"]],
+    ["field-a", ["fd-sig-glow", "fd-sig-scan", "fd-sig-speed"]],
+  ];
+  for (const [name, classes] of expects) {
+    const js = readFileSync(bundlePath(name), "utf8");
+    for (const cls of classes) {
+      assert(js.includes(cls), `${name} 缺动效叠加层 ${cls} —— 签名分支没编进产物`);
+    }
+  }
+  const bridgeText = allDistJsText();
+  assert(bridgeText.includes("data-motion") && bridgeText.includes("data-pack"),
+    "dist 里没有 data-motion/data-pack —— 桥接的签名读取没进产物");
 });
 
 check("GSAP 关键 API (timeline / fromTo) 出现在 dist 任一 JS", () => {

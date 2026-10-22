@@ -19,7 +19,7 @@ npm run doctor      # verify required external tools (codebase-memory-mcp, ponyt
 npm run bootstrap -- --platform all --route code
 npm run skills:install  # link skills into ~/.codex/skills + ~/.claude/skills + ~/.qoder/skills
 npm run build:templates # Vue news templates: src/web -> dist/ (only needed for the news route)
-npm test                # governance gates + integration tests + web gates
+npm test                # governance gates + render self-test + integration tests + web gates
 ```
 
 This projects `core/ENTRY.md` and `platforms/<plat>/rules/ENTRY.md` to `.claude/`, `.codex/`, `.trae/`, `.codebuddy/`, `.qoder/`, creates runtime dirs, and writes `./MEMORY.md` from the route template. Codex and Qoder share one native entry (`AGENTS.md`); bootstrap merges both deltas instead of letting one overwrite the other.
@@ -60,6 +60,7 @@ npm run doctor                 # verifies Node >=20.9, codebase-memory-mcp wirin
 ## Toolchain
 
 - **Node 20.9+ ~ 26+** — tested green on 20.9.0 and 26.8.2 (`engines: >=20.9.0`)
+- **Python 3.11+** — runs `skills/douyin-pro/scripts/path_b_selftest.py` (stdlib-only, offline; imports `tomllib`) via `npm run test:render`
 - **TypeScript 7** (Go-native compiler, ~10× faster typecheck). `npm run typecheck` calls `lib/tsc.js` directly: TS 7's `bin/tsc` launcher is an extensionless ESM file that Node <22 cannot load — calling the lib keeps the Node 20 floor
 - **tsx** runs all TS scripts (bootstrap / validate / index / tests) — no build step, no Babel
 - `tsconfig.json`: `erasableSyntaxOnly` (native-strip compatible) + `types: ["node"]` (TS 7 no longer auto-includes `@types/*`)
@@ -107,13 +108,15 @@ Skills are split into two tiers:
 - `npm run index` — regenerate `skills/INDEX.md` from `SKILL.md` frontmatter
 - `npm run stats` — print live counts (source files / skills / scripts) + git health + runtime dir sizes for the ARCHITECTURE table
 - `npm run check-bootstrap` — re-run the generator in a throwaway copy of the sources and byte-compare every bootstrap output in the working tree; `npm test` runs it, the pre-commit hook runs it with `--require-generated`
-- `npm run structure:audit` — assert the structural claims in README / ARCHITECTURE / STRUCTURE (core docs, platform/route/vertical counts, INDEX totals, forbidden homes, skills→routes dependency direction); `npm test` runs it
+- `npm run structure:audit` — assert the structural claims in README / ARCHITECTURE / STRUCTURE (core docs, platform/route/vertical counts, INDEX totals, skill frontmatter-name/directory agreement, forbidden homes, skills→routes dependency direction); `npm test` runs it
 - `npm run hooks:install` — copy `git-hooks/*` into `.git/hooks/`; run once per clone and after editing a hook
 - `npm run skills:audit` — list every skill (active + archive) with SKILL.md / _meta.json presence, size, mtime
 - `npm run skills:install` — symlink active skills into `~/.codex/skills/`, `~/.claude/skills/`, and `~/.qoder/skills/` so each platform can discover them
 - `npm run doctor` — hard gate for required external tooling (Node >=20.9, `codebase-memory-mcp`, its Codex/Claude wiring, `ponytail`); `bootstrap` refuses to run when it fails
 - `npm run typecheck` — TypeScript 7 native type check (via `lib/tsc.js` for Node 20 compat)
-- `npm test` — runs validate, structure audit, typechecks, bootstrap drift check, the four integration tests, and the Vue build test
+- `npm run test:render` — run the 251-assertion Python render-engine self-test; `npm test` runs it
+- `npm test` — runs validate, structure audit, both typechecks, bootstrap drift check, the render self-test, the four integration tests, and the Vue build test
+- **CI** — `.github/workflows/verify.yml` runs `npm ci && npm test` on `ubuntu-latest` (Node 20.9.0 + Python 3.12) for every push to `main` and every pull request
 
 ## Tooling
 

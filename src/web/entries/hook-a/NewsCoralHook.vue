@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import { gsap } from "../../lib/gsap-runtime";
-import { readVariables } from "../../lib/hyperframes-bridge";
+import { readVariables, readMotionSignature } from "../../lib/hyperframes-bridge";
 import type { HookVariables } from "../../lib/data.contract";
 
 /**
@@ -47,6 +47,7 @@ import type { HookVariables } from "../../lib/data.contract";
 const props = defineProps<{ compositionId: string; clip: HTMLElement }>();
 
 const vars = ref<Partial<HookVariables>>(readVariables(props.clip));
+const sig = readMotionSignature(props.clip).signature;
 const hasPhoto = computed(() =>
   Boolean(String(vars.value.imagePath ?? "").trim())
 );
@@ -55,12 +56,19 @@ const slot = computed(() => Number(vars.value.slotSeconds) || 4);
 // 动效 / photo 节点：全部是本实例自己的元素（clip 作用域契约）
 const bandEl = ref<HTMLElement>();
 const ebEl = ref<HTMLElement>();
+const headEl = ref<HTMLElement>();
 const acEl = ref<HTMLElement>();
 const hairEl = ref<HTMLElement>();
 const supEl = ref<HTMLElement>();
 const fieldEl = ref<HTMLElement>();
 const imgEl = ref<HTMLImageElement>();
 const creditEl = ref<HTMLElement>();
+const glowEl = ref<HTMLElement>();
+const sweepEl = ref<HTMLElement>();
+const scanEl = ref<HTMLElement>();
+const frameEl = ref<HTMLElement>();
+const speedEl = ref<HTMLElement>();
+const streakEl = ref<HTMLElement>();
 
 onMounted(() => {
   // 动量预算（frame.md §4，与原 hook.html 字面同值）
@@ -80,6 +88,39 @@ onMounted(() => {
   tl.fromTo(acEl.value!, { scaleX: 0 }, { scaleX: 1, duration: 0.4, ease: "power2.out" }, 0.82);
   tl.fromTo(hairEl.value!, { scaleX: 0 }, { scaleX: 1, duration: 0.45, ease: "power2.out" }, 1.05);
   tl.fromTo(supEl.value!, { opacity: 0, y: 22 }, { opacity: 1, y: 0, duration: 0.4 }, 1.25);
+
+  // 动效签名层：`--motion-signature off` 时 sig 恒为 calm，整段不执行 ⇒ 画面与改动前一致。
+  // 叠加层全部是形状/墨，不带信息；自带 background 的只做 scale/x 位移，不做 opacity
+  // （法则 8：半透明面与地面混色会动到文字对比度）。
+  if (sig === "coral") {
+    tl.fromTo(glowEl.value!, { scale: 0.82, xPercent: -4 },
+      { scale: 1.06, xPercent: 0, duration: 1.4, ease: "power2.out" }, 0);
+    tl.fromTo(sweepEl.value!, { xPercent: -120 },
+      { xPercent: 150, duration: 1.25, ease: "power2.inOut" }, 0.12);
+    tl.fromTo(headEl.value!, { y: 36, scale: 0.97 },
+      { y: 0, scale: 1, duration: 0.62, ease: "back.out(1.5)" }, 0.5);
+    tl.to(sweepEl.value!, { xPercent: 320, duration: driftDur, ease: "none" }, driftStart);
+  } else if (sig === "alert") {
+    tl.fromTo(frameEl.value!, { scaleY: 0 },
+      { scaleY: 1, duration: 0.38, ease: "power4.out" }, 0);
+    tl.fromTo(scanEl.value!, { yPercent: -18 },
+      { yPercent: 18, duration: 1.3, ease: "steps(9)" }, 0.05);
+    tl.fromTo(headEl.value!, { x: 12, y: 16 },
+      { x: 0, y: 0, duration: 0.5, ease: "power4.out" }, 0.45);
+    // 一次短促抖动收在 1.1s（入场预算内），不重复、不闪，避免频闪风险
+    tl.to(headEl.value!, { x: 5, duration: 0.05, ease: "none" }, 1.0);
+    tl.to(headEl.value!, { x: -4, duration: 0.05, ease: "none" }, 1.05);
+    tl.to(headEl.value!, { x: 0, duration: 0.06, ease: "none" }, 1.1);
+    tl.to(scanEl.value!, { yPercent: 60, duration: driftDur, ease: "none" }, driftStart);
+  } else if (sig === "blast") {
+    tl.fromTo(streakEl.value!, { xPercent: -30, scaleX: 0.3 },
+      { xPercent: 160, scaleX: 1, duration: 1.2, ease: "power4.out" }, 0);
+    tl.fromTo(speedEl.value!, { xPercent: -35 },
+      { xPercent: 35, duration: 1.4, ease: "power3.out" }, 0);
+    tl.fromTo(headEl.value!, { x: -90, scale: 0.94 },
+      { x: 0, scale: 1, duration: 0.55, ease: "expo.out" }, 0.35);
+    tl.to(speedEl.value!, { xPercent: 120, duration: driftDur, ease: "none" }, driftStart);
+  }
 
   // 呼吸：整镜剩余时间持续位移
   tl.to(fieldEl.value!, { yPercent: -3, duration: driftDur, ease: "none" }, driftStart);
@@ -116,7 +157,7 @@ onMounted(() => {
     <div class="h-band" id="h-band" ref="bandEl"></div>
     <div class="h-eb" id="h-eb" ref="ebEl" data-var-text="kicker">{{ vars.kicker ?? "NEWS" }}</div>
     <div class="h-field" id="h-field" ref="fieldEl">
-      <div class="h-hd">
+      <div ref="headEl" class="h-hd">
         <div id="h-l1" data-var-text="headTop">{{ vars.headTop ?? "标题第一行" }}</div>
         <div>
           <span id="h-l2" data-var-text="headBottomLead">{{ vars.headBottomLead ?? "第二行" }}</span><span
@@ -146,6 +187,15 @@ onMounted(() => {
       />
     </figure>
     <figcaption v-if="hasPhoto" class="hk-photo-credit" id="hk-credit" ref="creditEl">图源：Wikimedia Commons</figcaption>
+
+    <!-- 动效签名叠加层：只在 --motion-signature on 且命中包族时渲染；
+         纯装饰，不承载任何信息，pointer-events 关闭。 -->
+    <div v-if="sig === 'coral'" ref="glowEl" class="hk-sig-glow" data-layout-allow-overflow aria-hidden="true"></div>
+    <div v-if="sig === 'coral'" ref="sweepEl" class="hk-sig-sweep" data-layout-allow-overflow aria-hidden="true"></div>
+    <div v-if="sig === 'alert'" ref="scanEl" class="hk-sig-scan" data-layout-allow-overflow aria-hidden="true"></div>
+    <div v-if="sig === 'alert'" ref="frameEl" class="hk-sig-frame" data-layout-allow-overflow aria-hidden="true"></div>
+    <div v-if="sig === 'blast'" ref="speedEl" class="hk-sig-speed" data-layout-allow-overflow aria-hidden="true"></div>
+    <div v-if="sig === 'blast'" ref="streakEl" class="hk-sig-streak" data-layout-allow-overflow aria-hidden="true"></div>
   </div>
 </template>
 
@@ -180,6 +230,13 @@ onMounted(() => {
   #root > *:not([class$="-photo"]):not([class$="-photo-credit"]) {
     z-index: 1;
     text-shadow: 0 1px 3px rgba(0, 0, 0, 0.7), 0 0 1px rgba(0, 0, 0, 0.5);
+  }
+  /* 文字层必须压在动效签名叠加层之上。上面那条通配规则的 specificity 高于
+     `.h-eb { z-index: 2 }`，不在这里显式抬到 3，装饰层会整块盖住标题
+     （hyperframes check 的 text_occluded 实测就是这么红的）。 */
+  #root > #h-eb,
+  #root > #h-field {
+    z-index: 3;
   }
   .h-band {
     position: absolute;
@@ -300,4 +357,80 @@ onMounted(() => {
   /* 图作为底后，标题与辅助行从满屏宽缩到左半 */
   .has-photo .h-hd { max-width: 56cqw; }
   .has-photo .h-sup { max-width: 56cqw; }
+
+  /* ── 动效签名叠加层（z-index 低于文字层，pointer-events 关闭） ──
+     全部用 color-mix 把槽位色压到低 alpha；不在补间里碰 opacity，
+     所以它们的入场不会与地面混色（法则 8）。 */
+  .hk-sig-glow {
+    position: absolute;
+    inset: 12cqh 0 26cqh 0;
+    background: radial-gradient(
+      60% 50% at 26% 38%,
+      color-mix(in srgb, var(--c5) 30%, transparent),
+      transparent 72%
+    );
+    transform-origin: 26% 38%;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .hk-sig-sweep {
+    position: absolute;
+    top: -20cqh;
+    bottom: -20cqh;
+    left: -30cqw;
+    width: 22cqw;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      color-mix(in srgb, var(--c5) 24%, transparent),
+      transparent
+    );
+    transform: rotate(12deg);
+    z-index: 1;
+    pointer-events: none;
+  }
+  .hk-sig-scan {
+    position: absolute;
+    inset: -20cqh 0;
+    background: repeating-linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--c4) 18%, transparent) 0 0.35cqh,
+      transparent 0.35cqh 2.4cqh
+    );
+    z-index: 1;
+    pointer-events: none;
+  }
+  .hk-sig-frame {
+    position: absolute;
+    inset: 2.4cqh 2.4cqw;
+    border: 0.7cqh solid var(--c4);
+    box-shadow: inset 0 0 0 0.18cqh var(--c0);
+    transform-origin: 50% 0%;
+    z-index: 1;
+    pointer-events: none;
+  }
+  .hk-sig-speed {
+    position: absolute;
+    inset: -10cqh -40cqw;
+    background: repeating-linear-gradient(
+      104deg,
+      transparent 0 6cqw,
+      color-mix(in srgb, var(--c4) 16%, transparent) 6cqw 6.5cqw,
+      transparent 6.5cqw 12cqw
+    );
+    z-index: 1;
+    pointer-events: none;
+  }
+  .hk-sig-streak {
+    position: absolute;
+    top: 18cqh;
+    left: -60cqw;
+    width: 70cqw;
+    height: 2.2cqh;
+    background: linear-gradient(90deg, transparent, var(--c4), transparent);
+    transform: rotate(-18deg);
+    transform-origin: 50% 50%;
+    z-index: 1;
+    pointer-events: none;
+  }
 </style>

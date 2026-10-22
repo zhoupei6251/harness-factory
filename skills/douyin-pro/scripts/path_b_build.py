@@ -131,8 +131,10 @@ ALL_TEMPLATES = (
     "news-paper",         "news-podcast",
     "news-polarity",      # T19 极简高反差黑白对比 (2026-09-30)
 )
-#: --style / --template 选择映射; 选模板看 news-workflow/SKILL.md 的"模板决策树"或
-#: routes/news/MEMORY.md videos[].template 字段 (ALL_TEMPLATES 里任何一个都合法)。
+#: --style / --template 选择映射; **模板决策树只有一份，在 `routes/news/MEMORY.md`**
+#: （news-workflow/SKILL.md 曾自带一张只列 master 的表，没进表的包就成了"选不到"，见 ARCHITECTURE D27）。
+#: 命令行兜底: `python routes/news/scripts/decide_pack.py "<关键词>"`。
+#: routes/news/MEMORY.md videos[].template 填 ALL_TEMPLATES 里任何一个都合法。
 
 # ------------------------- pack 根（裁决 14 双轨） -------------------------
 #: 编译产物包（`hf_compile.py` 从 spec.toml 出）落在隔壁根，老包原地不动：
@@ -503,6 +505,10 @@ VUE_ROUTES: dict[tuple[str, str], str] = {}
 #: `vue_bundle_for()` 返回 None ⇒ 发射回落静态支，一字符不改。
 CUTOVER_ROLES: set[str] = {"hook"}
 
+#: 动效签名层开关。默认 off = 既有时间轴，画面与改动前逐像素一致；
+#: on = 组件按 `data-pack` 选包族语言（今天实现了 coral/alert/blast 三族）。
+MOTION_SIGNATURE_CHOICES = ("off", "on")
+
 #: 组件目录：`contract.toml` 放在这里，声明"只有组件、没有静态文件"的版式。
 VUE_ENTRIES_DIR = REPO_ROOT / "src" / "web" / "entries"
 
@@ -600,6 +606,8 @@ VUE_MOUNT_TPL = (
     ' data-composition-id="{composition_id}"'
     ' data-vue-mount="1"'
     ' data-vue-bundle="{bundle_name}"'
+    ' data-pack="{pack_name}"'
+    ' data-motion="{motion}"'
     ' style="{slot_css}"'
     ' data-variable-values="{values}"'
     ' data-start="{start}" data-duration="{dur}" data-track-index="1"'
@@ -1129,15 +1137,40 @@ def caption_line_chars(w: int, h: int) -> int:
     return max(CAPTION_MIN_LINE_CHARS, int(usable / caption_font_size(h)))
 
 
+#: 数字/英文成串走：小数点与千分位夹在数字中间时属于数字本身，不许当成断点
+#: （t005 实测 `4.90%` 被拆成 `4.` / `90%`，观众读不出这是同一个数）。
+CAPTION_TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*%?|\s+|.")
+
+#: 行内优先断点：句读之后。宽度不够时退到最近一个句读，而不是把 `三星` 硬拆成 `三`/`星`。
+CAPTION_BREAK_CHARS = "，、；：,;:"
+
+
+def _caption_break_at(buf: str) -> int:
+    """`buf` 里最后一个句读之后的下标；没有句读返回 0（只能按宽度硬断）。"""
+    cut = 0
+    for i, ch in enumerate(buf):
+        if ch in CAPTION_BREAK_CHARS:
+            cut = i + 1
+    return cut
+
+
 def caption_lines(text: str, line_chars: int) -> list[str]:
-    """按行宽把字幕切成行: 中文按字切, 英文单词与数字不拆。"""
+    """按行宽把字幕切成行: 中文按字切, 英文单词与数字不拆; 足够近时让到句读后断。"""
     lines, buf = [], ""
-    for token in re.findall(r"[A-Za-z0-9]+|\s+|.", text):
+    for token in CAPTION_TOKEN_RE.findall(text):
         if len(buf) + len(token) > line_chars and buf:
-            lines.append(buf.strip())
-            buf = token.strip()
-        else:
-            buf += token
+            cut = _caption_break_at(buf)
+            if cut:
+                lines.append(buf[:cut].strip())
+                buf = buf[cut:].lstrip()
+            else:
+                lines.append(buf.strip())
+                buf = ""
+        # 退到句读后仍放不下（或单个 token 本身超宽）：只能在宽度处硬断
+        while len(buf) + len(token) > line_chars and buf:
+            lines.append(buf[:line_chars].strip())
+            buf = buf[line_chars:].lstrip()
+        buf += token
     if buf.strip():
         lines.append(buf.strip())
     return lines
@@ -1182,17 +1215,30 @@ TTS_TICK_PER_SECOND = 1e7
 CAPTION_PUNCT_RE = re.compile(
     r"[\s，。、！？；：,.!?;:“”‘’\"'()（）【】《》〈〉~—–\-·・｜\|]+")
 
+#: `.` / `-` 只有夹在数字中间时才是数字本身（`7.56%` / `27-33`）。归一化前先换成
+#: 占位符，否则 `7.56%` 被压成 `756%`：词表是服务原值，比稿子多一个字 ⇒ 整镜归组
+#: 失配、退到字符时序（t005 三镜全部踩中，日志刷 ⚠️ 而画面仍然"看着正常"）。
+NUMERIC_JOINER_RE = re.compile(r"(?<=\d)([.\-])(?=\d)")
+_DOT_GUARD = "\ue000"
+_DASH_GUARD = "\ue001"
+
 #: 句子级 cue 的切分点。逗号**不**断条：一条 cue 要能读完一个完整语义，
 #: 逗号处断会让每句变成两到三次跳动，读的人眼睛要一直找。
 SENTENCE_END_RE = re.compile(r"[。！？；!?;]")
 
 #: 兜底切分（拿不到服务时序时）的词形：拉丁词与数字串成一节，其余一字一节。
-FALLBACK_TOKEN_RE = re.compile(r"[A-Za-z0-9]+|.")
+FALLBACK_TOKEN_RE = re.compile(r"[A-Za-z0-9]+(?:[.\-][A-Za-z0-9]+)*%?|.")
 
 
 def caption_norm(text: str) -> str:
-    """压成"词序列的形状"：去掉空白与标点，其余原样（`10月` 不许被压成 `月`）。"""
-    return CAPTION_PUNCT_RE.sub("", text or "")
+    """压成"词序列的形状"：去掉空白与标点，其余原样（`10月` 不许被压成 `月`）。
+
+    `.` / `-` 夹在数字之间时保留：那是数字的一部分，不是句读。
+    """
+    protected = NUMERIC_JOINER_RE.sub(
+        lambda m: _DOT_GUARD if m.group(1) == "." else _DASH_GUARD, text or "")
+    return (CAPTION_PUNCT_RE.sub("", protected)
+            .replace(_DOT_GUARD, ".").replace(_DASH_GUARD, "-"))
 
 
 def _tick_to_sec(ticks) -> float:
@@ -1373,7 +1419,7 @@ def cue_cache_key(text: str, voice: str) -> str:
 #:   · **解读逻辑变**（`words_from_events` 的 100ns→秒换算、`scene_cues_from_words` 归组、
 #:     `caption_norm` 归一化）→ 把下面的版本号 +1 ⇒ 旧缓存整批作废。缓存存的是这些函数的
 #:     **输出**，函数语义改了再复用旧输出=用错的处理喂新逻辑，必须显式作废。
-TTS_CACHE_SCHEMA_VERSION = 1
+TTS_CACHE_SCHEMA_VERSION = 2
 TTS_CACHE_DIRNAME = "tts-cache"
 TTS_CACHE_MP3_NAME = "scene.mp3"
 TTS_CACHE_META_NAME = "meta.json"
@@ -1462,8 +1508,11 @@ def caption_display_text(text: str) -> str:
     混用的表现是字幕少了逗号句号，读起来像电报。
     `｜` 反过来要**去掉**：它既不进词表（服务不念）也不该上屏（观众看字幕不需要知道
     作者在哪里点了强调）。cue 自己的 `text` 保留它 —— `cue_accent_words` 那一支 ① 要读。
+    句末标点也去掉：行宽正好被正文占满时，`。`/`；` 会单独掉到下一行 —— 一个字一行的
+    标点不是停顿，是排版事故（t005 两镜实测）。
     """
-    return " ".join((text or "").replace(ONSPLIT, "").split())
+    display = " ".join((text or "").replace(ONSPLIT, "").split())
+    return display.rstrip("。；！？.;!?")
 
 
 
@@ -2702,8 +2751,16 @@ def stage_vue_assets(work_dir: str, pack: dict) -> list[str]:
 
 
 def emit_mount(mount_index: int, layout: dict, values: dict, start: float,
-               dur: float, w: int, h: int) -> str:
-    """一镜一个 clip: 时序 = 配音时长, 内容 = 按契约填好的变量。"""
+               dur: float, w: int, h: int,
+               motion_signature: str = "off") -> str:
+    """一镜一个 clip: 时序 = 配音时长, 内容 = 按契约填好的变量。
+
+    `motion_signature` 只写进 Vue 版 mount：静态支没有组件读这两个属性，
+    多写一个字节都会动到 31/31 普查的逐字节基线。
+    """
+    if motion_signature not in MOTION_SIGNATURE_CHOICES:
+        raise EmitterError(
+            f"未知动效签名 {motion_signature!r}（允许: {MOTION_SIGNATURE_CHOICES}）")
     payload = dict(values)
     payload["slotSeconds"] = round(dur, 3)
     encoded = html.escape(json.dumps(payload, ensure_ascii=False), quote=True)
@@ -2731,7 +2788,9 @@ def emit_mount(mount_index: int, layout: dict, values: dict, start: float,
         # Task 3: clip 元素自带有序槽位块（作用域在 clip 内）。
         slot_css = html.escape(pks.slot_css(pack_name, layout["name"]), quote=True)
         vue_common = dict(common,
-                          composition_id=vue_clip_id(layout["composition_id"], mount_index))
+                          composition_id=vue_clip_id(layout["composition_id"], mount_index),
+                          pack_name=pack_name,
+                          motion=motion_signature)
         return VUE_MOUNT_TPL.format(bundle_name=bundle, slot_css=slot_css, **vue_common)
     if layout.get("vue_only"):
         # Vue-only 版式没有静态文件可回落：走到这里说明 bundle 没建出来，
@@ -2774,6 +2833,19 @@ def emit_audio_mount(mount_index: int, audio_path: str, work_dir: str,
     )
 
 
+def _caption_punct_at(text: str, i: int) -> bool:
+    """下标 `i` 的字符是不是**句读**。`.``-` 夹在数字中间时不是（与 caption_norm 同口径）。
+
+    切片按词长翻页；若这里把小数当标点，词就永远"没吃完"，下一个词的字会被并进上一片，
+    整套时序与文本错位 —— 而画面上的错字自检看不见（t005 实测）。
+    """
+    ch = text[i]
+    if not CAPTION_PUNCT_RE.fullmatch(ch):
+        return False
+    return not (ch in ".-" and 0 < i < len(text) - 1
+                and text[i - 1].isdigit() and text[i + 1].isdigit())
+
+
 def _subtitle_pieces(cue, display: str):
     """把上屏串按词切片：每个词连同**紧跟其后**的标点切成一片（服务不念标点，观众要看见）。
 
@@ -2785,8 +2857,8 @@ def _subtitle_pieces(cue, display: str):
     if not words:
         return []
     pieces, cur, ti, tc = [], "", 0, 0
-    for ch in display:
-        if CAPTION_PUNCT_RE.fullmatch(ch):
+    for i, ch in enumerate(display):
+        if _caption_punct_at(display, i):
             cur += ch                          # 标点接在当前词后（此时 ti 仍是未完成的那个）
             continue
         if ti >= len(words):                    # 词已用尽却还有字 = 切片与稿子分家
@@ -3019,7 +3091,8 @@ def emit_schematic_mount(mount_index: int, start: float, dur: float,
 def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
                      ctx_base: dict, w: int, h: int,
                      audio_files: list, image_records: list,
-                     scene_cues: list | None = None) -> list[dict]:
+                     scene_cues: list | None = None,
+                     motion_signature: str = "off") -> list[dict]:
     """逐镜选版式 + 填变量 + 生成宿主与挂载, 并把用过的版式文件复制进工作目录。
 
     `scene_cues` 提供且 pack 是**编译包**（path_c，`pack["compiled"]`）时，额外把每镜字幕
@@ -3083,7 +3156,8 @@ def emit_composition(pack: dict, scenes: list, durations: list, work_dir: str,
                     f"分镜{i} {layout_name}: grade×原语不一致 → 拒绝发射。作者声明 "
                     f"{author_key!r}(={author_code}) —— {'; '.join(conflicts)}")
         values = fill_variables(layout, scene, ctx)
-        mounts.append(emit_mount(i, layout, values, start, dur, w, h))
+        mounts.append(emit_mount(i, layout, values, start, dur, w, h,
+                                 motion_signature=motion_signature))
         # 本镜实际呈现的地面: 固定地面的版式用装包时算好的, 可换面的版式(story)
         # 用它自己填出来的 tone —— 字幕翻面与下一镜的"翻不翻面"都必须看真实地面, 不能看默认值。
         declared = values.get(TONE_VAR_ID)
@@ -3769,7 +3843,7 @@ def main():
                      help="节目包 (设计系统) 名 (兼容旧名 --style); 默认 " + DEFAULT_STYLE
                      + "; 两个 pack 根（存量 path_b + 编译产物 path_c）下现存的包都可选，"
                        "名单由 `available_templates()` 现算 (见 --list-templates)"
-                     + ". 见 templates/hyperframes_path_b/ 与 news-workflow/SKILL.md 模板决策树")
+                     + ". 决策树看 routes/news/MEMORY.md（唯一一份），或直接跑 decide_pack.py")
     ap.add_argument("--list-templates", action="store_true",
                     help="打印当前可点名的 pack 名单（含编译包）后退出")
     ap.add_argument("--voice", default="zh-CN-XiaoxiaoNeural", help="edge-tts 音色")
@@ -3801,6 +3875,10 @@ def main():
                          "routes/news/aigc-mode.json 里的 render=no-badge/draft; "
                          "与 --draft / --no-badge 同时给 = 报错")
     ap.add_argument("--fps", type=int, default=DEFAULT_FPS, help=f"渲染帧率 (默认 {DEFAULT_FPS})")
+    ap.add_argument("--motion-signature", choices=MOTION_SIGNATURE_CHOICES, default="off",
+                    help="动效签名层: off=原时间轴(默认，画面与改动前一致); "
+                         "on=按包族叠加动效语言。今天实现了 coral/alert/blast 三族，"
+                         "未实现签名的包族保持原时间轴；只对已切 Vue 的角色生效。")
     ap.add_argument("--quality", default=DEFAULT_QUALITY, choices=QUALITY_CHOICES,
                     help=f"渲染质量 (默认 {DEFAULT_QUALITY})")
     ap.add_argument("--gpu", action="store_true",
@@ -3900,6 +3978,8 @@ def main():
             log(f"解析到 {len(scenes)} 个分镜 | 设计系统 {args.style} | {w}x{h}")
 
             pack = load_style_pack(args.style)
+            log(f"[motion] 动效签名 {args.motion_signature}"
+                + ("（coral/alert/blast 三族）" if args.motion_signature == "on" else ""))
             register_indexed_derivers(
                 set().union(*(contract_ids(l) for l in pack["layouts"].values()))
             )
@@ -3968,7 +4048,8 @@ def main():
             # 字幕仍走烧录 ASS。这条开关的唯一判据是 pack 有没有 spec.toml，不在这里猜。
             shots = emit_composition(pack, scenes, durations, work, ctx_base, w, h,
                                      audio_files, image_records,
-                                     scene_cues=scene_cues if pack.get("compiled") else None)
+                                     scene_cues=scene_cues if pack.get("compiled") else None,
+                                     motion_signature=args.motion_signature)
             log(f"→ 合成 HTML 已生成: {os.path.join(work, 'index.html')}")
 
         with timed("gate"):
