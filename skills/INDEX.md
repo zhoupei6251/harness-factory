@@ -1,7 +1,7 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 30 active + 15 archived = 45 skills
+Total: 30 active + 14 archived = 44 skills
 
 ## Active (30)
 
@@ -38,7 +38,7 @@ Total: 30 active + 15 archived = 45 skills
 | understand-project | 理解项目结构和架构，生成知识图谱。触发：接手新项目、需要了解项目全局、询问架构设计。 |
 | writing-plans | Create a concise implementation plan for complex coding work or when the user asks for a plan. Routi |
 
-## Archived (15)
+## Archived (14)
 
 > Not in active use. Restore via: `git mv skills/archive/<name> skills/<name>`
 
@@ -56,6 +56,5 @@ Total: 30 active + 15 archived = 45 skills
 | archive/security-auditor | Use when reviewing code for security vulnerabilities, implementing authentication |
 | archive/summarize | Summarize URLs or files with the summarize CLI (web, PDFs, images, audio, |
 | archive/superdesign | Expert frontend design guidelines for creating beautiful, modern UIs. |
-| archive/ui-ux-pro-max | UI/UX design intelligence and implementation guidance for building polished |
 | archive/web-design-guidelines | 网页设计规范和最佳实践指南 |
 | archive/web-tools-guide | Web 工具使用指南：搜索、网页抓取、浏览器自动化。触发：查资料、上网、搜索、打开网站。 |

@@ -29,7 +29,6 @@ See `skills/INDEX.md` and `npm run stats` for live counts.
 | `scripts/bootstrap-contract.ts` | Shared bootstrap input/output ownership contract |
 | `docs/plans/` | Current durable plans when complexity warrants a record |
 | `verifications/` | Necessary repository verification/review records |
-| `docs/superpowers/` | Historical design records; not automatically loaded |
 
 There is no product frontend or media renderer in this repository. Frontend work in target projects is guided by `references/frontend-design.md`.
 

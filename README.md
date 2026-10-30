@@ -56,6 +56,6 @@ Edit `ENTRY.md`, `core/`, `capabilities/rules/`, `platforms/`, `templates/` and 
 
 The three `*.harness.md` files are tracked distribution artifacts; regenerate and commit them with their sources. Native entries, platform projections, dependencies and runtime scratch are gitignored. Existing project `MEMORY.md` is preserved.
 
-This repository supports only the `code` route. Historical files under `docs/superpowers/` are records, not active instructions.
+This repository supports only the `code` route. Source statistics read Git-tracked paths rather than recursively scanning local outputs.
 
 Repository maintenance commits directly to `main`; push requires an explicit request. Downstream projects retain their own Git workflow.

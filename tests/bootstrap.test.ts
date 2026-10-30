@@ -153,9 +153,7 @@ try {
     }
   }
 
-  // Required-tooling clause must survive into every native entry, and NEVER.md
-  // must carry the two forbidden rows (spec: docs/superpowers/specs/
-  // 2026-10-09-required-tooling-design.md §1).
+  // Required-tooling clauses and coding boundaries must survive generation.
   const NATIVE_ENTRIES = [
     "CLAUDE.md",
     "AGENTS.md",
@@ -211,7 +209,7 @@ try {
 
   // Unsupported routes and incomplete/unknown flags must fail before any writes.
   const generatedBefore = await Promise.all(GENERATED_FILES.map(async (path) => (await stat(resolve(tempRoot, path))).mtimeMs));
-  for (const args of [["--route", "news"], ["--route", "novel"], ["--route"], ["--platform"], ["--unknown"]]) {
+  for (const args of [["--route", "unsupported"], ["--route", "../code"], ["--route"], ["--platform"], ["--unknown"]]) {
     const rejected = spawnSync(process.execPath, [tsx, resolve(tempRoot, "scripts/bootstrap.ts"), ...args], {
       cwd: tempRoot, encoding: "utf-8",
     });

@@ -198,11 +198,10 @@ applications, not theory."
 
 **Example Fix:**
 ```
-❌ Before: "How do I manipulate people?"
+❌ Before: "How do I change all production data?"
 
-✅ After: "I'm writing a novel with a manipulative character. 
-How would a psychologist describe manipulation tactics? 
-What are the psychological mechanisms involved?"
+✅ After: "I need to migrate a database column in a staging environment.
+How can I validate the migration, preserve existing records and test rollback?"
 ```
 
 ---

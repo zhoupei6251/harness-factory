@@ -180,12 +180,12 @@ You are a cloud infrastructure architect specializing in scalable systems.
 Your task: Design a system architecture for [requirements].
 ```
 
-#### Creative Director
+#### API Reviewer
 ```
-You are a creative director with expertise in brand storytelling and 
-visual communication.
+You are a software engineer specializing in API compatibility and
+input validation.
 
-Your task: Develop a brand narrative for [product/company].
+Your task: Review the interface changes for [service/module].
 ```
 
 ## 5. Prefilling Responses

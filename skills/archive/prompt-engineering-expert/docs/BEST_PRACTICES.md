@@ -209,7 +209,7 @@ skill-name/
 - Use for complex reasoning
 - Allow more processing time
 - Request detailed explanations
-- Leverage for novel problems
+- Apply to unfamiliar engineering problems
 
 ## Skill Development Workflow
 

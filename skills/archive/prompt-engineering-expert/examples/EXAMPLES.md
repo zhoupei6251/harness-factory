@@ -128,34 +128,32 @@ Scenario: [YOUR SCENARIO HERE]
 <prompt>
   <metadata>
     <version>1.0</version>
-    <purpose>Generate marketing copy for SaaS products</purpose>
-    <target_audience>B2B decision makers</target_audience>
+    <purpose>Review an API change before release</purpose>
+    <target_audience>Service maintainers</target_audience>
   </metadata>
   
   <instructions>
     <objective>
-      Create compelling marketing copy that emphasizes ROI and efficiency gains
+      Identify compatibility regressions and missing input validation
     </objective>
     
     <constraints>
       <max_length>150 words</max_length>
-      <tone>Professional but approachable</tone>
-      <avoid>Jargon, hyperbole, false claims</avoid>
+      <evidence>Cite the affected file, line and caller</evidence>
+      <avoid>Unverified claims and unrelated style changes</avoid>
     </constraints>
     
     <format>
-      <headline>Compelling, benefit-focused (max 10 words)</headline>
-      <body>2-3 paragraphs highlighting key benefits</body>
-      <cta>Clear call-to-action</cta>
+      <finding>Concrete failure and affected input</finding>
+      <location>File and line</location>
+      <verification>Relevant test or reproduction</verification>
     </format>
     
     <examples>
       <example>
-        <product>Project management tool</product>
-        <copy>
-          Headline: "Cut Project Delays by 40%"
-          Body: "Teams waste 8 hours weekly on status updates. Our tool automates coordination..."
-        </example>
+        <finding>An omitted optional field now causes a parse error</finding>
+        <location>request.ts:42</location>
+        <verification>Parse a request without the optional field</verification>
       </example>
     </examples>
   </instructions>

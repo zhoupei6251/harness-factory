@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // install-into-project.ts — 把 harness-factory 的 harness 注入任意目标项目。
-// 设计：docs/superpowers/specs/2026-10-10-harness-isolation-design.md
+// 安装契约与使用说明：templates/README.md
 //
 // 模式：
 //   - self:  --target 等于本仓库根（harness-factory 自身），import 走 @ENTRY.md

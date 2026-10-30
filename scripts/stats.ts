@@ -9,29 +9,11 @@
  *      previously invisible.
  */
 import { readdir, readFile, stat } from "node:fs/promises";
-import { resolve, dirname, extname, join } from "node:path";
+import { resolve, dirname, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-
-const SKIP_DIRS = new Set([
-  ".git",
-  "node_modules",
-  "dist",
-  ".tmp",
-  ".acl-reports",
-  ".claude",
-  ".codex",
-  ".qoder",
-  ".trae",
-  ".codebuddy",
-  // Existing installations may still hold large retired outputs.
-  ".harness-news-runtime",
-  ".harness-novel-runtime",
-  ".ai-runtime-artifacts",
-  ".workbuddy",
-]);
 
 const RUNTIME_DIRS = [
   ".ai-runtime-artifacts",
@@ -39,19 +21,6 @@ const RUNTIME_DIRS = [
 ];
 
 const RUNTIME_SIZE_WARN_MB = 1024; // 1 GiB
-
-async function* walk(dir: string): AsyncGenerator<string> {
-  const entries = await readdir(dir, { withFileTypes: true });
-  for (const e of entries) {
-    if (SKIP_DIRS.has(e.name)) continue;
-    const p = join(dir, e.name);
-    if (e.isDirectory()) {
-      yield* walk(p);
-    } else {
-      yield p;
-    }
-  }
-}
 
 async function listDirs(rel: string): Promise<string[]> {
   try {
@@ -87,10 +56,11 @@ async function dirSizeMiB(rel: string): Promise<number> {
 }
 
 function gitLines(args: string[]): string {
-  return execFileSync("git", args, { cwd: ROOT, encoding: "utf-8" }).trim();
+  return execFileSync("git", args, { cwd: ROOT, encoding: "utf-8", stdio: ["ignore", "pipe", "pipe"] }).trim();
 }
 
-let totalSource = 0;
+const sourceFiles = execFileSync("git", ["ls-files", "-z"], { cwd: ROOT, encoding: "utf-8" }).split("\0").filter(Boolean);
+const totalSource = sourceFiles.length;
 let ts = 0,
   md = 0,
   json = 0,
@@ -98,8 +68,7 @@ let ts = 0,
   html = 0,
   other = 0;
 
-for await (const p of walk(ROOT)) {
-  totalSource++;
+for (const p of sourceFiles) {
   switch (extname(p)) {
     case ".ts":
       ts++;
@@ -139,7 +108,7 @@ const schemaFiles = (await readdir(resolve(ROOT, "schemas"), { withFileTypes: tr
 const pkg = JSON.parse(await readFile(resolve(ROOT, "package.json"), "utf-8"));
 const npmScripts = Object.keys(pkg.scripts ?? {}).length;
 
-const trackedCount = Number(gitLines(["ls-files"]).split("\n").filter(Boolean).length);
+const trackedCount = sourceFiles.length;
 
 let gitClean = "n/a";
 let ahead = 0;
@@ -170,7 +139,7 @@ console.log("# harness-factory stats (live — re-run `npm run stats`)");
 console.log("");
 console.log("| Metric | Count |");
 console.log("|---|---|");
-console.log(`| Source files (excl .git + node_modules + runtime dirs) | ${totalSource} |`);
+console.log(`| Source files (Git tracked only) | ${totalSource} |`);
 console.log(`|  · .ts | ${ts} |`);
 console.log(`|  · .md | ${md} |`);
 console.log(`|  · .json | ${json} |`);

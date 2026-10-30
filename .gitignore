@@ -22,10 +22,6 @@ GEMINI.md
 .codebuddy/
 .qoder/
 MEMORY.md
-# Legacy local output is ignored, never loaded or distributed.
-.harness-novel-runtime/
-.harness-news-runtime/
-
 # install-into-project.ts auto-backup files (created when overwriting existing CLAUDE.md/AGENTS.md/GEMINI.md)
 *.bak-*.md
 

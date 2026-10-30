@@ -136,6 +136,12 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
 // ---------- 3. routes/ ----------
 {
   const expectedRoutes = ["code"];
+  const routeSchema = JSON.parse(await readFile(resolve(ROOT, "schemas/route.schema.json"), "utf-8"));
+  if (JSON.stringify(routeSchema?.properties?.name?.enum) === JSON.stringify(expectedRoutes)) {
+    ok("route schema accepts only code");
+  } else {
+    bad("route schema must accept exactly the code route");
+  }
   const actual = await listDirs("routes");
   const missing = expectedRoutes.filter((r) => !actual.includes(r));
   const extra = actual.filter((r) => !expectedRoutes.includes(r));
@@ -235,9 +241,15 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
     if (!hasSkill || !hasMeta) {
       bad(`skills/${name} missing ${!hasSkill ? "SKILL.md" : ""}${!hasSkill && !hasMeta ? " + " : ""}${!hasMeta ? "_meta.json" : ""}`);
       badCount++;
+    } else {
+      const metadata = JSON.parse(await readFile(join(full, "_meta.json"), "utf-8"));
+      if (metadata.domain !== undefined && !["code", "shared"].includes(metadata.domain)) {
+        bad(`skills/${name} domain must be code or shared`);
+        badCount++;
+      }
     }
   }
-  if (badCount === 0) ok(`every active skill has SKILL.md + _meta.json`);
+  if (badCount === 0) ok(`every active skill has instructions and code/shared metadata`);
 }
 
 // ---------- 8. active skill frontmatter name matches its directory ----------

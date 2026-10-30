@@ -42,8 +42,7 @@ const RUNTIME_EVIDENCE_HOME = ".ai-runtime-artifacts/verifications/";
 
 async function validateEvidence(): Promise<void> {
   const tracked = new Set(trackedFiles());
-  // docs/superpowers/** is the historical record; its prose may name retired paths.
-  const docs = [...tracked].filter((p) => /\.(md|jsonl)$/.test(p) && !p.startsWith("docs/superpowers/"));
+  const docs = [...tracked].filter((p) => /\.(md|jsonl)$/.test(p));
   let bad = 0;
   let placeholders = 0;
   for (const p of docs) {
