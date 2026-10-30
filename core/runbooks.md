@@ -14,7 +14,8 @@ Full per-platform guide: `references/tooling.md`.
 - Discover MCP tools and call `list_projects` to verify codebase-memory connectivity. Use the exact project returned; index only if not indexed.
 - Read the installed ponytail skill and use `full` by default. Installation as a skill does not enable plugin hooks.
 - If tools fail, continue with source reads and targeted searches; report the actual failure and fallback. Do not kill other sessions to unlock an index.
-- `npm run skills:install -- --platform codex|claude|qoder` links active skills for the selected host; omit the flag for all supported skill targets. This is setup, not a per-task step.
+- `npm run skills:install -- --platform codex|claude|trae|workbuddy|qoder --target <project>` links 10 core skills into the selected host's native project directory. Omit the platform for all five, omit target for user scope, add `--profile all` for all active legacy skills. Preview with `--dry-run`; conflicts preserve existing directories/foreign links and return nonzero. This is setup, not a per-task step.
+- `npm run check:upstreams` verifies fixed revisions, local file hashes and license records offline. Imported subsets and explicit update procedure: `references/coding-capabilities.md`.
 
 ## Add a skill
 

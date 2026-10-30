@@ -15,6 +15,7 @@ Code is the only route. Keep the default path short: understand, implement, veri
 - Root `MEMORY.md` is project state. `routes/code/MEMORY.md` is an initialization template, not another state source.
 - Load common rules and only the current language/task rules; hook/setup guides are for configuring hooks, not every edit.
 - For frontend layout and styling, consult [references/frontend-design.md](references/frontend-design.md) on demand.
+- Select curated local skills by task using `core/intent-routing.md`; source/adapter details are in `references/coding-capabilities.md`. Load one primary method, then add only a missing capability. If a skill is not discovered by the host, read its bundled `skills/<name>/SKILL.md` directly.
 
 ## Behavior rules (R1-R8)
 
@@ -46,6 +47,8 @@ Read installed `codebase-memory` and `ponytail` skills once on first coding work
 | codebase-memory-mcp | `list_projects` once; choose the exact project, locate relevant symbols with `search_graph`, trace changed contracts/callers as needed and read source. Check cited-path coverage; re-index only when needed, not at every task. |
 | ponytail | Before generation: 不写 → 复用 → 标准库 → 平台原生 → 已有依赖 → 一行 → 最小实现. Keep boundary validation, error handling and accessibility. |
 
+`npm run skills:install -- --platform <host> --target <project>` links the 10-skill core profile into native project directories. Omit `--target` for user-level installation; `--profile all` opts into the legacy catalog. Preview with `--dry-run`. Installation never enables plugins, hooks or MCP servers. Pinned source integrity: `npm run check:upstreams` (offline).
+
 When graph tools are unavailable, use source reads and targeted searches and state:
 `[codebase-memory-mcp 不可用，已降级] 原因：<实际错误>；替代手段：<源码读取与调用追踪>`。
 Stale/missing graph coverage requires checking current source, not pretending the graph is complete. Setup details: [references/tooling.md](references/tooling.md).
@@ -55,7 +58,7 @@ Stale/missing graph coverage requires checking current source, not pretending th
 | Platform | Config root | Source |
 |----------|------------|--------|
 | Claude Code | `~/.claude/` | `platforms/claude/` |
-| Codex | `AGENTS.md` + `~/.codex/` | `platforms/codex/` |
+| Codex | `AGENTS.md` + `~/.codex/`; skills in `.agents/skills/` | `platforms/codex/` |
 | Trae | `~/.trae/` | `platforms/trae/` |
 | WorkBuddy | `~/.codebuddy/` | `platforms/workbuddy/` |
 | Qoder | `AGENTS.md` + `~/.qoder/` + `~/.qoder-cn/` | `platforms/qoder/` |

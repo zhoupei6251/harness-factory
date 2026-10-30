@@ -12,10 +12,12 @@ Canonical sources are edited directly; distribution artifacts are regenerated. T
 | `platforms/<p>/rules/ENTRY.md` | Five adapters: claude, codex, trae, workbuddy, qoder |
 | `routes/code/MEMORY.md` | Neutral initialization template, not live project state |
 | `skills/<name>/SKILL.md` + `_meta.json` | Active software-engineering procedures |
+| `skills/hf-*/upstream/`, `skills/ponytail/upstream-LICENSE` | Fixed upstream subsets and licenses; local SKILL.md adapters define scope |
 | `skills/archive/` | Inactive coding skills; not installed by `skills:install` |
 | `schemas/` | Platform/route/skill JSON schemas |
 | `mcp-config/` | External graph-tool configuration snippets |
 | `references/` | Setup, lessons, and on-demand frontend design references |
+| `references/upstreams.lock.json` | Source repositories, exact revisions, original paths and content hashes |
 | `templates/` | Downstream target entries, overview template and shared harness template |
 
 See `skills/INDEX.md` and `npm run stats` for live counts.

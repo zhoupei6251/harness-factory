@@ -10,7 +10,7 @@ Harness Factory distributes software-engineering instructions across five platfo
 | `capabilities/rules/{common,java,typescript}/` | Task/language-specific practices |
 | `platforms/<name>/rules/ENTRY.md` | Host configuration differences only |
 | `routes/code/MEMORY.md` | Neutral project-memory initialization template |
-| `skills/` | Coding and repository-maintenance procedures, loaded on demand |
+| `skills/` | Curated core and optional legacy procedures; upstream subsets live beside their adapters, loaded on demand |
 | `references/` | Tool setup, lessons and frontend design source guidance |
 
 Claude, Codex, Trae, WorkBuddy and Qoder are the adapters. Codex and Qoder share the native `AGENTS.md`; generation merges their deltas. Gemini's distributable harness remains for the existing downstream installer contract, without adding a sixth bootstrap adapter.
@@ -22,6 +22,8 @@ The common path is targeted evidence → smallest implementation → relevant ve
 Complex changes record the necessary scope, evidence and pass criteria once. Shared APIs, migrations and security boundaries get broader validation and independent review. Evidence, validation and accessibility remain requirements at every size.
 
 Context is loaded progressively. Setup guides, hook instructions, historical decisions and unrelated skills stay out of ordinary coding context. Frontend tasks use `references/frontend-design.md` to select an upstream reference as needed.
+
+`core/intent-routing.md` selects a bundled skill without requiring native discovery. `skills:install` optionally links 10 core skills into one or all five native host directories; all active legacy skills require explicit `--profile all`. Project scope uses `--target`, default scope is the user's home. The installer preserves user files/foreign links and never changes MCP or hook settings. `references/upstreams.lock.json` pins reviewed content files and licenses; `check:upstreams` verifies their bytes offline. Source upgrades are explicit, separate maintenance work. Graph/browser services and optional Python remain external capabilities, not npm runtime dependencies.
 
 ## Bootstrap contract
 

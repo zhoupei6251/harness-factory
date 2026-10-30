@@ -13,6 +13,19 @@ npm test
 
 Bootstrap is local and does not probe external tools or the network. Run `npm run doctor` explicitly for environment diagnosis. Required coding tools and per-platform setup are in [references/tooling.md](references/tooling.md).
 
+## Curated coding capabilities
+
+The default profile links 10 skills: Ponytail, Codebase Memory, debugging, verification, security, module design, effective tests, UI design, Web testing and Playwright. Local adapters use selected content from Superpowers, ECC, Matt Pocock Skills, Impeccable, Taste, UI UX Pro Max and Anthropic Skills. Original reference files, data, licenses and fixed revisions ship with the repository; ordinary tasks load only the matching skill. Full frameworks, hook runtimes and automatic updates are not part of this profile.
+
+```powershell
+# Preview project-local installation for all five hosts
+npm run skills:install -- --target D:/path/to/project --dry-run
+# Install for the host you use; omit --platform for all five
+npm run skills:install -- --platform codex --target D:/path/to/project
+```
+
+Omit `--target` for user-level installation. The explicit `--profile all` option retains access to all active legacy skills. Existing user directories/foreign links are preserved and reported as conflicts. Native rule entries also point directly to bundled skill files when host discovery is unavailable. [Capability scope, tool setup and updates](references/coding-capabilities.md).
+
 To use this harness in another project, clone/link it at `<project>/harness-factory/` and run:
 
 ```bash
@@ -30,7 +43,7 @@ See [templates/README.md](templates/README.md) for installation and [STRUCTURE.m
 - Keep validation, error handling, accessibility and honest reporting. Speed comes from removing unrelated work.
 - Root `MEMORY.md` stores the project's current facts; bootstrap initializes it only when missing.
 
-For frontend pages, [references/frontend-design.md](references/frontend-design.md) points to impeccable, taste-skill and ui-ux-pro-max-skill. Select the relevant source for the task instead of loading/installing all three.
+For frontend pages, [references/frontend-design.md](references/frontend-design.md) selects local Impeccable/Taste references or the UI UX Pro Max offline search engine. Choose one primary source for the task.
 
 ## Repository commands
 
@@ -44,7 +57,8 @@ For frontend pages, [references/frontend-design.md](references/frontend-design.m
 | `npm run check-bootstrap` | Compare generated entries with fresh output in isolation |
 | `npm run index` | Regenerate `skills/INDEX.md` |
 | `npm run stats` | Live repository counts and Git state |
-| `npm run skills:install -- --platform codex` | Link active skills for one host; omit platform to install to all supported skill targets |
+| `npm run skills:install -- --platform codex` | Link 10 core skills; optional --target, --profile all and --dry-run; five hosts supported |
+| `npm run check:upstreams` | Verify bundled source hashes and license records offline |
 | `npm run hooks:install` | Install the pre-commit bootstrap drift gate once per clone |
 | `npm test` | Full repository governance/bootstrap/install checks |
 

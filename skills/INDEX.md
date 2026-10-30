@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 30 active + 14 archived = 44 skills
+Total: 39 active + 14 archived = 53 skills
 
-## Active (30)
+## Active (39)
 
 | Skill | Description |
 |-------|-------------|
@@ -15,15 +15,24 @@ Total: 30 active + 14 archived = 44 skills
 | architecture-patterns | ## WHAT |
 | brainstorming | Clarify ambiguous coding requirements and compare meaningful design choices before a substantial cha |
 | code-review | Systematic code review patterns covering security, performance, maintainability, |
+| codebase-memory | 代码结构、符号、调用和改动影响取证；使用已连接的 codebase-memory-mcp 工具，失败时读取源码并报告实际原因。 |
 | find-skills | Helps users discover and install agent skills when they ask questions |
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |
 | get-callers | 获取调用指定符号的所有代码。触发：想知道谁在调用某个方法、分析依赖、评估影响。 |
 | git-xywh | 组织级 Git 工作流：三主干（main / test / develop）、五类临时分支、多环境隔离、Angular 提交与 MR 流程；涵盖合并、变基、冲突、恢复。任务涉及分支、提测、热修、版本标 |
 | harness-health | 显式检查 Harness 健康状态，复用 package.json 门禁，避免重复运行和无关诊断。 |
+| hf-debug | 定位测试失败、回归和难复现问题；按 Superpowers 的根因调查方法先取证，再修复。 |
+| hf-design | 设计或重构模块接口时，使用 Matt Pocock 的深模块方法减少调用者负担并改善可测试性。 |
+| hf-security | 涉及鉴权、输入、上传、数据库、敏感数据或第三方接口时，按 ECC 安全检查表检查实际边界。 |
+| hf-tdd | 用户要求 TDD，或非平凡逻辑需要回归测试时，按 Matt Pocock 方法测试公开行为并逐步红绿验证。 |
+| hf-ui | 页面视觉、排版、设计系统与交互改进：按任务选择 Impeccable 打磨、Taste 视觉参考或 UI UX Pro Max 本地数据搜索。 |
+| hf-verify | 完成代码改动前核对真实检查结果，依据 Superpowers 验证方法报告完成情况与未验证项。 |
+| hf-web-test | 使用 Anthropic Webapp Testing 方法检查本地 Web 应用、截图、控制台与关键交互，优先复用已有 Playwright 工具或测试。 |
 | index-project | 为项目建立代码索引。触发：大型项目、需要精准定位符号、快速查找调用关系。 |
 | lsp-query | 通过 Language Server Protocol（typescript-language-server / pyright / gopls 等）做结构化代码查询：定义、引用、悬停信息、符号、代码 |
 | planning-with-files | Implements Manus-style file-based planning to organize and track progress |
 | playwright | Browser automation via Playwright MCP. Navigate websites, click elements, |
+| ponytail | > |
 | project-planner | Triage ideas, problems, and feature requests into the right format |
 | query-knowledge-graph | 查询 codebase-memory-mcp 的知识图谱，获取结构化信息。触发：需要查询项目结构、模块关系、依赖关系。 |
 | query-symbol | 快速定位代码符号（类/函数/变量）。触发：需要找某个符号、不知道在哪里、查询定义。 |

@@ -41,6 +41,8 @@
 
 项目根 `MEMORY.md` 是项目状态；`routes/code/MEMORY.md` 仅为初始化模板。前端页面按需查 `harness-factory/references/frontend-design.md`，从三个上游来源选当前需要的部分。
 
+按 `harness-factory/core/intent-routing.md` 选择本地精选技能：调试 `hf-debug`、模块设计 `hf-design`、有效测试 `hf-tdd`、安全 `hf-security`、前端 `hf-ui`、浏览器 `playwright` / `hf-web-test`、完成验证 `hf-verify`。未被客户端发现时直接读 `harness-factory/skills/<name>/SKILL.md`。一个任务只用一个主流程，优先本地适配说明，不串联上游完整工作流；安装与来源见 `harness-factory/references/coding-capabilities.md`。
+
 **加载顺序**（Claude Code 会话开始时）：
 1. `~/.claude/CLAUDE.md`（用户全局记忆）
 2. `<cwd>/CLAUDE.md`（项目根，**含本文件的 @import**）

@@ -1,0 +1,6 @@
+# Keep pinned upstream hashes identical across Windows and Unix checkouts.
+skills/**/upstream/** text eol=lf
+skills/ponytail/SKILL.md text eol=lf
+skills/ponytail/upstream-LICENSE text eol=lf
+# Preserve the pinned upstream document's existing trailing space verbatim.
+skills/hf-web-test/upstream/SKILL.md whitespace=-blank-at-eol

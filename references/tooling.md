@@ -5,6 +5,14 @@
 > 安装状态属于**每台机器一次性配置**，不随 `npm run bootstrap` 渲染。
 > 缺失或未接通时**声明降级**：改用等效手段（Read / Grep）并在回复中说明原因，禁止默默跳过。详见文末「降级语义」。
 
+## 精选技能接入
+
+`npm run skills:install -- --platform codex --target <project>` 安装默认 10 个核心技能；五端均支持，省略 platform 安装五端，省略 target 为用户级安装。`--dry-run` 只预览，`--profile all` 显式安装所有 active 旧技能。已有用户目录和其他链接会保留并报告冲突。此命令不修改 MCP、插件或 Hook 设置。
+
+内容已随仓库保存，不需要每次访问 GitHub；按 `core/intent-routing.md` 直接读本地技能即可。来源、选取范围、版本与更新方式见 [coding-capabilities.md](coding-capabilities.md)，离线完整性检查为 `npm run check:upstreams`。
+
+Playwright 为可选浏览器服务：优先已有浏览器或测试能力；需要配置时使用 `mcp-config/playwright.json`（JSON 客户端）或 `playwright.codex.toml`。片段固定 `@playwright/mcp@0.0.83`，默认隔离会话、headless；Windows 用 `npx.cmd`，其他系统改 `npx`。新会话发现工具后实际导航、截图并操作一个本地页面，才报告浏览器连通；文件存在或技能已安装不代表服务可用。不会替用户自动信任 Hook、改全局配置或复用真实浏览器登录态。
+
 ## 一览
 
 | 工具 | 是什么 | 与本仓库的关系 | 上游 |

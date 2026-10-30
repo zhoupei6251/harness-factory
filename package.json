@@ -15,8 +15,9 @@
     "hooks:install": "tsx scripts/install-hooks.ts",
     "skills:audit": "tsx scripts/skills-audit.ts",
     "skills:install": "tsx scripts/install-skills.ts",
+    "check:upstreams": "tsx scripts/check-upstreams.ts",
     "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
-    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run check-bootstrap && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts && tsx tests/install-roundtrip.test.ts && tsx tests/downstream-render.test.ts && tsx tests/stats.test.ts"
+    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run check-bootstrap && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts && tsx tests/install-roundtrip.test.ts && tsx tests/downstream-render.test.ts && tsx tests/stats.test.ts && tsx tests/install-skills.test.ts && tsx tests/upstream-skills.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

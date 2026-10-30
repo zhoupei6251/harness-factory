@@ -1,0 +1,5 @@
+# Optional snippet. On Windows use npx.cmd; on macOS/Linux use npx.
+[mcp_servers.playwright]
+command = "npx.cmd"
+args = ["-y", "@playwright/mcp@0.0.83", "--isolated", "--headless"]
+startup_timeout_sec = 120
