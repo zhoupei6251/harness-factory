@@ -17,7 +17,7 @@
  * check-bootstrap.ts cannot reproduce the artifact and reports drift — that
  * failure is the reminder, not a false alarm to work around.
  */
-export const BOOTSTRAP_INPUTS = ["ENTRY.md", "package.json", "core", "platforms", "routes", "scripts", "templates"];
+export const BOOTSTRAP_INPUTS = ["ENTRY.md", "package.json", "core", "platforms", "routes/code", "scripts", "templates"];
 
 /** Files whose bytes must equal what a fresh bootstrap run produces. */
 export const GENERATED_FILES = [
@@ -40,17 +40,10 @@ export const GENERATED_FILES = [
   "GEMINI.harness.md",
 ];
 
-/**
- * Root `MEMORY.md` is deliberately NOT in GENERATED_FILES: `npm run bootstrap
- * -- --route news` projects whichever route was selected, so byte-equality with
- * one specific route template is not an invariant. check-bootstrap.ts instead
- * requires it to match SOME `routes/<route>/MEMORY.md` verbatim, which catches
- * both failure modes (root edited directly, source edited without re-run)
- * without hard-coding the selected route.
- */
+/** Project state, initialized once from routes/code/MEMORY.md and then preserved. */
 export const ROUTE_MEMORY = "MEMORY.md";
 
-const OWNED_TOP_DIRS = new Set([".claude", ".codex", ".qoder", ".trae", ".codebuddy", ".ai-runtime-artifacts", ".harness-novel-runtime", ".harness-news-runtime"]);
+const OWNED_TOP_DIRS = new Set([".claude", ".codex", ".qoder", ".trae", ".codebuddy", ".ai-runtime-artifacts"]);
 
 /**
  * Is this repo-root-relative path owned by bootstrap (generated output or the

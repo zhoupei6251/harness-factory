@@ -1,12 +1,12 @@
 {
   "name": "harness-factory",
   "version": "2.5.0",
-  "description": "多平台 AI harness 治理仓库：core 治理文档 + capabilities 语言规则 + 5 平台适配器（claude/codex/trae/workbuddy/qoder）+ code/novel/news 三路由 + skills 库 + news 域 Vue 模板层（src/web → vite build 出 dist/，由 skills/douyin-pro/scripts/path_b_build.py 消费）。治理侧单一事实源，npm run bootstrap 渲染到各平台目录。",
+  "description": "面向代码开发的轻量多平台 AI harness：按需加载治理规则、代码图谱取证、最小实现与相关验证。",
   "private": true,
   "type": "module",
   "scripts": {
     "doctor": "tsx scripts/doctor.ts",
-    "bootstrap": "tsx scripts/doctor.ts && tsx scripts/bootstrap.ts",
+    "bootstrap": "tsx scripts/bootstrap.ts",
     "validate": "tsx scripts/validate-schemas.ts",
     "index": "tsx scripts/build-index.ts",
     "stats": "tsx scripts/stats.ts",
@@ -16,24 +16,12 @@
     "skills:audit": "tsx scripts/skills-audit.ts",
     "skills:install": "tsx scripts/install-skills.ts",
     "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
-    "typecheck:web": "node node_modules/typescript/lib/tsc.js --noEmit -p tsconfig.web.json",
-    "prebuild:templates": "node -e \"require('fs').rmSync('dist',{recursive:true,force:true})\"",
-    "build:templates": "vite build",
-    "build:templates:dev": "vite build --mode development",
-    "preview:templates": "vite preview --port 4173",
-    "test:web": "tsx tests/web/vue-build.test.ts",
-    "test:render": "tsx scripts/test-render.ts",
-    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run typecheck:web && npm run check-bootstrap && npm run test:render && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts && tsx tests/install-roundtrip.test.ts && tsx tests/downstream-render.test.ts && npm run test:web"
+    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run check-bootstrap && tsx tests/bootstrap.test.ts && tsx tests/install-template.test.ts && tsx tests/install-roundtrip.test.ts && tsx tests/downstream-render.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",
-    "@vitejs/plugin-vue": "^5.2.4",
-    "gsap": "3.15.0",
     "tsx": "^4.23.15",
-    "typescript": "^7.0.2",
-    "vite": "^6.4.4",
-    "vue": "3.5.43",
-    "vue-tsc": "^2.2.12"
+    "typescript": "^7.0.2"
   },
   "engines": {
     "node": ">=20.9.0"

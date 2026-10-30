@@ -18,6 +18,15 @@ const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SKIP_DIRS = new Set([
   ".git",
   "node_modules",
+  "dist",
+  ".tmp",
+  ".acl-reports",
+  ".claude",
+  ".codex",
+  ".qoder",
+  ".trae",
+  ".codebuddy",
+  // Existing installations may still hold large retired outputs.
   ".harness-news-runtime",
   ".harness-novel-runtime",
   ".ai-runtime-artifacts",
@@ -25,8 +34,6 @@ const SKIP_DIRS = new Set([
 ]);
 
 const RUNTIME_DIRS = [
-  ".harness-news-runtime",
-  ".harness-novel-runtime",
   ".ai-runtime-artifacts",
   ".workbuddy",
 ];

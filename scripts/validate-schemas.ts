@@ -11,7 +11,7 @@ const SKILLS_DIR = resolve(ROOT, "skills");
 
 // Runtime dirs are ignorable by contract (see core/routing.md). Anything tracked
 // under one is an ad-hoc `git add -f` rescue that the next clone will lose.
-const RUNTIME_DIRS = [".harness-news-runtime", ".harness-novel-runtime", ".ai-runtime-artifacts"];
+const RUNTIME_DIRS = [".ai-runtime-artifacts"];
 
 function trackedFiles(): string[] {
   return execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf-8" })
@@ -38,7 +38,7 @@ async function validateRuntimeDirs(): Promise<void> {
 // so a markdown-bolded live pointer (`**…/x.md**`, `*` then `*` then EOL) stays checked.
 const EVIDENCE_PTR = /routes\/[a-z0-9-]+\/evidence\/[A-Za-z0-9._\-/]+/g;
 const GLOB_MID_PATH = /^[*?\[][A-Za-z0-9._\-/]/;
-const OLD_EVIDENCE_HOME = ".harness-news-runtime/verifications/";
+const RUNTIME_EVIDENCE_HOME = ".ai-runtime-artifacts/verifications/";
 
 async function validateEvidence(): Promise<void> {
   const tracked = new Set(trackedFiles());
@@ -63,7 +63,7 @@ async function validateEvidence(): Promise<void> {
         bad++;
       }
     }
-    if (text.includes(OLD_EVIDENCE_HOME)) {
+    if (text.includes(RUNTIME_EVIDENCE_HOME)) {
       console.log(`[FAIL] ${p}: evidence still referenced inside an ignorable runtime dir`);
       bad++;
     }

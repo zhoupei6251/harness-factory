@@ -1,41 +1,9 @@
 # Java 测试规则
 
-## 单元测试
-- Service 层覆盖率 ≥ 80%
-- 使用 JUnit 5 + Mockito
-- 测试方法命名：should_预期行为_when_条件
-- 每个测试方法只测一个行为
+- 使用项目现有测试框架、断言库与命名约定，不为遵循规则新增 JUnit、Mockito、AssertJ、H2 或 Testcontainers。
+- 业务分支、缺陷修复、事务、权限、租户隔离及公共接口变化，应验证对应正常、边界和失败路径；简单可检查的低风险改动无需新增重复测试。
+- 测试独立且可重复，数据与环境按项目约定隔离。断言具体字段、副作用或异常，避免仅检查非空；不依赖执行顺序或实际外部服务。
+- 事务、SQL、缓存和跨模块行为需要集成证据时复用已有设施；不要用 mock 替代真正需要验证的持久化语义。
+- 一组相关修改完成后优先运行受影响测试或模块检查；扩大到全量测试须有项目门禁或实际风险依据，已有覆盖率要求照常遵守。
 
-## 测试结构
-```java
-@Test
-void should_return_user_when_id_exists() {
-    // Given
-    when(userRepository.findById(1L)).thenReturn(Optional.of(user));
-    
-    // When
-    User result = userService.getUser(1L);
-    
-    // Then
-    assertThat(result).isNotNull();
-    assertThat(result.getName()).isEqualTo("test");
-}
-```
-
-## 集成测试
-- 使用 @SpringBootTest + @Transactional（自动回滚）
-- 数据库测试使用 H2 或 Testcontainers
-- API 测试使用 MockMvc 或 RestAssured
-- 避免依赖外部服务，使用 Mock 或 WireMock
-
-## 测试数据
-- 使用 @BeforeEach 准备测试数据
-- 避免测试间依赖，每个测试独立
-- 使用 Builder 模式构造复杂对象
-- 禁止硬编码 ID，使用动态生成
-
-## 断言规范
-- 使用 AssertJ（assertThat）而非 JUnit 原生断言
-- 断言要具体：检查字段值，而非仅检查非空
-- 异常测试使用 assertThrows，检查异常类型和消息
-- 避免使用 System.out.println 验证，使用断言
+执行限制优先：项目禁止自动运行 Maven 时，只列出对应编译或测试命令，明确未运行。交付中区分源码走查、实际测试和未验证项。

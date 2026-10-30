@@ -22,23 +22,21 @@ GEMINI.md
 .codebuddy/
 .qoder/
 MEMORY.md
+# Legacy local output is ignored, never loaded or distributed.
 .harness-novel-runtime/
 .harness-news-runtime/
 
 # install-into-project.ts auto-backup files (created when overwriting existing CLAUDE.md/AGENTS.md/GEMINI.md)
 *.bak-*.md
 
-# Credentials & session state (sau / social-auto-upload login state) — never commit
+# Credentials & session state — never commit
 cookies/
 *cookie*.json
 verify_code.txt
 
-# Python bytecode from skill scripts (skills/douyin-pro/scripts, etc.)
+# Python bytecode from code tooling
 __pycache__/
 *.py[cod]
-
-# short-video-script-creator default output (was a hardcoded absolute path)
-skills/short-video-script-creator/out_put/
 
 # code-route runtime artifacts (see core/routing.md runtime dir)
 .ai-runtime-artifacts/
@@ -46,7 +44,7 @@ skills/short-video-script-creator/out_put/
 # Agent workspace data (工作记忆 / 会话数据) — 本地工作态，不入库
 .workbuddy/
 
-# Local pipeline-stage timing dumps (parse/dub/images/emit/gate) — runtime artifact, not source
+# Local timing dumps — runtime artifact, not source
 timing.json
 
 # diagnose-windows-sandbox-acl skill outputs (ACL backup files + JSONL reports)

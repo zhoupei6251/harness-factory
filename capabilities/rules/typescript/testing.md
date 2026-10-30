@@ -1,43 +1,9 @@
 # TypeScript 测试规则
 
-## 单元测试
-- 使用 Vitest 或 Jest
-- 测试文件命名：*.test.ts 或 *.spec.ts
-- 测试函数命名：should_<预期>_when_<条件>
-- 使用 AAA 模式（Arrange-Act-Assert）
+- 沿用项目已有测试框架、文件命名与断言风格；Node 内置断言或现有脚本足以验证时直接复用，不额外安装测试库。
+- 新增分支、异步逻辑、解析器、缺陷修复或公共接口变化，验证实际输入输出、边界和错误处理；简单可检查的文案、样式或配置改动不强制新增测试。
+- 优先运行相关用例和项目类型检查，模块接口或构建配置变更再扩展验证；一组相关修改完成后批量运行，避免每次编辑重跑全仓。
+- mock 只用于必要的外部依赖；异步测试等待完成，并检查失败分支。涉及类型契约时复用现有类型检查，不为测试安装专用类型库。
+- 页面变更按需验证关键交互、状态、键盘操作和不同视口；可用浏览器时检查实际渲染，未做视觉验证则明确说明。
 
-## 测试结构
-```typescript
-import { describe, it, expect } from 'vitest'
-import { add } from './math'
-
-describe('add', () => {
-  it('should return sum when given two numbers', () => {
-    // Arrange
-    const a = 1
-    const b = 2
-    
-    // Act
-    const result = add(a, b)
-    
-    // Assert
-    expect(result).toBe(3)
-  })
-})
-```
-
-## Mock 和 Stub
-- 使用 vi.mock 或 jest.mock
-- Mock 外部依赖（API、数据库）
-- 避免过度 Mock
-- 使用 vi.fn 创建 Mock 函数
-
-## 覆盖率
-- 核心逻辑覆盖率 ≥ 80%
-- 工具函数覆盖率 ≥ 90%
-- 使用 c8 或 istanbul 生成报告
-
-## 类型测试
-- 使用 tsd 或 expect-type 测试类型
-- 确保泛型正确推导
-- 验证类型错误场景
+遵守项目现有覆盖率和 CI 门禁，不追求脱离行为的统一比例。交付附实际验证结果与未运行项。

@@ -46,10 +46,6 @@ function bad(msg: string): void {
   fail++;
 }
 
-async function sha256(path: string): Promise<string> {
-  return createHash("sha256").update(await readFile(path)).digest("hex");
-}
-
 /**
  * Line endings are not part of the contract. core.autocrlf=true rewrites them on
  * checkout, so a committed artifact legitimately differs from a freshly generated
@@ -151,22 +147,9 @@ try {
       }
     }
 
-    // Root MEMORY.md: must equal some route template, whichever route was bootstrapped.
+    // MEMORY.md is project-owned state; only its initialization is a contract.
     if (await exists(resolve(ROOT, ROUTE_MEMORY))) {
-      const routes = (await readdir(resolve(ROOT, "routes"))).sort();
-      const treeHash = await sha256(resolve(ROOT, ROUTE_MEMORY));
-      const matched: string[] = [];
-      for (const route of routes) {
-        const template = resolve(ROOT, "routes", route, "MEMORY.md");
-        if ((await exists(template)) && (await sha256(template)) === treeHash) {
-          matched.push(`routes/${route}/MEMORY.md`);
-        }
-      }
-      if (matched.length > 0) {
-        ok(`${ROUTE_MEMORY} == ${matched.join(" | ")}`);
-      } else {
-        bad(`${ROUTE_MEMORY} matches no routes/<route>/MEMORY.md — it was edited directly, or its source changed without \`npm run bootstrap\``);
-      }
+      ok(`${ROUTE_MEMORY} exists (project-owned state, not a generated artifact)`);
     } else {
       if (REQUIRE_GENERATED) bad(`${ROUTE_MEMORY} (absent) — run \`npm run bootstrap\` before committing`);
       else skip(`${ROUTE_MEMORY} (absent) — run \`npm run bootstrap\` to generate`);

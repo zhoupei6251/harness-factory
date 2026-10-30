@@ -1,53 +1,25 @@
 # harness-factory templates
 
-把 harness-factory 引入新项目的模板集合。
+## Install into a project
 
-## 用法
+1. Clone or link this repository at `<project>/harness-factory/`; keep that directory name.
+2. Run `npx tsx harness-factory/scripts/install-into-project.ts --target .` from the project root.
+3. The installer backs up existing entries and renders the project overview. Review the resulting local files and start a new agent session.
 
-1. 把 `harness-factory/` 克隆或软链到目标项目根（保持目录名 `harness-factory/`）
-2. 在目标项目根跑：
-   ```bash
-   npx tsx harness-factory/scripts/install-into-project.ts --target .
-   ```
-3. 按提示确认（如有 `CLAUDE.md` / `AGENTS.md` / `GEMINI.md` 已存在，会自动备份）
-4. 验证：
-   - `git status` 无 harness 相关 dirty
-   - 启动 Claude Code / Codex / Gemini 会话，应能看到 harness 规则
+| Template | Output |
+|----------|--------|
+| `target-CLAUDE.md` | Project `CLAUDE.md` |
+| `target-AGENTS.md` | Project `AGENTS.md` for Codex/Qoder |
+| `target-GEMINI.md` | Project `GEMINI.md` |
+| `project-birds-eye.template.md` | Default overview; replace with `--birds-eye-file <path>` |
+| `harness.template.md` | Repository `CLAUDE.harness.md`, `AGENTS.harness.md`, `GEMINI.harness.md` through bootstrap |
 
-## 模板清单
+The target templates contain `${PROJECT_BIRDS_EYE}` and `${HARNESS_FACTORY_IMPORT}`. Other-project mode points at `harness-factory/*.harness.md`; self mode uses this repository's `ENTRY.md`. Codex/Gemini use conditional text instructions and Claude uses an `@import`.
 
-### install-into-project.ts 用的模板
+## Maintain the shared harness
 
-| 模板 | 目标文件 | 用途 |
-|---|---|---|
-| `target-CLAUDE.md` | `CLAUDE.md` | Claude Code 项目根加载 |
-| `target-AGENTS.md` | `AGENTS.md` | Codex / Qoder 项目根加载 |
-| `target-GEMINI.md` | `GEMINI.md` | Gemini 项目根加载 |
-| `project-birds-eye.template.md` | （占位文本） | 填入目标项目的项目鸟瞰 |
+Edit `harness.template.md`, then run `npm run bootstrap`. Bootstrap replaces the platform title, intro, loading convention/order and cross-platform tail from `HARNESS_DELTAS` in `scripts/bootstrap.ts`.
 
-### bootstrap.ts 用的模板（harness-factory 自身）
+Keep the common execution rules here. Platform deltas contain only platform differences. Routine coding proceeds directly; complex work uses a concise plan and relevant verification. Frontend design guidance is referenced on demand through `references/frontend-design.md`.
 
-| 模板 | 目标文件 | 用途 |
-|---|---|---|
-| `harness.template.md` | `CLAUDE.harness.md` / `AGENTS.harness.md` / `GEMINI.harness.md` | §1-§6 canonical harness 规则；5 个 `${PLATFORM_*}` 占位符被 `scripts/bootstrap.ts` 的 `HARNESS_DELTAS` 替换 |
-
-## 占位符
-
-模板中含两个占位符，`install-into-project.ts` 会自动替换：
-
-| 占位符 | 替换为 |
-|---|---|
-| `${PROJECT_BIRDS_EYE}` | 用户通过 `--birds-eye-file <path>` 提供，或 `project-birds-eye.template.md` 的内容 |
-| `${HARNESS_FACTORY_IMPORT}` | self 模式：`@ENTRY.md`（同目录）；other 模式：`@harness-factory/CLAUDE.harness.md` |
-
-## self 模式
-
-`install-into-project.ts --target .` 若在 harness-factory 仓库自身运行（路径等于 `__dirname/..`），自动进入 self 模式：
-
-- import 路径走 `@ENTRY.md`（同目录、已存在）
-- 前置检查：ENTRY.md 存在、core/ 存在、AGENTS.md 存在
-- 任一不满足：退出码 3，不写任何文件
-
-## 重要：不要改 harness-factory/ 目录名
-
-`install-into-project.ts` 硬编码相对路径 `harness-factory/...`。改名会导致所有 @import 失效。
+`tests/install-roundtrip.test.ts` verifies exact rendering, idempotence and dry-run behavior. `npm run check-bootstrap` verifies distributed harness files against the canonical template.

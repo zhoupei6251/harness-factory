@@ -10,23 +10,19 @@
  * - They miss the case where a template regression (e.g., wrong @import path
  *   in templates/project-birds-eye.template.md) breaks every downstream user
  *   silently. install-template.test.ts catches the install side; this test
- *   adds the bootstrap side and ties them together against a real downstream.
+ *   adds the bootstrap side and ties them together against a downstream fixture.
  *
  * Strategy:
- * - If ../aigc_platfrom_back exists, copy it to a temp dir and use that
- *   (preferred: tests the real downstream contract).
- * - Otherwise build a minimal mock downstream in temp (still exercises the
- *   install + bootstrap + assertion flow).
+ * - Build a deterministic downstream fixture in temp; never copy unrelated repos.
  * - Always run install --force, then bootstrap, then assert the 5 platform
  *   dirs and 3 root wrappers. Cleanup the temp dir at the end.
  *
  * Exits 0 on full pass, 1 on any assertion failure.
  */
-import { existsSync } from "node:fs";
 import { cp, mkdtemp, readFile, rm, stat, writeFile, mkdir } from "node:fs/promises";
 import { join, resolve, dirname, relative } from "node:path";
 import { tmpdir } from "node:os";
-import { spawnSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { GENERATED_FILES, isBootstrapOwned } from "../scripts/bootstrap-contract.ts";
 
@@ -34,7 +30,6 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "..");
 const NODE = process.execPath;
 const TSX = resolve(ROOT, "node_modules", "tsx", "dist", "cli.mjs");
-const SIBLING = resolve(ROOT, "..", "aigc_platfrom_back");
 const INSTALL = resolve(ROOT, "scripts", "install-into-project.ts");
 
 let fail = 0;
@@ -61,11 +56,23 @@ function relFromRoot(src: string): string {
   return relative(ROOT, plain).replaceAll("\\", "/");
 }
 
+// A fresh clone has tracked sources only; runtime renders and scratch dirs can
+// be gigabytes and must never enter an integration-test copy.
+const cloneSources = new Set<string>();
+for (const file of execFileSync("git", ["ls-files", "-z"], { cwd: ROOT, encoding: "utf-8" }).split("\0").filter(Boolean)) {
+  if (isBootstrapOwned(file)) continue;
+  cloneSources.add(file);
+  let parent = dirname(file).replaceAll("\\", "/");
+  while (parent !== ".") {
+    cloneSources.add(parent);
+    parent = dirname(parent).replaceAll("\\", "/");
+  }
+}
+
 function isCloneNoise(src: string): boolean {
   const rel = relFromRoot(src);
   if (rel === "" || rel.startsWith("..")) return false;
-  const top = rel.split("/")[0];
-  return top === ".git" || top === "node_modules" || isBootstrapOwned(rel);
+  return !cloneSources.has(rel);
 }
 
 /** mtimeMs of every generated artifact at the real repo root — the leak tripwire. */
@@ -90,16 +97,8 @@ async function setupMock(): Promise<string> {
 }
 
 async function main(): Promise<void> {
-  const usedSibling = existsSync(SIBLING);
-  const target = usedSibling
-    ? await (async () => {
-        info(`sibling aigc_platfrom_back found at ${SIBLING}; copying to temp`);
-        const t = await mkdtemp(join(tmpdir(), "hf-downstream-sib-"));
-        await cp(SIBLING, t, { recursive: true });
-        return t;
-      })()
-    : await setupMock();
-  info(usedSibling ? "using sibling copy" : "using minimal mock downstream");
+  const target = await setupMock();
+  info("using deterministic mock downstream");
 
   try {
     // 1. Install harness into the target

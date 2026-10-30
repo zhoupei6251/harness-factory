@@ -1,37 +1,10 @@
 # Java Hooks
 
-## PreToolUse
+本文件是建议，不代表已配置宿主 hooks。先读取项目执行限制；项目禁止自动执行 Maven 时，任何 hook 或验证流程都不得自动调用 Maven，只列出建议命令与未验证项。
 
-### 编译检查
-- 触发：Edit/Write *.java
-- 行为：运行 `mvn compile -q` 或 `gradle build -x test`
-- 目的：确保语法正确，避免编译错误
+- 一组相关编辑完成后，按影响使用项目已有的模块编译、相关测试和质量检查；不在每次 Java 文件读写前编译或格式化全仓。
+- 沿用已有 Maven/Gradle wrapper、格式化与静态检查配置，不为满足本规则新增插件、覆盖率工具或依赖。
+- 格式化只处理授权范围。构建文件或依赖变化时再检查相关依赖兼容性，不在每次响应结束时运行依赖树或全套静态扫描。
+- 已有且允许执行的 hooks 门禁保持有效；避免与手工验证重复执行相同检查。检查失败应保留原因，不吞掉错误或报告通过。
 
-### 代码格式化
-- 触发：Edit/Write *.java
-- 行为：运行 `mvn spotless:apply` 或 `gradle spotlessApply`
-- 目的：统一代码风格（Google Java Format 或自定义）
-
-## PostToolUse
-
-### 单元测试
-- 触发：Edit/Write *Test.java
-- 行为：运行对应测试类 `mvn test -Dtest=ClassName`
-- 目的：确保测试通过，避免回归
-
-### 依赖检查
-- 触发：Edit pom.xml / build.gradle
-- 行为：运行 `mvn dependency:tree` 或 `gradle dependencies`
-- 目的：检查依赖冲突和版本问题
-
-## Stop
-
-### 代码质量
-- 触发：每次响应结束
-- 行为：运行 Checkstyle / SpotBugs / PMD
-- 目的：检查代码规范、潜在 bug、复杂度
-
-### 测试覆盖率
-- 触发：修改 Service 层代码后
-- 行为：运行 JaCoCo 生成覆盖率报告
-- 目的：确保覆盖率 ≥ 80%
+仅因新修改、失败或未解决风险重跑检查；不能执行时明确结果未知。

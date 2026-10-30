@@ -1,23 +1,16 @@
 # core/ENTRY.md - governance doc index
 
-> This file is itself the 8th governance doc. The table below names the other
-> seven. `scripts/structure-audit.ts` asserts that all eight exist; updating the
-> list and the file together is the only safe way to change either.
+The eight governance documents remain available; load only what the current task needs.
 
 | Doc | Read when |
 |-----|-----------|
-| `intent-routing.md` | Task start: decide what to load |
-| `karpathy-guidelines.md` | Coding: thinking rules |
-| `NEVER.md` | **Mandatory**: forbidden list |
-| `principles.md` | Design: design principles |
-| `routing.md` | Route table details |
-| `runbooks.md` | Trigger words map to actions |
-| `tags-index.md` | Tag system |
+| `ENTRY.md` | This index; usually already included by the native entry |
+| `intent-routing.md` | Choose task-specific context |
+| `karpathy-guidelines.md` | Coding decisions |
+| `NEVER.md` | Mandatory boundaries; once per session |
+| `principles.md` | Design tradeoffs |
+| `routing.md` | Route/runtime details |
+| `runbooks.md` | Install, bootstrap or repository maintenance |
+| `tags-index.md` | Maintaining tagged documents |
 
-## Loading strategy
-
-Do not read all 8 every session. Read by intent:
-- Coding task: `NEVER.md` + `karpathy-guidelines.md` + `routing.md`
-- Design task: `principles.md` + `routing.md`
-- Bug fix: `NEVER.md` + `runbooks.md`
-- New project: all 8 once
+Read once per session unless the source changes. Do not preload the whole index, all skills or historical plans.

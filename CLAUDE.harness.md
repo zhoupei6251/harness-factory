@@ -3,106 +3,43 @@
 # CLAUDE.harness.md — harness-factory 可分发 harness 规则
 
 > 本文件由 `harness-factory/scripts/install-into-project.ts` 在 other 模式下被目标项目 `@harness-factory/CLAUDE.harness.md` 引用。  
-> 自包含：包含阶段门禁、Tier 1 分级流水线、证据段模板、加载规则。  
-> 设计稿：[2026-10-10-tier1-pipeline-design.md](docs/superpowers/specs/2026-10-10-tier1-pipeline-design.md)
+> 代码任务按风险加载规则、取证、实现和验证。
 
-## §1 阶段门禁（强制基线）
+## §1 默认执行
 
-| 阶段 | 必做 | 暂停时机 |
+仅处理代码任务。用户要求实现、修复、优化时，直接完成取证 → 最小改动 → 相关验证；同一授权范围内不再索取 spec/plan 批准。用户只要求方案时才停在方案。
+
+- 普通任务：简短说明目标，主 Agent 直接处理，无强制文档、worktree 或子 Agent。
+- 复杂任务：一份简短计划包含范围、证据和通过标准；按依赖分步实施，需要时安排独立审查。
+- 只有缺失决定实质影响行为/范围，或操作尚未获授权时才询问。提交和 push 遵守项目及用户授权。
+
+## §2 按风险分级
+
+| 级别 | 判定 | 交付 |
 |---|---|---|
-| 设计 / spec | Load `brainstorming` skill → 写 spec 产物 | 写完暂停，等用户「开始计划 / 开始实现」 |
-| 计划 | Load `writing-plans` skill → 写 plan 产物 | 写完暂停，等用户「开始实现」 |
-| 实现 | 已批准 plan 后才动业务代码；**Tier 1 走主 Agent 直做**（见 §2）；Tier 2+ 走 `claude-orchestration` + worktree 派发 | 末次实现完成 ≠ 批次完成 |
-| 验证 / 尾盘 | Load `verification-before-completion` → 写 `verifications/*-verification-lite.md`（Tier 1）或 `*-collective-test.md`（Tier 2+） | 证据未落盘禁止声称「完成」 |
-| Git | Load `git-xywh` skill；子 Agent 默认不 commit / push | 由 Leader 统一处理 |
+| Tier 0 | 文案、配置微调、局部且易回退 | 直接修改，针对性检查，回复中说明 |
+| Tier 1 | 常规功能、修复、局部重构 | 目标代码及调用者取证，最小实现，相关测试与 diff 检查 |
+| Tier 2+ | 公共契约、数据迁移、安全边界、多模块联动 | 一份计划/证据记录，关键路径验证，独立审查和必要回退说明 |
 
-**自主性约束**：
-- 「自主性」仅适用于**实现阶段**，且须满足 plan/spec 已批准 + 用户原话授权
-- 写完 spec / plan / decision 后**必须暂停**；「写方案」「写计划」不属于实现阶段
-- Tier 1 走主 Agent 直做时仍须写**证据段**（见 §3）+ verification-lite
+文件数/行数用于估计范围，不自动触发重型流水线。独立工作可并行；不为满足流程制造任务、分支或重复产物。
 
-## §2 Tier 1 分级流水线（标准改动）
+## §3 证据与最小实现
 
-**触发条件**（任一不满足则走 Tier 2+）：
-- 改动 ≤ 200 行
-- 改动 ≤ 3 个文件
-- 不碰公共 API、不改数据库 schema、不改构建脚本
-- 不涉及多模块联动、不引入新依赖
+首次代码任务读取已安装 `codebase-memory`、`ponytail` skill；后者默认 `full`。
 
-**流程**（与 Tier 2+ 的区别）：
+1. `list_projects` 确认精确项目；已有索引不重复全量索引。
+2. 用 `search_graph` 定位，按变更风险 `trace_path` 查相关调用，用 `get_code_snippet` 读源，并核对引用路径的覆盖情况。
+3. 图谱过期/缺覆盖时读当前源码补证；工具失败时说明实际原因，改用源码读取与定向搜索：
+   `[codebase-memory-mcp 不可用，已降级] 原因：<实际错误>；替代手段：<源码读取与调用追踪>`。
+4. 生成前执行：不写 → 复用 → 标准库 → 平台原生 → 已有依赖 → 一行 → 最小实现。保留边界校验、错误处理与可访问性。
 
-| 阶段 | Tier 2+ 流程 | Tier 1 流程 |
-|---|---|---|
-| 文档 | spec + plan + 验证分散 3 份 | **1 份合并文档**（spec + plan + 验证断言合一，见 §3 证据段模板） |
-| 暂停 | spec 后 + plan 后**两次** | **合并文档后 1 次**：「确认开始实现？」 |
-| 实现 | Leader 派发 WU 到子 Agent（worktree） | **主 Agent 直做**（不开 worktree，不派子 Agent） |
-| 验证 | collective-test + code-review | 内联断言 + verification-lite |
+复用本会话仍有效的证据；不要每次任务全库审计或预加载无关图谱。
 
-**完成判据**：
-1. 合并文档已写（含证据段）
-2. 用户确认「开始实现」
-3. 主 Agent 改完 + 跑通内联断言
-4. 写 `verifications/*-verification-lite.md`，证据闭环
-5. **可以 commit**（不自动 push，push 由用户决定）
+## §4 按需加载
 
-**升档判据**（Tier 1 干到一半发现需要升档）：写到合并文档阶段如发现触发条件不再满足（> 200 行、跨模块、碰 schema），立刻停止并告知用户升 Tier 2。已写文档可作为 Tier 2 的 spec 输入。
+本文件是下游项目的简短执行入口。先读 `harness-factory/core/NEVER.md`；按任务需要再查 `harness-factory/core/intent-routing.md`、相关语言规则和 skill。无需遍历治理目录或重复读已在上下文中的入口。
 
-## §3 证据段模板（合并文档必填）
-
-合并文档的「证据」段**不能为空**。Agent 改代码前必须从知识图谱拿证据。
-
-**模板**：
-
-```markdown
-## 证据（Evidence）
-
-### 改动触及的代码（from search_graph）
-
-| 符号 | qualified_name | 现有行数 | 角色 |
-|---|---|---|---|
-| <Name> | `com.example.X` | 123 | 直接改 |
-| <Name2> | `com.example.Y` | 45 | 调用者 |
-
-> 至少 1 行；行数 ≥ 50 的函数应同时列出其测试覆盖情况。
-
-### 影响面（from trace_path）
-
-- **inbound callers**（谁调我）：
-  - `com.example.A.method1`（line 30，调用 `X.process()`）
-  - `com.example.B.method2`（line 88，调用 `X.validate()`）
-- **outbound callees**（我调谁）：
-  - `com.example.Z.fetch()`（line 67）
-- **跨服务 / 异步链路**（如有）：—
-
-### 验证断言（改完逐条核）
-
-- [ ] `<行号>` 处的旧实现替换为新实现，类型签名不变
-- [ ] 新增分支有对应单元测试（或解释为何不需）
-- [ ] 受影响的 callers 行为不变（或解释兼容方案）
-- [ ] `mvn compile` / 等价构建命令成功（**仅列出命令，不自动跑**）
-- [ ] 影响面内的关键路径走查通过
-
-### 不可验证的盲点（如有）
-
-- 列出本次改动未触及但理论上可能受影响的路径，**主动声明盲点比假装全绿更值得信任**。
-```
-
-**取证据的硬性要求**（R1 / R2 / R8 对应）：
-- 改动前**必须**调 `search_graph` / `trace_path` 拿图谱证据；不许凭印象
-- 工具未装/未接通 → 声明降级：`[codebase-memory-mcp 不可用，已降级] 原因：<...>；替代手段：<Read / Grep 手工取证>`
-- **不可**在没有证据的情况下声称完成（违反 NEVER.md 禁止项）
-
-## §4 加载规则（其他项目用本文件时按此加载）
-
-| 路径 | 用途 |
-|---|---|
-| [`ENTRY.md`](../ENTRY.md) | harness 唯一入口（治理文档、阶段门禁总纲） |
-| [`core/routing.md`](../core/routing.md) | 路由表（task → route → skill 加载） |
-| [`core/intent-routing.md`](../core/intent-routing.md) | 意图路由（任务判定 + 加载规则） |
-| [`core/NEVER.md`](../core/NEVER.md) | 禁止项（每条必读） |
-| [`core/runbooks.md`](../core/runbooks.md) | 触发词 → 动作映射（Git、路由、工具） |
-| [`core/principles.md`](../core/principles.md) | 设计原则（minimal change 等） |
-| [`templates/README.md`](../templates/README.md) | 跨项目注入 harness 的方法（install-into-project.ts） |
+项目根 `MEMORY.md` 是项目状态；`routes/code/MEMORY.md` 仅为初始化模板。前端页面按需查 `harness-factory/references/frontend-design.md`，从三个上游来源选当前需要的部分。
 
 **加载顺序**（Claude Code 会话开始时）：
 1. `~/.claude/CLAUDE.md`（用户全局记忆）
@@ -115,16 +52,12 @@
 - Trae / WorkBuddy: 同 Codex，由模型读 prompt 内指令
 - Gemini: 项目根 `GEMINI.md` 的条件读 `harness-factory/GEMINI.harness.md`（若存在）
 
-## §5 Tier 0（小改动）速通
+## §5 验证
 
-≤ 50 行、单文件、不引入依赖、不改公共 API、不改 schema：直接处理，**无需合并文档**。首句声明 `「Harness：小改动，直接处理」` 即可，验证内联在回复里。
+完成一批相关编辑后运行能检出本次故障的检查；新增非平凡逻辑留测试或可执行自检。涉及共享契约/安装/生成器时运行对应集成检查。无关全量构建、逐文件 lint/typecheck、无变化重跑测试不作为默认步骤。
+
+遵守目标项目的验证限制；例如禁止自动 Maven 时只列命令并说明未运行。工具或检查失败要处理或明确报告，不得声称通过。
 
 ## §6 完成判据
 
-| 任务 Tier | 完成判据 |
-|---|---|
-| **Tier 0**（小改动） | 改动符合判定 + 口头说明改动范围 |
-| **Tier 1**（标准改动） | 合并文档 + 用户确认 + 主 Agent 改完 + 验证断言逐条核 + `verifications/*-verification-lite.md` 落盘 |
-| **Tier 2+**（多 task / GROUP） | collective-test + code-review 落盘 |
-
-**写完 ≠ 完成**。必须按上表落盘后再向用户声称完成。
+通过标准已核对，必要调用者/配置/测试已同步，相关验证有真实结果，diff 已检查。普通任务在回复中给证据和验证即可；复杂任务保存一份必要记录。说明未验证项和实质风险，不以文档数量代表质量。

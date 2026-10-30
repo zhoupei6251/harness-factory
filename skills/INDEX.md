@@ -1,42 +1,27 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 48 active + 52 archived = 100 skills
+Total: 30 active + 15 archived = 45 skills
 
-## Active (48)
+## Active (30)
 
 | Skill | Description |
 |-------|-------------|
 | add-platform | Add a new platform adapter to harness-factory. Walks through platforms/<plat>/rules/ENTRY.md creatio |
-| add-route | Add a new route (vertical domain) to harness-factory. Walks through routes/<route>/MEMORY.md creatio |
 | add-skill | Add a new skill to harness-factory. Walks through SKILL.md + _meta.json creation, schema validation, |
 | agent-browser | Browser automation for AI agents via inference.sh. Navigate web pages, |
 | analyze-architecture | 深入分析项目架构，回答架构相关问题。触发：询问设计原因、技术选型、模块职责、架构决策。 |
 | analyze-impact | 评估代码变更的影响范围。触发：重构前、修改核心方法、批量修改前。 |
 | architecture-patterns | ## WHAT |
-| brainstorming | You MUST use this before any creative work - creating features, building |
-| cn-video-script-writer | 短视频脚本生成专家，面向抖音、B站、YouTube、小红书、视频号内容创作者，快速生成爆款脚本和文案。触发场景：用户提到"写脚本"、"短视频脚本"、"抖音文案"、"B站脚本"、"视频选题"、"直播话术 |
+| brainstorming | Clarify ambiguous coding requirements and compare meaningful design choices before a substantial cha |
 | code-review | Systematic code review patterns covering security, performance, maintainability, |
-| douyin-copy-extract | 粘贴抖音、快手、小红书、视频号公开可访问的短视频分享链接，一键提取标题、简介、口播文案，提供原版、优化朗读版、精简浓缩版，并支持违禁敏感词提醒与口播时长参考，排版整洁纯净，一键复制即用。 |
-| douyin-pro | 抖音短视频双路径生产体系（单 Skill 版）。Path A[付费·高质量]：策略大脑→（可选：素材混剪/AI高光提取）→脚本优化→AI生图/素材准备→配音渲染（百炼/GPT-SoVITS/CosyV |
-| douyin-upload | 当 agent 需要通过已安装的 `sau` CLI 完成抖音登录、cookie 校验、视频上传或图文发布时使用这个 skill。该 skill 适用于已经安装 `social-auto-upload |
-| fact-check | 事实核查：多源交叉验证稿件里的每个数字/引语/时间点，产出带"存疑项处置"与"时效性风险"的核查单。news-workflow 的硬门禁——不通过就不许进渲染。route=news 且稿件进 rend |
 | find-skills | Helps users discover and install agent skills when they ask questions |
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |
 | get-callers | 获取调用指定符号的所有代码。触发：想知道谁在调用某个方法、分析依赖、评估影响。 |
 | git-xywh | 组织级 Git 工作流：三主干（main / test / develop）、五类临时分支、多环境隔离、Angular 提交与 MR 流程；涵盖合并、变基、冲突、恢复。任务涉及分支、提测、热修、版本标 |
-| harness-health | 运行仓库现有门禁并汇总健康状态 — 不另建一套检测，不维护第二份判据 |
-| hot-topic-content-maker | 把一个热点，变成今天就能发出去的内容。热点、事件、节日节点由你带来，也可以让它去读抖音热榜、TikTok 与 X 的热搜榜与趋势，或者你报一个话题，让它去搜小红书和抖音上正在发的相关内容，把值得接的话 |
-| humanizer | Remove signs of AI-generated writing from text. Use when editing or reviewing |
-| humanizer-zh | 中文 AI 文风清洗，消除 AI 生成特征，去套路化，句式重构，人物声音分化 |
+| harness-health | 显式检查 Harness 健康状态，复用 package.json 门禁，避免重复运行和无关诊断。 |
 | index-project | 为项目建立代码索引。触发：大型项目、需要精准定位符号、快速查找调用关系。 |
 | lsp-query | 通过 Language Server Protocol（typescript-language-server / pyright / gopls 等）做结构化代码查询：定义、引用、悬停信息、符号、代码 |
-| media-short-video-copy | 短视频文案工作流入口（skillset 路由器）：可选竞品文案提取，按任务只路由到三个脚本生成器之一（口吻定制 / 快速口播 / 多平台模板），可选爆款标题生成。当用户要写短视频脚本、口播稿、多平台脚 |
-| news-collect | 零成本热点采集：百度热搜 board API + feedx 中文媒体 RSS，一条命令把"今天什么在热"落成选题线索 JSON，喂给 news-workflow 步骤 0。stdlib-only，无 |
-| news-curate | 选题策展层：按台账去重已发/在途事件（零成本，不重复生成），只用免费信号给线索排序，产出带理由的今日候选清单。route=news 且采集跑完、选稿之前使用。产出是候选，不是已核实事实。 |
-| news-generator | 新闻写作技能包：根据热点/素材生成新闻稿件 |
-| news-polish | 新闻稿件润色技能：去AI味、提升可读性、专业化表达 |
-| news-workflow | 新闻域总工作流入口（v2 单轨）：选题 → 模板决策 → 脚本 → 事实核查 → 成片 → 发布。所有 path = Path B（免费·零云费）。route=news 且任务跨多阶段时使用。 |
 | planning-with-files | Implements Manus-style file-based planning to organize and track progress |
 | playwright | Browser automation via Playwright MCP. Navigate websites, click elements, |
 | project-planner | Triage ideas, problems, and feature requests into the right format |
@@ -44,19 +29,16 @@ Total: 48 active + 52 archived = 100 skills
 | query-symbol | 快速定位代码符号（类/函数/变量）。触发：需要找某个符号、不知道在哪里、查询定义。 |
 | receiving-code-review | 根据独立审查者的反馈修改代码。 |
 | refactor-safely | Plans and executes safe refactors with small steps, tests, and rollback |
-| requesting-code-review | Use when completing tasks, implementing major features, or before merging |
+| requesting-code-review | Request an independent review of substantial or high-risk code changes, or when the user asks for re |
 | ripgrep-search | 使用 ripgrep（rg）做高速文本搜索，定位引用、字符串、关键字。触发：grep、find、搜索文本、定位字符串、查找引用、查找 TODO/FIXME、查找实现、查找日志、搜索代码。 |
 | self-improving | Self-reflection + Self-criticism + Self-learning + Self-organizing memory. |
-| short-video-script-creator | 短视频核心脚本创作，通过专属参数清晰区分产品信息、口吻对标、内容对标及历史文案，批量生成高质量脚本，原生支持PDF/Word。 |
 | simplify | Refactor code for clarity, consistency, and maintainability without changing |
 | skill-vetter | Security-first skill vetting for AI agents. Use before installing any |
-| two-stage-review | 两阶段审查：先验证 Spec 合规，再检查代码质量。code 域实现完成后使用。 |
+| two-stage-review | 对复杂或高风险代码变更，从需求合规和代码质量两个维度进行一次独立审查。 |
 | understand-project | 理解项目结构和架构，生成知识图谱。触发：接手新项目、需要了解项目全局、询问架构设计。 |
-| viral-script-writer | 爆款口播视频脚本创作专家。基于50,000+高播放量视频分析总结的方法论，为用户创作符合"黄金3秒"原则的口播脚本。支持抖音、TikTok、YouTube、B站、X.com等多平台适配。当用户需要写口 |
-| viral-title-generator | 根据文章主题、关键词或内容摘要，一键生成多个平台的高点击率爆款标题，内置「数字+痛点+悬念」等爆款公式，输出10个标题并标注预估点击率。当用户提到爆款标题、标题生成、起标题、取标题、取个标题、帮我起个 |
-| writing-plans | Use when you have a spec or requirements for a multi-step task, before |
+| writing-plans | Create a concise implementation plan for complex coding work or when the user asks for a plan. Routi |
 
-## Archived (52)
+## Archived (15)
 
 > Not in active use. Restore via: `git mv skills/archive/<name> skills/<name>`
 
@@ -65,52 +47,15 @@ Total: 48 active + 52 archived = 100 skills
 | archive/agent-shield | 安全审计：扫描配置漏洞、注入风险、MCP 安全问题。保护 Harness Foundry 免受提示注入、权限过度、Hook 注入等攻击。 |
 | archive/auto-compact | 智能上下文压缩：在最佳时机触发压缩，保留关键状态，清理冗余上下文。 |
 | archive/backend-doc-generator | 生成标准后端技术文档，包含Mermaid流程图、时序图、类图、状态图。Invoke when user needs to create backend |
-| archive/ceo-orchestration | CEO 角色主 Skill — 跨域协调入口，调用子 Skill 完成各项职责 |
 | archive/code-insight-stack | 编排 codebase-memory + ripgrep + LSP 三层查询栈，按场景选择最便宜的工具组合。触发：探索陌生代码库、定位修改点、调查 bug、准备 refactor、计划实现、跨文件影 |
 | archive/cursor-orchestration | Cursor 多 subagent 并行编排，等价于 omx ultrawork。在用户已批准 plan 并说「开始实现」后，通过 harness-coder（代码）、harness-implemen |
 | archive/document-review | Systematic document review with type-specific rules. **Environment preparation** |
-| archive/fanqie | 用途与边界 |
-| archive/fanqie-novel-auto-publish | 番茄小说创作发布一条龙技能，整合 AI 创作与番茄发布，支持全自动批量上传、断点续传、错误重试、发布报告生成 |
 | archive/frontend-design | Create distinctive, production-grade frontend interfaces with high design |
-| archive/inkos | Autonomous novel writing CLI agent with web workbench (InkOS Studio) |
-| archive/junli-ai-novel | 长篇网文核心写作引擎，支持章节续写、扩写、重写，维护人物状态和伏笔追踪 |
 | archive/karpathy-guidelines | 写代码、审查代码、重构代码时的行为准则：先想再写、保持简单、只改必要的，目标驱动。code 域默认基线，P0 优先级。 |
-| archive/memory-manager | 通用项目记忆管理引擎，三域（code/novel/news）共用架构，域隔离，状态机追踪，Agent 交接压缩协议 |
-| archive/novel-36-beats | 结构化节拍写作框架，基于 The Crucible Writing System 的 36-beat 三幕式结构，为长篇网文提供完整的情节骨架与节奏控制指南 |
-| archive/novel-ai-wash | 深度文风清洗引擎，四层清洗体系（词级→句式→叙事→人物声音），用于批量深度去AI味，与humanizer-zh互补 |
-| archive/novel-batch-write | 批量写作模式，当用户说"写到第N章"时触发，自动并行/串行写作 |
-| archive/novel-checkpoint | 创建、验证写作进度检查点，确保批量写作不丢失上下文 |
-| archive/novel-contexts | 小说上下文管理，维护角色设定、世界观、时间线的全局一致性 |
-| archive/novel-dashboard | 小说进度仪表板，显示当前书籍状态、章节进度、人物和伏笔状态 |
-| archive/novel-debug | 情节排查：角色矛盾/伏笔遗漏/节奏失控。发现问题后加载。 |
-| archive/novel-evaluator | 7维量化小说评分系统，基于情节/人物/文笔/世界观/情感/创新/钩子进行质量审查，联动63条陷阱检测，逐条引用原文举证 |
-| archive/novel-foreshadowing-dag | 伏笔有向无环图管理 — 借鉴 Openwrite 伏笔DAG系统，结构化管理和追踪所有伏笔的埋设、触发和回收 |
-| archive/novel-generator | 根据用户提供的内容方向自动生成提示词并创作爽文小说。适用场景：(1) 用户提供小说方向/题材/关键词，(2) 需要生成章节连贯的长篇爽文，(3) 需要维护角色、地点、情节的连续性 |
-| archive/novel-guardian | 法医式事实核查 Agent — 借鉴 Novel-OS Guardian，专门检查角色/时间线/世界观/情节的连续性 |
-| archive/novel-guidelines | 小说写作前思维基线：AI 陷阱 + 简洁原则。写章节/大纲/续写前必须加载。 |
-| archive/novel-improver | 双平台长篇改进skill。将长篇小说系统性地改良至番茄9.0+或起点精品标准。适用于：用户要求"改良小说"、"提升评分"、"去AI味"、"平台优化"、"让小说达到9.0+"等情况。覆盖多维度评审、结构 |
-| archive/novel-init | 新书创作向导，帮助用户从零开始创建小说项目 |
-| archive/novel-mechanical-scorer | 无LLM的确定性章节质量评分器 — 借鉴 autonovel (NousResearch) 机械评分器，在LLM审稿前做纯规则检查 |
-| archive/novel-metrics | 写作指标追踪，统计字数、速度、质量趋势 |
-| archive/novel-orchestrator | 小说创作总控调度器，协调 writer→planner→reviewer→humanizer→editor→memory-keeper 全链路，管理阶段门禁和返修闭环 |
-| archive/novel-protocol | 长篇网文写作协议——渐进式披露入口 + 因果链一致性强制。解决长篇小说两大痛点：(1) 全量加载 416KB novel 规则导致 token 浪费与注意力稀释；(2) 跨章世界观漂移、能力凭空出现、 |
-| archive/novel-quick-write | 快速单章写作，无需完整编排流程。适用于"写第X章"类型的简单写作任务 |
-| archive/novel-receiving-review | 接收审稿反馈，正确处理修改建议，不是盲目接受或机械执行 |
-| archive/novel-recovery | 会话恢复，当用户重新打开会话时恢复小说写作进度 |
-| archive/novel-safe-revision | 安全返修：审稿后小步修改，验证不破坏其他章节。 |
-| archive/novel-simplify | 章节自查：AI 痕迹/冗余/套路化。写后审稿前必须自查。 |
-| archive/novel-voice-profile | 为小说角色建立可复用的声音档案（Voice Profile），借鉴 ECC brand-voice 的 Source-First 方法论 |
-| archive/novel-writer-cn | 创建小说创作框架，包括人物设定、人物关系、剧情发展和多版本结局。Use when users ask to write novels, create story plots, design chara |
-| archive/piqie-writing | 番茄爆款写作技能（融合版）— 500章+350章两次长篇实战教训。快节奏爆款专项：3章一爽、平台算法适配、新人破零路径。触发场景：写番茄小说、写网文爆款、快节奏章节。 |
 | archive/prompt-engineering-expert | Advanced expert in prompt engineering, custom instructions design, and |
-| archive/qidian-writing | 起点中文网写作技能 — 慢热品质专项：设定硬、人物真、每章信息增量。基于《黑龙醒》前100章实战 + 起点读者行为分析。触发场景：写起点小说、慢热品质文、群像展开。 |
 | archive/security-auditor | Use when reviewing code for security vulnerabilities, implementing authentication |
-| archive/short-video-script | 短视频脚本创作技能。用于生成抖音、快手、B站、视频号等平台的短视频脚本、标题、封面建议。适用于自媒体运营、内容创作需求。 |
 | archive/summarize | Summarize URLs or files with the summarize CLI (web, PDFs, images, audio, |
 | archive/superdesign | Expert frontend design guidelines for creating beautiful, modern UIs. |
 | archive/ui-ux-pro-max | UI/UX design intelligence and implementation guidance for building polished |
 | archive/web-design-guidelines | 网页设计规范和最佳实践指南 |
-| archive/web-novel-publishing-readiness-and-quality-check-skill | 小说质量检查技能。触发关键词：检查正文、质量报告、违禁词、套路句、章节衔接、逻辑漏洞、自检、人写感、大纲、人设。执行最大算力深度推理五步链，每章必须跑freq_check.py词频扫描+逐行违禁词扫描 |
 | archive/web-tools-guide | Web 工具使用指南：搜索、网页抓取、浏览器自动化。触发：查资料、上网、搜索、打开网站。 |
-| archive/writing-novel | 长篇小说写作skill。从500+章实战中提炼的全流程方法论。覆盖大纲设计、逐章写作、质量控制、平台优化、AI味消除。适用于番茄小说等网文平台。触发场景：写小说、写网文、写章节、设计大纲、做人物设定。 |
-| archive/zhi-dou-writing | 智斗小说专属写作技能。融合《第九特区》《犯上者》《诡秘之主》《赘婿》等顶级智斗作品的创作精华，专注于写出有真人感、高智商博弈、强情绪节奏的智斗/权谋小说。触发场景：写智斗小说、写权谋文、写高智商对抗、 |

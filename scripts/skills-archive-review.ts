@@ -101,7 +101,7 @@ const platformDirs = await listDirs("platforms");
 //     including it would make every skill read as "1 reference from
 //     INDEX.md" and obscure real reachability.
 //   - node_modules, dist, runtime dirs: not source-of-truth.
-const skipRelDirs = ["skills/archive/", "node_modules/", "dist/", ".harness-news-runtime/", ".harness-novel-runtime/", ".ai-runtime-artifacts/", ".workbuddy/"];
+const skipRelDirs = ["skills/archive/", "node_modules/", "dist/", ".ai-runtime-artifacts/", ".workbuddy/"];
 
 function isExcluded(rel: string): boolean {
   if (rel === "skills/INDEX.md") return true;

@@ -12,7 +12,7 @@
  *      runbooks / tags-index + ENTRY.md itself, which the index table leaves
  *      implicit).
  *   2. platforms/ has exactly 5 adapters, each with platforms/<p>/rules/ENTRY.md.
- *   3. routes/ has exactly 3 routes, each with routes/<r>/MEMORY.md.
+ *   3. routes/ has only code, with routes/code/MEMORY.md.
  *   4. capabilities/rules/ has the 3 verticals java / typescript / common,
  *      each with hooks.md / patterns.md / security.md / testing.md.
  *   5. templates/ carries the 4 files install-into-project.ts + bootstrap.ts
@@ -35,11 +35,6 @@
  *        - bootstrap-owned paths tracked under a runtime dir (already
  *          covered by validate-schemas.ts; we re-check it so structure-audit
  *          catches it when run before validate).
- *  11. Dependency direction at the skills/routes boundary: the render engine
- *      (skills/douyin-pro/scripts) must not import product code
- *      (routes/news/scripts). Product scripts may import the engine — that is
- *      the supported direction. path_b_selftest.py is exempt: it is the shared
- *      test harness and loads both sides on purpose.
  *
  * Exit 0 = clean. Exit 1 = at least one assertion failed. The script does not
  * repair anything — it reports, the human (or another script) decides.
@@ -140,7 +135,7 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
 
 // ---------- 3. routes/ ----------
 {
-  const expectedRoutes = ["code", "news", "novel"];
+  const expectedRoutes = ["code"];
   const actual = await listDirs("routes");
   const missing = expectedRoutes.filter((r) => !actual.includes(r));
   const extra = actual.filter((r) => !expectedRoutes.includes(r));
@@ -152,7 +147,7 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
         allHaveMemory = false;
       }
     }
-    if (allHaveMemory) ok(`routes/ has exactly 3 routes, each with MEMORY.md`);
+    if (allHaveMemory) ok(`routes/ has only code, with MEMORY.md`);
   } else {
     if (missing.length) bad(`routes/ missing route(s): ${missing.join(", ")}`);
     if (extra.length) bad(`routes/ has extra route dir(s): ${extra.join(", ")}`);
@@ -342,7 +337,7 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
 
   // runtime dir entries tracked (covered by validate-schemas.ts, but we re-check so
   // structure-audit is independent of validate's run order).
-  const RUNTIME_DIRS = [".harness-news-runtime", ".harness-novel-runtime", ".ai-runtime-artifacts"];
+  const RUNTIME_DIRS = [".ai-runtime-artifacts"];
   let tracked: string[] = [];
   try {
     tracked = execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf-8" })
@@ -356,27 +351,6 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
     ok(`no tracked files under runtime dirs (${RUNTIME_DIRS.join(", ")})`);
   } else {
     for (const p of runtimeOffenders) bad(`runtime content must not be tracked: ${p}`);
-  }
-}
-
-// ---------- 11. skills/routes dependency direction ----------
-{
-  const engineFiles = await listFiles("skills/douyin-pro/scripts", ".py");
-  const offenders: string[] = [];
-  for (const name of engineFiles) {
-    if (name === "path_b_selftest.py") continue;
-    const text = await readFile(resolve(ROOT, "skills/douyin-pro/scripts", name), "utf-8");
-    // Import plumbing only. Prose/error messages may legitimately name product files.
-    const importsProduct = /(?:from|import)\s+[^\n]*routes[\\/]news[\\/]scripts/.test(text)
-      || text.split(/\r?\n/).some((line) => /sys\.path/.test(line) && /routes[\\/]news[\\/]scripts/.test(line));
-    if (importsProduct) offenders.push(name);
-  }
-  if (offenders.length === 0) {
-    ok(`douyin-pro engine (${engineFiles.length - 1} non-selftest scripts) does not import routes/news code`);
-  } else {
-    for (const f of offenders) {
-      bad(`skills/douyin-pro/scripts/${f} imports routes/news/scripts — dependency must point product → engine`);
-    }
   }
 }
 

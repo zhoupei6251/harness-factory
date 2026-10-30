@@ -1,73 +1,68 @@
 ---
 name: harness-factory
-description: "Harness Factory unified entry: behavior rules for all 5 platforms."
+description: "Code-only Harness rules for Claude / Codex / Trae / WorkBuddy / Qoder."
 tags: [Rules, Runbook]
 ---
 
 # ENTRY.md - Harness Factory unified entry
 
-> One file, all platforms. Claude / Codex / Trae / WorkBuddy / Qoder share this as the single source of truth.
+Code is the only route. Keep the default path short: understand, implement, verify.
 
-## Load priority
+## Load once, then work
 
-1. **This file** - behavior rules (all platforms mandatory)
-2. `core/ENTRY.md` - 7 governance doc index
-3. `core/intent-routing.md` - intent routing
-4. `core/NEVER.md` - forbidden list (mandatory)
+- Native entries already contain this file, the core index and platform deltas; do not re-read their source copies.
+- Read `core/NEVER.md`, then use `core/intent-routing.md` for task-specific loading. Read each document/skill once per session unless it changes.
+- Root `MEMORY.md` is project state. `routes/code/MEMORY.md` is an initialization template, not another state source.
+- Load common rules and only the current language/task rules; hook/setup guides are for configuring hooks, not every edit.
+- For frontend layout and styling, consult [references/frontend-design.md](references/frontend-design.md) on demand.
 
 ## Behavior rules (R1-R8)
 
 | # | Rule | One-liner |
 |---|------|-----------|
-| R1 | Read before write | Never modify code you have not read |
-| R2 | Keep it simple | If 200 lines can be 50, rewrite |
-| R3 | Surgical edits | Touch only what needs touching |
-| R4 | Goal-driven | Define pass criteria before coding |
-| R5 | Tool first | Use tools, do not shell-around |
-| R6 | No silent failures | Raise errors, do not swallow |
-| R7 | Surface conflicts | State contradictions immediately |
-| R8 | No over-engineering | Abstract only on the second occurrence |
+| R1 | Read before write | Read the code and relevant callers before editing |
+| R2 | Keep it simple | Use the smallest complete solution |
+| R3 | Surgical edits | Touch only the requested scope |
+| R4 | Goal-driven | Define observable pass criteria |
+| R5 | Tool first | Use purpose-built tools when available |
+| R6 | No silent failures | Preserve validation and useful errors |
+| R7 | Surface conflicts | Resolve material contradictions explicitly |
+| R8 | No over-engineering | Reuse before adding abstraction |
 
-## Routes
+## Execution
 
-| Route | Load | Project to |
-|-------|------|-----------|
-| `code` | `routes/code/MEMORY.md` + `capabilities/rules/` | `./MEMORY.md` |
-| `novel` **(archived)** | `routes/novel/MEMORY.md` — 归档件，不再自动装载 | `./MEMORY.md` 仅显式 `--route novel` |
-| `news` **(archived)** | `routes/news/MEMORY.md` + `capabilities/rules/` — 归档件，不再自动装载 | `./MEMORY.md` 仅显式 `--route news` |
+- A request to implement, fix or optimize authorizes work through relevant verification. Do not require a separate spec/plan approval for the same scope.
+- Routine changes: brief intent, targeted evidence, direct implementation and relevant checks. No mandatory plan file, worktree, subagent or verification document.
+- Complex or risky changes: keep one concise plan/evidence record, split independent work when useful, and request independent review for material risks.
+- Ask only when a missing decision changes scope/behavior or the next action needs authorization. A request for a plan alone does not authorize implementation.
+- Batch independent reads/checks. Run relevant tests after a coherent edit, not whole-project checks after every file. Repeat only after changes or failures that justify it.
 
-> **2026-10-22 退役中**：news 与 novel 两域整体迁往独立仓库 `D:\zhoupei\heron`（规格见其
-> `docs/plans/2026-10-22-heron-news-webapp-design.md`，本仓库的域内件另有快照 `heron/reference/from-harness-factory/`）。
-> 归档期内的口径：目录与脚本**此刻仍可运行**（它们还是 heron 的 oracle 与视觉尺子），但意图路由不再指向它们。
-> 分两步退：先摘路由（本次），摘目录与 schema/投影/package 脚本另起一次提交，等新闻域在 heron 侧
-> 用 `fixtures/` 对完账再做。详见 `core/intent-routing.md`。
+## Tooling (required — 代码域强制)
+
+Read installed `codebase-memory` and `ponytail` skills once on first coding work; ponytail defaults to `full`.
+
+| Tool | Required use |
+|------|--------------|
+| codebase-memory-mcp | `list_projects` once; choose the exact project, locate relevant symbols with `search_graph`, trace changed contracts/callers as needed and read source. Check cited-path coverage; re-index only when needed, not at every task. |
+| ponytail | Before generation: 不写 → 复用 → 标准库 → 平台原生 → 已有依赖 → 一行 → 最小实现. Keep boundary validation, error handling and accessibility. |
+
+When graph tools are unavailable, use source reads and targeted searches and state:
+`[codebase-memory-mcp 不可用，已降级] 原因：<实际错误>；替代手段：<源码读取与调用追踪>`。
+Stale/missing graph coverage requires checking current source, not pretending the graph is complete. Setup details: [references/tooling.md](references/tooling.md).
 
 ## Platform mapping
 
 | Platform | Config root | Source |
 |----------|------------|--------|
 | Claude Code | `~/.claude/` | `platforms/claude/` |
-| Codex | `./AGENTS.md` + `~/.codex/` | `platforms/codex/` |
+| Codex | `AGENTS.md` + `~/.codex/` | `platforms/codex/` |
 | Trae | `~/.trae/` | `platforms/trae/` |
 | WorkBuddy | `~/.codebuddy/` | `platforms/workbuddy/` |
-| Qoder | `./AGENTS.md` + `~/.qoder/` + `~/.qoder-cn/` | `platforms/qoder/` |
-
-## Tooling (required — 代码域强制)
-
-> 两工具是代码域开发的**执行方式**，不是可选附件。
-> 适用范围：改 TS / 脚本 / 测试 / 配置 / 规则文件。豁免：纯文案产出（novel / news 稿件）。
-> 降级语义：工具未装或未接通时，改用等效手段（Read / Grep），并**在回复中声明降级原因**；禁止默默跳过或假装已用。
-
-| Tool | 绑定规则 | 必须这样做 | Install |
-|------|---------|-----------|---------|
-| codebase-memory-mcp | R1 | 改代码前用 `analyze-impact` / `get-callers` / `query-symbol` 拿图谱证据 | 根 `.mcp.json` 或 `references/tooling.md` |
-| ponytail | R2 / R8 | 生成前走七级决策阶梯（不写→复用→库→原生→依赖→一行→最小实现） | `references/tooling.md` |
+| Qoder | `AGENTS.md` + `~/.qoder/` + `~/.qoder-cn/` | `platforms/qoder/` |
 
 ## Workflow (this repository only)
 
-> **This section describes how `harness-factory` itself is developed. It is NOT a rule for downstream projects** — they should follow `git-xywh` and the per-platform branching guidelines they receive via bootstrap.
-
-- **Main-only Git workflow.** Since 2026-09-29 the harness-factory repo commits directly to `main`; no `task/*` / `feature/*` branches, no worktrees held open between sessions. Rationale: this repo is a *rule distribution* artifact, not a product codebase — every commit is a self-contained, easily-revertable ruleset change; merge conflicts are rare because most edits are in different subtrees. `git-xywh`'s three-trunk / five-branch model is **not relaxed for downstream projects**.
-- **`push` requires explicit ask.** Even on `main`, `git push` is the user's call — don't push after commit unless the user said so.
-- **Backups never committed.** `*.bak-*.md` is git-ignored; `npx tsx scripts/install-into-project.ts --target <path>` is the supported way to roll back a target project's harness install.
-- **Hygiene gates before commit.** `git status` should show only files you intentionally touched; stray `*.bak-*` / `timing.json` / runtime dumps must be cleaned up. See `.gitignore` for the runtime pattern list.
+- Commit directly to `main`; do not create a worktree or feature branch for routine repository maintenance. Downstream projects retain their own Git policy.
+- Push only when explicitly requested. Never force-push shared branches.
+- Edit canonical files, then run `npm run bootstrap` to regenerate distributed entries. Bootstrap is local; run `npm run doctor` explicitly for environment diagnosis.
+- Before commit, review the diff, run relevant checks and check `git status`; do not commit backups or runtime dumps.

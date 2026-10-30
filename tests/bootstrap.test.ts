@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { cp, mkdtemp, readFile, readdir, realpath, rm, stat } from "node:fs/promises";
+import { cp, mkdtemp, readFile, readdir, realpath, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { join, resolve, dirname } from "node:path";
 import { tmpdir } from "node:os";
@@ -57,8 +57,6 @@ const ROOT_MUST_SURVIVE = [
   ".codebuddy",
   ".qoder",
   ".ai-runtime-artifacts",
-  ".harness-novel-runtime",
-  ".harness-news-runtime",
 ];
 
 /**
@@ -184,6 +182,45 @@ try {
       console.log(`[ok]   AGENTS.md merges the ${delta.toLowerCase()}`);
     } else {
       console.log(`[FAIL] AGENTS.md missing the ${delta} delta`);
+      fail = 1;
+    }
+  }
+
+  // A repeat run must preserve the project's own state, including its mtime.
+  const memoryPath = resolve(tempRoot, ROUTE_MEMORY);
+  const projectMemory = "# Project state\n\nKeep this decision across bootstrap runs.\n";
+  await writeFile(memoryPath, projectMemory, "utf-8");
+  const memoryBefore = await stat(memoryPath);
+  const repeat = spawnSync(process.execPath, [tsx, resolve(tempRoot, "scripts/bootstrap.ts"), "--platform", "codex"], {
+    cwd: tempRoot, encoding: "utf-8",
+  });
+  if (repeat.status === 0 && await readFile(memoryPath, "utf-8") === projectMemory
+    && (await stat(memoryPath)).mtimeMs === memoryBefore.mtimeMs) {
+    console.log("[ok]   repeat bootstrap preserves project MEMORY.md bytes and mtime");
+  } else {
+    console.log(`[FAIL] repeat bootstrap changed project state or failed: ${repeat.stderr}`);
+    fail = 1;
+  }
+  const agentsAfterRepeat = await readFile(resolve(tempRoot, "AGENTS.md"), "utf-8");
+  if (["Codex platform rules", "Qoder platform rules"].every((marker) => agentsAfterRepeat.includes(marker))) {
+    console.log("[ok]   --platform codex preserves both shared AGENTS.md deltas");
+  } else {
+    console.log("[FAIL] single-platform bootstrap lost a shared AGENTS.md delta");
+    fail = 1;
+  }
+
+  // Unsupported routes and incomplete/unknown flags must fail before any writes.
+  const generatedBefore = await Promise.all(GENERATED_FILES.map(async (path) => (await stat(resolve(tempRoot, path))).mtimeMs));
+  for (const args of [["--route", "news"], ["--route", "novel"], ["--route"], ["--platform"], ["--unknown"]]) {
+    const rejected = spawnSync(process.execPath, [tsx, resolve(tempRoot, "scripts/bootstrap.ts"), ...args], {
+      cwd: tempRoot, encoding: "utf-8",
+    });
+    const generatedAfter = await Promise.all(GENERATED_FILES.map(async (path) => (await stat(resolve(tempRoot, path))).mtimeMs));
+    if (rejected.status !== null && rejected.status !== 0 && /Unknown/.test(rejected.stderr)
+      && generatedAfter.every((mtime, i) => mtime === generatedBefore[i])) {
+      console.log(`[ok]   rejects ${args.join(" ")} without writing generated files`);
+    } else {
+      console.log(`[FAIL] invalid arguments accepted or wrote files: ${args.join(" ")}`);
       fail = 1;
     }
   }

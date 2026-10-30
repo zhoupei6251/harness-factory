@@ -1,7 +1,0 @@
-{
-  "name": "add-route",
-  "description": "Add a new route (vertical domain) to harness-factory. Walks through routes/<route>/MEMORY.md creation and bootstrap.ts registration.",
-  "tags": ["Runbook"],
- "triggers": ["add route", "new route", "new vertical"],
-  "version": "0.1.0"
-}

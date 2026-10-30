@@ -1,37 +1,8 @@
 # TypeScript Hooks
 
-## PreToolUse
+本文件是建议，不代表已配置宿主 hooks；配置与执行限制遵循项目和宿主。
 
-### 类型检查
-- 触发：Edit/Write *.ts *.tsx
-- 行为：运行 `tsc --noEmit`
-- 目的：确保类型正确
-
-### 代码格式化
-- 触发：Edit/Write *.ts *.tsx
-- 行为：运行 `prettier --write`
-- 目的：统一代码风格
-
-## PostToolUse
-
-### ESLint 检查
-- 触发：Edit/Write *.ts *.tsx
-- 行为：运行 `eslint --fix`
-- 目的：检查代码规范
-
-### 单元测试
-- 触发：Edit/Write *.test.ts *.spec.ts
-- 行为：运行 `vitest run`
-- 目的：确保测试通过
-
-## Stop
-
-### 构建检查
-- 触发：修改核心代码后
-- 行为：运行 `tsc` 或 `npm run build`
-- 目的：确保构建成功
-
-### 依赖检查
-- 触发：修改 package.json 后
-- 行为：运行 `npm audit`
-- 目的：扫描依赖漏洞
+- 一组 TypeScript 编辑完成后，使用 `package.json` 中已有的类型检查、lint 和受影响测试命令。不要每次 Edit/Write 都运行整仓 `tsc`、构建或测试。
+- 格式化与自动修复只针对本次修改的文件，沿用现有工具和配置；不为符合规则安装 Prettier、ESLint、Vitest 等依赖。
+- 构建配置、依赖或跨模块导出变化时，按影响增加构建或集成验证。依赖安全检查使用项目现有机制，不在每次响应结束时自动审计。
+- 已有 hooks 门禁照常执行；避免嵌套触发或与手工检查重复。无法运行时说明原因与未验证项。

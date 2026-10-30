@@ -1,7 +1,6 @@
 ---
 name: writing-plans
-description: Use when you have a spec or requirements for a multi-step task, before
-  touching code
+description: Create a concise implementation plan for complex coding work or when the user asks for a plan. Routine edits can proceed directly.
 version: 1.0.0
 when_to_use: 调用 writing-plans 时
 status: peripheral
@@ -11,114 +10,19 @@ tags:
 domain: shared
 category: shared.planning
 ---
+
 # Writing Plans
 
-## Overview
+计划帮助完成变更，不给每次编辑增加流程。小范围且目标明确的任务直接处理；跨模块、存在重要依赖或高风险的变更，以及用户明确要求计划时，使用本技能。
 
-Write comprehensive implementation plans assuming the engineer has zero context for our codebase and questionable taste. Document everything they need to know: which files to touch for each task, code, testing, docs they might need to check, how to test it. Give them the whole plan as bite-sized tasks. DRY. YAGNI. TDD. Frequent commits.
+先基于代码图谱和当前源码确认影响面，读取相关调用者、测试与配置。按 ponytail 阶梯优先删除、复用和最小实现；图谱不可用或覆盖不足时如实说明手工取证范围。
 
-Assume they are a skilled developer, but know almost nothing about our toolset or problem domain. Assume they don't know good test design very well.
+计划按项目目录约定保存；没有约定时使用 `docs/plans/YYYY-MM-DD-<topic>.md`。一份文档即可包含：
 
-**Announce at start:** "I'm using the writing-plans skill to create the implementation plan."
+- **目标与通过标准**：用户可观察的结果、必要约束和范围。
+- **证据与影响面**：相关符号、调用路径、文件，以及图谱覆盖或验证限制。
+- **实现步骤**：按依赖顺序列出要改的文件、行为和必要测试；只列影响实现的细节，不复制整个实现。
+- **验证**：优先现有相关检查，列出实际命令、预期结果和项目禁止执行的命令。
+- **风险**：兼容性、数据变化与确有必要的恢复方式。
 
-**Context:** This should be run in a dedicated worktree (created by brainstorming skill).
-
-**Save plans to:** `docs/plans/YYYY-MM-DD-<feature-name>.md`
-
-## Bite-Sized Task Granularity
-
-**Each step is one action (2-5 minutes):**
-- "Write the failing test" - step
-- "Run it to make sure it fails" - step
-- "Implement the minimal code to make the test pass" - step
-- "Run the tests and make sure they pass" - step
-- "Commit" - step
-
-## Plan Document Header
-
-**Every plan MUST start with this header:**
-
-```markdown
-# [Feature Name] Implementation Plan
-
-> **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
-
-**Goal:** [One sentence describing what this builds]
-
-**Architecture:** [2-3 sentences about approach]
-
-**Tech Stack:** [Key technologies/libraries]
-
----
-```
-
-## Task Structure
-
-```markdown
-### Task N: [Component Name]
-
-**Files:**
-- Create: `exact/path/to/file.py`
-- Modify: `exact/path/to/existing.py:123-145`
-- Test: `tests/exact/path/to/test.py`
-
-**Step 1: Write the failing test**
-
-```python
-def test_specific_behavior():
-    result = function(input)
-    assert result == expected
-```
-
-**Step 2: Run test to verify it fails**
-
-Run: `pytest tests/path/test.py::test_name -v`
-Expected: FAIL with "function not defined"
-
-**Step 3: Write minimal implementation**
-
-```python
-def function(input):
-    return expected
-```
-
-**Step 4: Run test to verify it passes**
-
-Run: `pytest tests/path/test.py::test_name -v`
-Expected: PASS
-
-**Step 5: Commit**
-
-```bash
-git add tests/path/test.py src/path/file.py
-git commit -m "feat: add specific feature"
-```
-```
-
-## Remember
-- Exact file paths always
-- Complete code in plan (not "add validation")
-- Exact commands with expected output
-- Reference relevant skills with @ syntax
-- DRY, YAGNI, TDD, frequent commits
-
-## Execution Handoff
-
-After saving the plan, offer execution choice:
-
-**"Plan complete and saved to `docs/plans/<filename>.md`. Two execution options:**
-
-**1. Subagent-Driven (this session)** - I dispatch fresh subagent per task, review between tasks, fast iteration
-
-**2. Parallel Session (separate)** - Open new session with executing-plans, batch execution with checkpoints
-
-**Which approach?"**
-
-**If Subagent-Driven chosen:**
-- **REQUIRED SUB-SKILL:** Use superpowers:subagent-driven-development
-- Stay in this session
-- Fresh subagent per task + code review
-
-**If Parallel Session chosen:**
-- Guide them to open new session in worktree
-- **REQUIRED SUB-SKILL:** New session uses superpowers:executing-plans
+用户已授权实现时，计划后直接继续，遇到新证据再更新步骤。用户只要求计划时，交付计划即可。worktree、并行 Agent、逐步提交与额外技能均按实际需要和项目约定选择，不作为默认前置条件。不要为每个步骤重复生成设计、计划和验证文档。

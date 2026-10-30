@@ -1,6 +1,6 @@
 # tooling.md — 代码域强制工具：ponytail + codebase-memory-mcp
 
-> 代码域开发（改 TS / 脚本 / 测试 / 配置 / 规则文件）**强制**使用以下两个工具；纯文案产出（novel / news 稿件）豁免。
+> 代码开发（改 TS / 脚本 / 测试 / 配置 / 规则文件）使用以下两个工具，按任务范围取证。
 > 两者均为**本地运行、免费开源**，无需任何 API Key，符合仓库安全条款（禁止真实密码 / Key / 私钥入库）。
 > 安装状态属于**每台机器一次性配置**，不随 `npm run bootstrap` 渲染。
 > 缺失或未接通时**声明降级**：改用等效手段（Read / Grep）并在回复中说明原因，禁止默默跳过。详见文末「降级语义」。
@@ -10,7 +10,7 @@
 | 工具 | 是什么 | 与本仓库的关系 | 上游 |
 |------|--------|----------------|------|
 | **codebase-memory-mcp** | 代码知识图谱 MCP 服务：tree-sitter（162 语言）+ Hybrid LSP，持久化 SQLite 图谱 | 10 个 active skills 依赖它（`query-symbol`、`get-callers`、`get-callees`、`analyze-impact`、`query-knowledge-graph`、`index-project`、`understand-project`、`analyze-architecture`、`lsp-query`、`ripgrep-search`）；为 R1「Read before write」提供改动前证据 | [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) |
-| **ponytail** | 「最懒资深工程师」生成前检查插件：7 级决策阶梯（不写 → 复用 → 配置 → 一行 → 最小实现 → 完整实现），官方数据约省 54% 代码量 | 与 `core/NEVER.md`、R2「Keep it simple」、R8「No over-engineering」互补：NEVER.md 是文档约束，ponytail 是生成前强制检查 | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT） |
+| **ponytail** | 生成前按不写 → 复用 → 标准库 → 平台原生能力 → 已有依赖 → 一行 → 最小实现选择 | 对应 R2 / R8；默认 `full`。安装 skill 不代表已启用插件或 lifecycle hooks | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT） |
 
 ---
 
@@ -80,7 +80,7 @@ curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/i
    ⚠️ 返回的 `name` 是**路径 slug**（如 `D-work-xinyue-aigc_platfrom_back-harness-factory`），
    不是目录名。凡需要 `project` 参数的工具（`index_status` / `search_graph` / `detect_changes` …）
    都传这个 slug；传目录名 `harness-factory` 会得到 `project not found or not indexed`（实测）。
-2. 对目标仓库执行一次 `index_repository`（大仓库首次索引需要几分钟）。
+2. 仅项目未索引时执行 `index_repository`；已索引就复用。索引过期或覆盖缺口只补读受影响源码，必要时才刷新对应索引，不为每个任务重建全仓库图谱。
 3. 之后即可使用 `search_graph` / `trace_path` / `query_graph` / `get_architecture` / `detect_changes` 等工具
    （本机 0.9.0 实测暴露 14 个，上游文档写 17 —— 以 `mcp_list` 当次结果为准），
    入口见本仓库 skills（如 `skills/query-symbol/SKILL.md`）。
@@ -143,7 +143,7 @@ curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/i
 
 - **R1（Read before write）**：改动前用 `analyze-impact` / `get-callers` 拿图谱证据，而不是凭感觉。
 - **R2 / R8 / NEVER.md**：ponytail 把「先问能不能不写」从文档约定变成生成前的强制检查，二者同向；`core/NEVER.md` 另有两条禁止项（无证据不改代码 / 不跳生成阶梯）。
-- **强制范围**：改 TS / 脚本 / 测试 / 配置 / 规则文件必用两工具；纯文案产出（novel / news 稿件）豁免，交由 route 自身规则治理。
+- **执行范围**：改 TS / 脚本 / 测试 / 配置 / 规则文件使用两工具。一次任务复用已读规则、图谱标识及证据；调用链或范围变化时才补充查询。
 - **最小改动原则**：两工具都不进 `package.json` 依赖、不被 bootstrap 渲染——它们是每台机器的环境配置，仓库只提供配置片段（`.mcp.json`、`mcp-config/`）与本文档。
 
 ## 降级语义
@@ -156,3 +156,10 @@ curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/i
 ```
 
 降级只覆盖**工具缺失 / 未接通**。Trae / WorkBuddy / Qoder 上 ponytail 无 hook 强制（纯指令生效）属于平台能力差异，照常用，不算降级。
+
+## 控制工具开销
+
+- `npm run bootstrap` 只执行本地生成；`npm run doctor` 是显式环境诊断，会运行外部工具版本探测，可能访问网络。普通编辑、生成和测试不重复运行 doctor。
+- 符号定位用 `search_graph`，影响分析用相关方向的 `trace_path`，源码用 `get_code_snippet`；Markdown、配置和覆盖缺口用精确文件读取。限制输出与遍历深度，只在证据不足时扩大范围。
+- 不为普通修改预加载全部 skills、架构图或历史文档；不在每次 Edit/Write 后跑全仓编译、测试或 audit。一批连贯修改完成后运行相关检查，范围扩大才升级验证。
+- 本文描述接入方式；bootstrap 不安装插件、不信任 hook、不修改用户全局配置。前端设计参考见 [frontend-design.md](frontend-design.md)。

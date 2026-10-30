@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   npm-test:
-    name: npm test (Node 20.9 / Python 3.12)
+    name: npm test (Node 20.9)
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -28,10 +28,6 @@ jobs:
         with:
           node-version: 20.9.0
           cache: npm
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
 
       - run: npm ci
       - run: npm test

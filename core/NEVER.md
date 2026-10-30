@@ -1,18 +1,19 @@
-# NEVER.md - forbidden patterns (all platforms, all tasks)
+# NEVER.md - coding boundaries
 
-| Forbidden | Why | Alternative |
-|-----------|-----|-------------|
-| shell write text files | unsafe, no diff preview | use Write/Edit tool |
-| empty catch | hides bugs | handle or re-raise |
-| controller writes business | wrong layer | business in service |
-| loop SQL (N+1) | performance | join / batch |
-| silent data loss | corrupt state | raise on parse fail |
-| cache update before commit | race | update after commit |
-| auto git push | destructive | explicit user push |
-| implementer = reviewer | blind spot | separate Agent instance |
-| edit unread file | guessing | read first |
-| over-abstract on first use | complexity | wait for 2nd occurrence |
-| multi-line if without braces | bug-prone | always brace |
-| "大概"/"差不多" in code | slop | exact match or fail |
-| change code without evidence | guessing | query graph first; if MCP down, degrade and say so |
-| skip the lazy ladder | over-build | ponytail ladder first; if unavailable, say so |
+| Forbidden | Alternative |
+|-----------|-------------|
+| edit unread file | Read current source and the relevant callers |
+| change code without evidence | Query the graph first; verify stale/gapped source; if unavailable, explain degradation |
+| skip the lazy ladder | Apply ponytail before generation |
+| empty catch or silent data loss | Handle errors with context or re-raise |
+| controller writes business | Keep business logic in its existing service layer |
+| loop SQL (N+1) | Join or batch |
+| cache update before commit | Update after commit |
+| secrets in source/logs | Use configured secrets and redact output |
+| over-abstract on first use | Reuse existing code; add abstraction when repetition warrants it |
+| multi-line if without braces | Always brace |
+| auto git push | Require explicit user authorization |
+| claiming independent review of your own work | Use a separate reviewer when independent review is required |
+| claiming checks passed without running them | Report the actual command, result and any limits |
+
+Use structured edit tools for source changes. Never trade input validation, data integrity or accessibility for speed.
