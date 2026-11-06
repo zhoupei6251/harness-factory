@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { readdir, mkdir, stat, lstat, realpath, symlink } from "node:fs/promises";
+import { readdir, mkdir, stat, lstat, realpath, symlink, unlink } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
 import { homedir, platform as osPlatform } from "node:os";
 import { fileURLToPath } from "node:url";
 import { loadPlatforms } from "./platforms.ts";
+import { readDeclaration, assertKnown } from "./harness-json.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const SKILLS_DIR = join(ROOT, "skills");
@@ -61,6 +62,33 @@ async function skillNames(profile: string): Promise<string[]> {
   return [...names].sort();
 }
 
+/**
+ * Removes factory-owned links that the declaration no longer asks for. Real
+ * directories and links pointing elsewhere are never touched — a user's own
+ * skill in the same folder is not ours to delete.
+ */
+async function pruneSkills(destRoot: string, keep: Set<string>, dryRun: boolean): Promise<number> {
+  let entries: string[];
+  try {
+    entries = await readdir(destRoot);
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const name of entries) {
+    if (keep.has(name)) continue;
+    const path = join(destRoot, name);
+    const info = await lstat(path).catch(() => null);
+    if (!info?.isSymbolicLink()) continue;
+    const target = await realpath(path).catch(() => null);
+    if (!target || !resolve(target).startsWith(SKILLS_DIR)) continue;
+    if (!dryRun) await unlink(path);
+    console.log(`[${dryRun ? "plan-rm" : "rm"}] ${path}`);
+    removed++;
+  }
+  return removed;
+}
+
 async function installSkill(name: string, destRoot: string, dryRun: boolean): Promise<"installed" | "kept" | "conflict"> {
   const src = join(SKILLS_DIR, name);
   const dst = join(destRoot, name);
@@ -90,16 +118,37 @@ async function installSkill(name: string, destRoot: string, dryRun: boolean): Pr
 
 try {
   const matrix = await loadPlatforms();
-  const { platforms, profile, base, dryRun } = parseArgs(process.argv.slice(2), [...matrix.keys()].sort());
-  const names = await skillNames(profile);
-  console.log(`${names.length} skills (${profile}); hosts: ${platforms.join(", ")}; ${dryRun ? "preview" : "install"}`);
-  const counts = { installed: 0, kept: 0, conflict: 0 };
-  for (const target of platforms) {
-    for (const name of names) {
-      counts[await installSkill(name, join(base, matrix.get(target)!.skillsDir), dryRun)]++;
-    }
+  const builtinHosts = [...matrix.keys()].sort();
+  const { platforms, profile, base, dryRun } = parseArgs(process.argv.slice(2), builtinHosts);
+
+  const decl = await readDeclaration(base);
+  let names: string[];
+  let hosts: string[];
+  if (decl) {
+    assertKnown("platform", decl.platforms, builtinHosts);
+    assertKnown("skill", decl.skills, await skillNames("all"));
+    names = decl.skills;
+    hosts = decl.platforms;
+    console.log(`declaration: ${hosts.length} host(s), ${names.length} skill(s); ${dryRun ? "preview" : "install"}`);
+  } else {
+    names = await skillNames(profile);
+    hosts = platforms;
+    console.log(`${names.length} skills (${profile}); hosts: ${hosts.join(", ")}; ${dryRun ? "preview" : "install"}`);
   }
-  console.log(`${dryRun ? "Planned" : "Installed"}: ${counts.installed}; already linked: ${counts.kept}; conflicts: ${counts.conflict}. No plugins, hooks or MCP settings changed.`);
+
+  const counts = { installed: 0, kept: 0, conflict: 0 };
+  let pruned = 0;
+  for (const target of hosts) {
+    const destRoot = join(base, matrix.get(target)!.skillsDir);
+    for (const name of names) {
+      counts[await installSkill(name, destRoot, dryRun)]++;
+    }
+    if (decl) pruned += await pruneSkills(destRoot, new Set(names), dryRun);
+  }
+  console.log(
+    `${dryRun ? "Planned" : "Installed"}: ${counts.installed}; already linked: ${counts.kept}; conflicts: ${counts.conflict}` +
+      `${decl ? `; pruned: ${pruned}` : ""}. No plugins, hooks or MCP settings changed.`,
+  );
   if (counts.conflict) process.exitCode = 1;
 } catch (error) {
   console.error(`[FAIL] ${error instanceof Error ? error.message : String(error)}`);

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["platforms", "skills", "agents"],
+  "properties": {
+    "platforms": {
+      "description": "Hosts this project projects into.",
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "skills": {
+      "description": "Exact skill set. Anything linked into the project but absent here is pruned.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "agents": {
+      "description": "Exact agent set, by contract slug. Wrappers absent here are pruned.",
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    }
+  },
+  "additionalProperties": false
+}

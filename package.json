@@ -19,7 +19,7 @@
     "init:project": "tsx tools/scripts/init-project.ts",
     "check:upstreams": "tsx tools/scripts/check-upstreams.ts",
     "typecheck": "node node_modules/typescript/lib/tsc.js --noEmit",
-    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run check-bootstrap && tsx tools/tests/bootstrap.test.ts && tsx tools/tests/install-template.test.ts && tsx tools/tests/install-roundtrip.test.ts && tsx tools/tests/downstream-render.test.ts && tsx tools/tests/stats.test.ts && tsx tools/tests/install-skills.test.ts && tsx tools/tests/install-agents.test.ts && tsx tools/tests/upstream-skills.test.ts"
+    "test": "npm run validate && npm run structure:audit && npm run typecheck && npm run check-bootstrap && tsx tools/tests/bootstrap.test.ts && tsx tools/tests/install-template.test.ts && tsx tools/tests/install-roundtrip.test.ts && tsx tools/tests/downstream-render.test.ts && tsx tools/tests/stats.test.ts && tsx tools/tests/install-skills.test.ts && tsx tools/tests/install-agents.test.ts && tsx tools/tests/harness-declaration.test.ts && tsx tools/tests/upstream-skills.test.ts"
   },
   "devDependencies": {
     "@types/node": "^20.19.43",

@@ -13,6 +13,10 @@ npm run init:project -- --target <project>          # 入口文件 + skills + ag
 npm run agents:install -- --platform claude --target <project> [--force]
 ```
 
+项目根若有 `harness.json`（`platforms` / `skills` / `agents`），则以声明为准：只生成声明的角色，
+并删掉以前生成过、这次没声明的包装（没有生成标记的手写文件永远不动）。没有声明时回退到
+`--platform` 参数。
+
 `install-agents.ts` 读取 `agents/index.json`，为每个 `generate: true` 的角色生成薄包装到 `<project>/.claude/agents/`：
 
 ```markdown

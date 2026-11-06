@@ -1,11 +1,12 @@
 #!/usr/bin/env node
 // install-agents.ts — 从 agents/ 契约生成各平台的薄包装。
 // 契约是唯一事实源；目标项目的 agent 文件是生成物，勿手改。
-import { readFile, writeFile, mkdir, stat, readdir } from "node:fs/promises";
+import { readFile, writeFile, mkdir, stat, readdir, unlink } from "node:fs/promises";
 import { join, resolve, dirname } from "node:path";
 import { homedir } from "node:os";
 import { fileURLToPath } from "node:url";
 import { loadPlatforms } from "./platforms.ts";
+import { readDeclaration, assertKnown } from "./harness-json.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const AGENTS_DIR = join(ROOT, "agents");
@@ -128,22 +129,61 @@ async function install(meta: AgentMeta, platform: string, destRoot: string, dryR
   return existing === null ? "installed" : "updated";
 }
 
+/** Removes generated wrappers the declaration no longer asks for. Files without the marker are never touched. */
+async function pruneAgents(destRoot: string, keep: Set<string>, dryRun: boolean): Promise<number> {
+  let entries: string[];
+  try {
+    entries = await readdir(destRoot);
+  } catch {
+    return 0;
+  }
+  let removed = 0;
+  for (const file of entries) {
+    const name = file.replace(/\.md$/, "");
+    if (!file.endsWith(".md") || keep.has(name)) continue;
+    const path = join(destRoot, file);
+    const content = await readFile(path, "utf-8").catch(() => null);
+    if (content === null || !content.includes(MARKER)) continue;
+    if (!dryRun) await unlink(path);
+    console.log(`[${dryRun ? "plan-rm" : "rm"}] ${path}`);
+    removed++;
+  }
+  return removed;
+}
+
 try {
   const matrix = await loadPlatforms();
   const known = [...matrix.values()].filter((c) => c.agentsDir !== null).map((c) => c.id).sort();
   const { platforms, base, dryRun, force } = parseArgs(process.argv.slice(2), known);
   const agents = await loadMeta();
-  const generated = agents.filter((a) => a.generate);
-  console.log(`${generated.length} agents; hosts: ${platforms.join(", ")}; ${dryRun ? "preview" : "install"}`);
+  const decl = await readDeclaration(base);
+
+  let generated = agents.filter((a) => a.generate);
+  let hosts = platforms;
+  if (decl) {
+    assertKnown("agent", decl.agents, agents.map((a) => a.slug));
+    const declared = new Set(decl.agents);
+    generated = generated.filter((a) => declared.has(a.slug));
+    const capable = new Set(known);
+    hosts = decl.platforms.filter((p) => capable.has(p));
+    const skipped = decl.platforms.filter((p) => !capable.has(p));
+    if (skipped.length) console.log(`[skip] no per-agent files on: ${skipped.join(", ")}`);
+  }
+
+  console.log(`${generated.length} agents; hosts: ${hosts.join(", ") || "(none)"}; ${dryRun ? "preview" : "install"}`);
   const counts = { installed: 0, updated: 0, kept: 0, conflict: 0 };
-  for (const platform of platforms) {
+  let pruned = 0;
+  const keep = new Set(generated.map((a) => wrapperName(a)));
+  for (const platform of hosts) {
     const destRoot = join(base, matrix.get(platform)!.agentsDir!);
     for (const meta of generated) {
       counts[await install(meta, platform, destRoot, dryRun, force)]++;
     }
+    if (decl) pruned += await pruneAgents(destRoot, keep, dryRun);
   }
   console.log(
-    `${dryRun ? "Planned" : "Installed"}: ${counts.installed} new, ${counts.updated} updated, ${counts.kept} unchanged, ${counts.conflict} conflicts. No plugins, hooks or MCP settings changed.`,
+    `${dryRun ? "Planned" : "Installed"}: ${counts.installed} new, ${counts.updated} updated, ${counts.kept} unchanged, ${counts.conflict} conflicts` +
+      `${decl ? `; pruned: ${pruned}` : ""}. No plugins, hooks or MCP settings changed.`,
   );
   if (counts.conflict) process.exitCode = 1;
 } catch (error) {
