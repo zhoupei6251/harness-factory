@@ -77,6 +77,12 @@ async function loadMeta(): Promise<AgentMeta[]> {
     if (!Array.isArray(meta.skills)) throw new Error(`agents/index.json ${meta.slug} needs a skills array (may be empty)`);
     const contract = join(AGENTS_DIR, `${meta.slug}.md`);
     if (!(await stat(contract)).isFile()) throw new Error(`agents/${meta.slug}.md is missing`);
+    // A wrapper that names a skill the host cannot load is silently useless.
+    for (const skill of meta.skills) {
+      if (!(await stat(join(ROOT, "skills", skill, "SKILL.md")).catch(() => null))?.isFile()) {
+        throw new Error(`agents/index.json ${meta.slug} lists unknown skill "${skill}" (no skills/${skill}/SKILL.md)`);
+      }
+    }
   }
   const onDisk = (await readdir(AGENTS_DIR)).filter((f) => f.endsWith(".md") && f !== "README.md").map((f) => f.slice(0, -3));
   const declared = new Set(parsed.agents.map((m) => m.slug));
@@ -86,18 +92,18 @@ async function loadMeta(): Promise<AgentMeta[]> {
   return parsed.agents;
 }
 
-function render(meta: AgentMeta, platform: string): string {
+function render(meta: AgentMeta, platform: string, frontmatter: string[]): string {
   const name = wrapperName(meta);
-  const lines = [
-    "---",
-    `name: ${name}`,
-    `platform: ${platform}`,
-    `type: ${meta.type}`,
-    `model: ${meta.model}`,
-    `readonly: ${meta.readonly}`,
-    `core: harness-factory/agents/${meta.slug}.md`,
-  ];
-  if (meta.skills.length) lines.push("skills:", ...meta.skills.map((s) => `  - ${s}`));
+  const accepts = new Set(frontmatter);
+  const lines = ["---", `name: ${name}`];
+  // `description` is how the host decides when to delegate to this agent; a
+  // wrapper without it is an agent the model cannot route to.
+  lines.push(`description: ${JSON.stringify(meta.description)}`);
+  if (accepts.has("type")) lines.push(`type: ${meta.type}`);
+  if (accepts.has("model")) lines.push(`model: ${meta.model}`);
+  if (accepts.has("readonly")) lines.push(`readonly: ${meta.readonly}`);
+  lines.push(`core: harness-factory/agents/${meta.slug}.md`);
+  if (meta.skills.length && accepts.has("skills")) lines.push("skills:", ...meta.skills.map((s) => `  - ${s}`));
   lines.push("---", `<!-- ${MARKER} — edit agents/${meta.slug}.md instead -->`, `# ${name}`, "");
   lines.push(`你是${meta.description}。`, "");
   lines.push(`**先 Read \`harness-factory/agents/${meta.slug}.md\`** — 完整行为契约。`);
@@ -106,9 +112,9 @@ function render(meta: AgentMeta, platform: string): string {
   return lines.join("\n");
 }
 
-async function install(meta: AgentMeta, platform: string, destRoot: string, dryRun: boolean, force: boolean) {
+async function install(meta: AgentMeta, platform: string, destRoot: string, frontmatter: string[], dryRun: boolean, force: boolean) {
   const dst = join(destRoot, `${wrapperName(meta)}.md`);
-  const content = render(meta, platform);
+  const content = render(meta, platform, frontmatter);
   const existing = await readFile(dst, "utf-8").catch((error: NodeJS.ErrnoException) => {
     if (error.code!== "ENOENT") throw error;
     return null;
@@ -175,9 +181,13 @@ try {
   let pruned = 0;
   const keep = new Set(generated.map((a) => wrapperName(a)));
   for (const platform of hosts) {
-    const destRoot = join(base, matrix.get(platform)!.agentsDir!);
+    const cfg = matrix.get(platform)!;
+    if (!cfg.agentFrontmatter) {
+      throw new Error(`platforms/${platform}/platform.json declares agentsDir but no agentFrontmatter`);
+    }
+    const destRoot = join(base, cfg.agentsDir!);
     for (const meta of generated) {
-      counts[await install(meta, platform, destRoot, dryRun, force)]++;
+      counts[await install(meta, platform, destRoot, cfg.agentFrontmatter, dryRun, force)]++;
     }
     if (decl) pruned += await pruneAgents(destRoot, keep, dryRun);
   }

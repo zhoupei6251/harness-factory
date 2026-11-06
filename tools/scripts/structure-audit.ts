@@ -169,7 +169,19 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
       const dangling = declared.filter((slug) => !onDisk.includes(slug));
       if (orphan.length) bad(`agents/${orphan.join(", ")}.md has no agents/index.json entry`);
       if (dangling.length) bad(`agents/index.json lists missing contract(s): ${dangling.join(", ")}`);
-      if (!orphan.length && !dangling.length) ok(`agents/ index and contracts agree (${onDisk.length})`);
+      // A wrapper naming a skill the host cannot load is silently useless.
+      const activeSkills = new Set((await readdir(resolve(ROOT, "skills"), { withFileTypes: true }))
+        .filter((e) => e.isDirectory() && e.name !== "archive").map((e) => e.name));
+      const badSkills: string[] = [];
+      for (const agent of index.agents) {
+        for (const skill of agent.skills) {
+          if (!activeSkills.has(skill)) badSkills.push(`${agent.slug}→${skill}`);
+        }
+      }
+      if (badSkills.length) bad(`agents/index.json references non-active skill(s): ${badSkills.join(", ")}`);
+      if (!orphan.length && !dangling.length && !badSkills.length) {
+        ok(`agents/ index and contracts agree (${onDisk.length}), skills resolve`);
+      }
     }
   }
 }

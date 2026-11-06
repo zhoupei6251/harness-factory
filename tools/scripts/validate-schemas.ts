@@ -36,7 +36,7 @@ async function validateRuntimeDirs(): Promise<void> {
 // whose name is still unwritten is a TODO, not a delivery promise.
 // A metacharacter counts as a placeholder only when the path *continues* after it,
 // so a markdown-bolded live pointer (`**…/x.md**`, `*` then `*` then EOL) stays checked.
-const EVIDENCE_PTR = /routes\/[a-z0-9-]+\/evidence\/[A-Za-z0-9._\-/]+/g;
+const EVIDENCE_PTR = /records\/verifications\/[A-Za-z0-9._\-/]+/g;
 const GLOB_MID_PATH = /^[*?\[][A-Za-z0-9._\-/]/;
 const RUNTIME_EVIDENCE_HOME = "ai-runtime-artifacts/verifications/";
 

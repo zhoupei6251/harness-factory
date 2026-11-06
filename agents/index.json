@@ -72,7 +72,7 @@
       "type": "general-purpose",
       "model": "inherit",
       "readonly": true,
-      "skills": ["web-tools-guide"]
+      "skills": []
     }
   ]
 }
