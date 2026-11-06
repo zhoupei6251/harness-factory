@@ -15,27 +15,29 @@ function parseArgs(argv: string[], known: string[]) {
   let profile = "all";
   let dryRun = false;
   let force = false;
+  let birdsEye = "";
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
       console.log(
-        "Usage: init-project.ts --target <path> [--platform all|<host>] [--profile core|all] [--force] [--dry-run]\n" +
+        "Usage: init-project.ts --target <path> [--platform all|<host>] [--profile core|all] [--force] [--dry-run] [--birds-eye-file <path>]\n" +
           "Installs entry files, skills and agents into a project. Default host: claude; default profile: all.",
       );
       process.exit(0);
     }
     if (arg === "--dry-run") { dryRun = true; continue; }
     if (arg === "--force") { force = true; continue; }
-    if (!["--target", "--platform", "--profile"].includes(arg)) throw new Error(`Unknown argument: ${arg}`);
+    if (!["--target", "--platform", "--profile", "--birds-eye-file"].includes(arg)) throw new Error(`Unknown argument: ${arg}`);
     const value = argv[++i];
     if (!value || value.startsWith("--")) throw new Error(`Missing value for ${arg}`);
     if (arg === "--target") target = resolve(value);
     else if (arg === "--platform") platform = value;
-    else profile = value;
+    else if (arg === "--profile") profile = value;
+    else birdsEye = resolve(value);
   }
   if (!target) throw new Error("--target is required");
   if (platform !== "all" && !known.includes(platform)) throw new Error(`Unknown platform: ${platform}`);
-  return { target, platform, profile, dryRun, force };
+  return { target, platform, profile, dryRun, force, birdsEye };
 }
 
 function step(name: string, script: string, args: string[]): void {
@@ -50,12 +52,12 @@ try {
   const matrix = await loadPlatforms();
   const allHosts = [...matrix.keys()].sort();
   const agentHosts = [...matrix.values()].filter((c) => c.agentsDir !== null).map((c) => c.id).sort();
-  const { target, platform, profile: prof, dryRun, force } = parseArgs(process.argv.slice(2), allHosts);
+  const { target, platform, profile: prof, dryRun, force, birdsEye } = parseArgs(process.argv.slice(2), allHosts);
   const flags = [dryRun ? "--dry-run" : "", force ? "--force" : ""].filter(Boolean);
   const hosts = platform === "all" ? allHosts : [platform];
   console.log(`init-project: ${target} (hosts: ${hosts.join(", ")}, profile: ${prof})${dryRun ? " [preview]" : ""}`);
 
-  step("entry files", "install-into-project.ts", ["--target", target, ...flags]);
+  step("entry files", "install-into-project.ts", ["--target", target, ...flags, ...(birdsEye ? ["--birds-eye-file", birdsEye] : [])]);
   step("skills", "install-skills.ts", ["--platform", platform, "--profile", prof, "--target", target, ...flags]);
 
   // Only hosts whose platform.json declares an agentsDir get wrappers.

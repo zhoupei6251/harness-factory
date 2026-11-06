@@ -118,9 +118,25 @@ async function testColleagueScenario(): Promise<void> {
   await rm(birdsEye.replace(/birds-eye\.md$/, ""), { recursive: true });
 }
 
+async function testDeclaredPlatforms(): Promise<void> {
+  console.log("--- test: harness.json decides which native entries are written ---");
+  const target = await setupTarget();
+  const birdsEye = await setupBirdsEye();
+  await writeFile(join(target, "harness.json"), JSON.stringify({ platforms: ["codex"], skills: [], agents: [] }), "utf-8");
+  const r = run(target, ["--birds-eye-file", birdsEye]);
+  assert(r.status === 0, `exit code 0 (got ${r.status})`);
+  assert(await exists(join(target, "AGENTS.md")), "AGENTS.md written for declared codex");
+  assert(!(await exists(join(target, "CLAUDE.md"))), "CLAUDE.md skipped when claude is not declared");
+  assert(!(await exists(join(target, "GEMINI.md"))), "GEMINI.md skipped (no gemini adapter to declare it)");
+
+  await rm(target, { recursive: true });
+  await rm(birdsEye.replace(/birds-eye\.md$/, ""), { recursive: true });
+}
+
 await testCleanTarget();
 await testReinstallBackup();
 await testColleagueScenario();
+await testDeclaredPlatforms();
 
 if (fail === 0) {
   console.log("");

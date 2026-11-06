@@ -29,7 +29,7 @@ Omit `--target` for user-level installation. The explicit `--profile all` option
 To use this harness in another project, clone/link it at `<project>/harness-factory/` and run:
 
 ```bash
-npx tsx harness-factory/scripts/install-into-project.ts --target <project>
+npx tsx harness-factory/tools/scripts/install-into-project.ts --target <project>
 ```
 
 See [templates/README.md](templates/README.md) for installation and [STRUCTURE.md](STRUCTURE.md) for file ownership.

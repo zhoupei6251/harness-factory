@@ -15,6 +15,8 @@ import { existsSync } from "node:fs";
 import { resolve, dirname, basename } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { readDeclaration } from "./harness-json.ts";
+import { loadPlatforms } from "./platforms.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "../..");
@@ -176,14 +178,26 @@ async function main(): Promise<void> {
   const birdsEye = await loadBirdsEye(args);
   console.log(`[ok]   loaded birds-eye (${birdsEye.length} chars)${args.birdsEyeFile ? ` from ${args.birdsEyeFile}` : " from default template"}`);
 
+  // A declared project receives only the entries its declared platforms read,
+  // so the platform matrix stays the single source of truth here too.
+  const templateFiles: TemplateFile[] = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"];
+  const decl = await readDeclaration(target);
+  const matrix = await loadPlatforms();
+  const wantsEntry = (tf: TemplateFile): boolean =>
+    !decl || decl.platforms.some((host) => matrix.get(host)?.nativeEntry === tf);
+  if (decl) {
+    const skipped = templateFiles.filter((tf) => !wantsEntry(tf));
+    if (skipped.length) console.log(`[skip] not read by declared platforms ${decl.platforms.join("/")}: ${skipped.join(", ")}`);
+  }
+
   // Render + write
   // A project may keep its own finished CLAUDE.md in the factory
   // (`projects/<project-dir>/CLAUDE.md`). That copy is the durable one: the
   // project file is gitignored, so branch switches and clones destroy it, while
   // the factory is a separate repository that survives them.
   const ownedDir = resolve(ROOT, "projects", basename(target));
-  const templateFiles: TemplateFile[] = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"];
   for (const tf of templateFiles) {
+    if (!wantsEntry(tf)) continue;
     const owned = resolve(ownedDir, tf);
     const useOwned = tf === "CLAUDE.md" && existsSync(owned);
     const template = await readFile(resolve(TEMPLATES_DIR, `target-${tf}`), "utf-8");
@@ -220,6 +234,7 @@ async function main(): Promise<void> {
 
     // skip-worktree on existing tracked files
     for (const tf of templateFiles) {
+      if (!wantsEntry(tf)) continue;
       if (!isTracked(target, tf)) continue;
       if (args.dryRun) {
         console.log(`[dry]  would git update-index --skip-worktree ${tf}`);

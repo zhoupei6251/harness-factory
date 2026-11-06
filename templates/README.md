@@ -3,7 +3,7 @@
 ## Install into a project
 
 1. Clone or link this repository at `<project>/harness-factory/`; keep that directory name.
-2. Run `npx tsx harness-factory/scripts/install-into-project.ts --target .` from the project root.
+2. Run `npx tsx harness-factory/tools/scripts/install-into-project.ts --target .` from the project root.
 3. The installer backs up existing entries and renders the project overview. Review the resulting local files and start a new agent session.
 
 | Template | Output |

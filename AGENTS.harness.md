@@ -2,7 +2,7 @@
 
 # AGENTS.harness.md — harness-factory 可分发 harness 规则（Codex / Qoder 端）
 
-> 本文件由 `harness-factory/scripts/install-into-project.ts` 在 other 模式下被目标项目 `AGENTS.md` 条件读取。  
+> 本文件由 `harness-factory/tools/scripts/install-into-project.ts` 在 other 模式下被目标项目 `AGENTS.md` 条件读取。  
 > 模型指令：若你正在阅读的目标项目 `AGENTS.md` 含「请读取 `harness-factory/AGENTS.harness.md`」指令，请按本文件规则工作。  
 > 与其他平台共用同一代码工作流。
 

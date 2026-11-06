@@ -31,7 +31,7 @@ const HARNESS_DELTAS: Record<"CLAUDE" | "AGENTS" | "GEMINI", HarnessDelta> = {
   CLAUDE: {
     title: "CLAUDE.harness.md — harness-factory 可分发 harness 规则",
     intro: [
-      "> 本文件由 `harness-factory/scripts/install-into-project.ts` 在 other 模式下被目标项目 `@harness-factory/CLAUDE.harness.md` 引用。  ",
+      "> 本文件由 `harness-factory/tools/scripts/install-into-project.ts` 在 other 模式下被目标项目 `@harness-factory/CLAUDE.harness.md` 引用。  ",
       "> 代码任务按风险加载规则、取证、实现和验证。",
     ].join("\n"),
     section_0: "",
@@ -52,7 +52,7 @@ const HARNESS_DELTAS: Record<"CLAUDE" | "AGENTS" | "GEMINI", HarnessDelta> = {
   AGENTS: {
     title: "AGENTS.harness.md — harness-factory 可分发 harness 规则（Codex / Qoder 端）",
     intro: [
-      "> 本文件由 `harness-factory/scripts/install-into-project.ts` 在 other 模式下被目标项目 `AGENTS.md` 条件读取。  ",
+      "> 本文件由 `harness-factory/tools/scripts/install-into-project.ts` 在 other 模式下被目标项目 `AGENTS.md` 条件读取。  ",
       "> 模型指令：若你正在阅读的目标项目 `AGENTS.md` 含「请读取 `harness-factory/AGENTS.harness.md`」指令，请按本文件规则工作。  ",
       "> 与其他平台共用同一代码工作流。",
     ].join("\n"),
@@ -80,7 +80,7 @@ const HARNESS_DELTAS: Record<"CLAUDE" | "AGENTS" | "GEMINI", HarnessDelta> = {
   GEMINI: {
     title: "GEMINI.harness.md — harness-factory 可分发 harness 规则（Gemini 端）",
     intro: [
-      "> 本文件由 `harness-factory/scripts/install-into-project.ts` 在 other 模式下被目标项目 `GEMINI.md` 条件读取。  ",
+      "> 本文件由 `harness-factory/tools/scripts/install-into-project.ts` 在 other 模式下被目标项目 `GEMINI.md` 条件读取。  ",
       "> 模型指令：若你正在阅读的目标项目 `GEMINI.md` 含「请读取 `harness-factory/GEMINI.harness.md`」指令，请按本文件规则工作。  ",
       "> 与其他平台共用同一代码工作流。",
     ].join("\n"),

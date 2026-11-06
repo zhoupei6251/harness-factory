@@ -2,7 +2,7 @@
 
 # CLAUDE.harness.md — harness-factory 可分发 harness 规则
 
-> 本文件由 `harness-factory/scripts/install-into-project.ts` 在 other 模式下被目标项目 `@harness-factory/CLAUDE.harness.md` 引用。  
+> 本文件由 `harness-factory/tools/scripts/install-into-project.ts` 在 other 模式下被目标项目 `@harness-factory/CLAUDE.harness.md` 引用。  
 > 代码任务按风险加载规则、取证、实现和验证。
 
 ## §1 默认执行
