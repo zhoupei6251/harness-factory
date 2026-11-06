@@ -1,9 +1,9 @@
 # Skill Index
 
 Auto-generated. Re-run with: npm run index
-Total: 39 active + 14 archived = 53 skills
+Total: 44 active + 14 archived = 58 skills
 
-## Active (39)
+## Active (44)
 
 | Skill | Description |
 |-------|-------------|
@@ -17,6 +17,7 @@ Total: 39 active + 14 archived = 53 skills
 | code-review | Systematic code review patterns covering security, performance, maintainability, |
 | codebase-memory | 代码结构、符号、调用和改动影响取证；使用已连接的 codebase-memory-mcp 工具，失败时读取源码并报告实际原因。 |
 | find-skills | Helps users discover and install agent skills when they ask questions |
+| frontend-design | Create distinctive, production-grade frontend interfaces with high design quality. Use this skill wh |
 | get-callees | 获取指定符号调用的所有代码。触发：想知道某个方法内部调用了什么、分析实现细节。 |
 | get-callers | 获取调用指定符号的所有代码。触发：想知道谁在调用某个方法、分析依赖、评估影响。 |
 | git-xywh | 组织级 Git 工作流：三主干（main / test / develop）、五类临时分支、多环境隔离、Angular 提交与 MR 流程；涵盖合并、变基、冲突、恢复。任务涉及分支、提测、热修、版本标 |
@@ -43,8 +44,12 @@ Total: 39 active + 14 archived = 53 skills
 | self-improving | Self-reflection + Self-criticism + Self-learning + Self-organizing memory. |
 | simplify | Refactor code for clarity, consistency, and maintainability without changing |
 | skill-vetter | Security-first skill vetting for AI agents. Use before installing any |
+| systematic-debugging | Use when encountering any bug, test failure, or unexpected behavior, before proposing fixes |
+| test-driven-development | Use when implementing any feature or bugfix, before writing implementation code |
 | two-stage-review | 对复杂或高风险代码变更，从需求合规和代码质量两个维度进行一次独立审查。 |
+| ui-ux-pro-max | UI/UX design intelligence with searchable database |
 | understand-project | 理解项目结构和架构，生成知识图谱。触发：接手新项目、需要了解项目全局、询问架构设计。 |
+| verification-before-completion | Use when about to claim work is complete, fixed, or passing, before committing or creating PRs - req |
 | writing-plans | Create a concise implementation plan for complex coding work or when the user asks for a plan. Routi |
 
 ## Archived (14)

@@ -1,0 +1,78 @@
+{
+  "agents": [
+    {
+      "slug": "coder",
+      "description": "实现 WU 内业务代码，按 done criteria 交付",
+      "generate": true,
+      "type": "general-purpose",
+      "model": "inherit",
+      "readonly": false,
+      "skills": ["requesting-code-review"]
+    },
+    {
+      "slug": "debugger",
+      "description": "缺陷调查与根因修复，先诊断后动手",
+      "generate": true,
+      "type": "general-purpose",
+      "model": "inherit",
+      "readonly": false,
+      "skills": ["systematic-debugging"]
+    },
+    {
+      "slug": "explorer",
+      "description": "只读探查：定位符号、理解结构、追踪调用",
+      "generate": true,
+      "type": "general-purpose",
+      "model": "inherit",
+      "readonly": true,
+      "skills": ["codebase-memory"]
+    },
+    {
+      "slug": "implementer",
+      "description": "轻量执行：docs / chore / config 类改动",
+      "generate": true,
+      "type": "general-purpose",
+      "model": "inherit",
+      "readonly": false,
+      "skills": []
+    },
+    {
+      "slug": "leader-code",
+      "description": "编排者：路由判定、任务派发、结果整合",
+      "generate": true,
+      "name": "leader-code",
+      "type": "general-purpose",
+      "model": "inherit",
+      "readonly": false,
+      "skills": ["writing-plans", "brainstorming"]
+    },
+    {
+      "slug": "reviewer",
+      "description": "独立审查者：五轴审查，未参与实现",
+      "generate": true,
+      "name": "reviewer",
+      "type": "general-purpose",
+      "model": "sonnet",
+      "readonly": true,
+      "skills": ["code-review"]
+    },
+    {
+      "slug": "test-engineer",
+      "description": "测试资产：单测补强、集成、E2E",
+      "generate": true,
+      "type": "general-purpose",
+      "model": "inherit",
+      "readonly": false,
+      "skills": ["test-driven-development", "verification-before-completion"]
+    },
+    {
+      "slug": "web-investigator",
+      "description": "只读外部调研：库 API、厂商契约、版本兼容",
+      "generate": true,
+      "type": "general-purpose",
+      "model": "inherit",
+      "readonly": true,
+      "skills": ["web-tools-guide"]
+    }
+  ]
+}
