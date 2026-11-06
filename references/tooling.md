@@ -9,9 +9,9 @@
 
 `npm run skills:install -- --platform codex --target <project>` 安装默认 10 个核心技能；五端均支持，省略 platform 安装五端，省略 target 为用户级安装。`--dry-run` 只预览，`--profile all` 显式安装所有 active 旧技能。已有用户目录和其他链接会保留并报告冲突。此命令不修改 MCP、插件或 Hook 设置。
 
-内容已随仓库保存，不需要每次访问 GitHub；按 `core/intent-routing.md` 直接读本地技能即可。来源、选取范围、版本与更新方式见 [coding-capabilities.md](coding-capabilities.md)，离线完整性检查为 `npm run check:upstreams`。
+内容已随仓库保存，不需要每次访问 GitHub；按 `guides/intent-routing.md` 直接读本地技能即可。来源、选取范围、版本与更新方式见 [coding-capabilities.md](coding-capabilities.md)，离线完整性检查为 `npm run check:upstreams`。
 
-Playwright 为可选浏览器服务：优先已有浏览器或测试能力；需要配置时使用 `mcp-config/playwright.json`（JSON 客户端）或 `playwright.codex.toml`。片段固定 `@playwright/mcp@0.0.83`，默认隔离会话、headless；Windows 用 `npx.cmd`，其他系统改 `npx`。新会话发现工具后实际导航、截图并操作一个本地页面，才报告浏览器连通；文件存在或技能已安装不代表服务可用。不会替用户自动信任 Hook、改全局配置或复用真实浏览器登录态。
+Playwright 为可选浏览器服务：优先已有浏览器或测试能力；需要配置时使用 `references/mcp/playwright.json`（JSON 客户端）或 `playwright.codex.toml`。片段固定 `@playwright/mcp@0.0.83`，默认隔离会话、headless；Windows 用 `npx.cmd`，其他系统改 `npx`。新会话发现工具后实际导航、截图并操作一个本地页面，才报告浏览器连通；文件存在或技能已安装不代表服务可用。不会替用户自动信任 Hook、改全局配置或复用真实浏览器登录态。
 
 ## 一览
 
@@ -26,7 +26,7 @@ Playwright 为可选浏览器服务：优先已有浏览器或测试能力；需
 
 ### 安装方式 A：零安装（npx，本仓库已配置）
 
-仓库根 **`.mcp.json`** 已提交以下配置（与 `mcp-config/codebase-memory.json` 同源）：
+仓库根 **`.mcp.json`** 已提交以下配置（与 `references/mcp/codebase-memory.json` 同源）：
 
 ```json
 {
@@ -46,7 +46,7 @@ Playwright 为可选浏览器服务：优先已有浏览器或测试能力；需
 - ⚠️ **不要加 `--ui=true`**。npm 分发的二进制是「built without the embedded UI」，带着它只会多打一行
   `the HTTP server will not start` 警告，UI 并不存在（实测）。要内嵌 UI 得用
   `codebase-memory-mcp-ui` release 资产或自行 `make -f Makefile.cbm cbm-with-ui`。
-  本仓库的 `.mcp.json` / `mcp-config/*` 早期都带过这个 flag，已全部去掉。
+  本仓库的 `.mcp.json` / `references/mcp/*` 早期都带过这个 flag，已全部去掉。
 
 ### 安装方式 B：静态二进制（官方推荐，零依赖、无需 Node）
 
@@ -78,7 +78,7 @@ curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/i
 |------|----------|
 | Claude Code | 仓库根 `.mcp.json`（已提交，首次打开提示启用）；或 `claude mcp add` 全局注册 |
 | Codex | `~/.codex/config.toml` 增加 `[mcp_servers.codebase_memory]`，`command = "npx"`、`args = ["-y", "codebase-memory-mcp"]`；或方式 B 指向二进制 |
-| Trae | 设置 → MCP → 添加服务器，粘贴 `mcp-config/codebase-memory.json` 内容 |
+| Trae | 设置 → MCP → 添加服务器，粘贴 `references/mcp/codebase-memory.json` 内容 |
 | WorkBuddy | 同 Trae，手动添加 MCP server（npx 或二进制路径均可） |
 | Qoder | ⚠️ 仓库根 `.mcp.json` **不读**（实测：声明了 `codebase_memory`，会话内 MCP 列表无此服务）。改写 `~/.qoder-cn/settings.json` 的顶层 `mcpServers`（user 作用域；另有 project `.qoder/settings.json` / local `.qoder/settings.local.json`）。⚠️ Windows 上 `command` 必须是 `npx.cmd`——片段里的 `npx` 在 `spawn(shell:false)` 下直接 ENOENT，与 `scripts/doctor.ts:42` 同因。用内置 `mcp-config` skill 写，改完 `/mcp reload` |
 
@@ -121,7 +121,7 @@ curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/i
 | 端 | 用户级 | 项目级 | 备注 |
 |----|--------|--------|------|
 | Claude Code | `~/.claude.json` | 仓库根 `.mcp.json` | 本项目走项目级，已提交 |
-| Codex | `~/.codex/config.toml` 的 `[mcp_servers.*]` | 不读项目 `.mcp.json` | 片段见 `mcp-config/codebase-memory.codex.toml` |
+| Codex | `~/.codex/config.toml` 的 `[mcp_servers.*]` | 不读项目 `.mcp.json` | 片段见 `references/mcp/codebase-memory.codex.toml` |
 | Qoder | `~/.qoder-cn/settings.json` 顶层 `mcpServers` | `.qoder/settings.json`（入库）/ `.qoder/settings.local.json`（gitignored） | ⚠️ Windows 上 `command` 用 `npx.cmd`；改完需 `/mcp reload`（CLI 侧命令，Agent 无法自行触发） |
 
 > 本机实测：`codebase_memory` 已注册在 Qoder **user 作用域**，`command = "npx.cmd"`，**已连通**
@@ -150,9 +150,9 @@ curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/i
 ## 与本仓库治理的关系
 
 - **R1（Read before write）**：改动前用 `analyze-impact` / `get-callers` 拿图谱证据，而不是凭感觉。
-- **R2 / R8 / NEVER.md**：ponytail 把「先问能不能不写」从文档约定变成生成前的强制检查，二者同向；`core/NEVER.md` 另有两条禁止项（无证据不改代码 / 不跳生成阶梯）。
+- **R2 / R8 / NEVER.md**：ponytail 把「先问能不能不写」从文档约定变成生成前的强制检查，二者同向；`rules/NEVER.md` 另有两条禁止项（无证据不改代码 / 不跳生成阶梯）。
 - **执行范围**：改 TS / 脚本 / 测试 / 配置 / 规则文件使用两工具。一次任务复用已读规则、图谱标识及证据；调用链或范围变化时才补充查询。
-- **最小改动原则**：两工具都不进 `package.json` 依赖、不被 bootstrap 渲染——它们是每台机器的环境配置，仓库只提供配置片段（`.mcp.json`、`mcp-config/`）与本文档。
+- **最小改动原则**：两工具都不进 `package.json` 依赖、不被 bootstrap 渲染——它们是每台机器的环境配置，仓库只提供配置片段（`.mcp.json`、`references/mcp/`）与本文档。
 
 ## 降级语义
 

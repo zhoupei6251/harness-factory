@@ -11,11 +11,11 @@ Code is the only route. Keep the default path short: understand, implement, veri
 ## Load once, then work
 
 - Native entries already contain this file, the core index and platform deltas; do not re-read their source copies.
-- Read `core/NEVER.md`, then use `core/intent-routing.md` for task-specific loading. Read each document/skill once per session unless it changes.
-- Root `MEMORY.md` is project state. `routes/code/MEMORY.md` is an initialization template, not another state source.
+- Read `rules/NEVER.md`, then use `guides/intent-routing.md` for task-specific loading. Read each document/skill once per session unless it changes.
+- Root `MEMORY.md` is project state. `templates/code-MEMORY.md` is an initialization template, not another state source.
 - Load common rules and only the current language/task rules; hook/setup guides are for configuring hooks, not every edit.
 - For frontend layout and styling, consult [references/frontend-design.md](references/frontend-design.md) on demand.
-- Select curated local skills by task using `core/intent-routing.md`; source/adapter details are in `references/coding-capabilities.md`. Load one primary method, then add only a missing capability. If a skill is not discovered by the host, read its bundled `skills/<name>/SKILL.md` directly.
+- Select curated local skills by task using `guides/intent-routing.md`; source/adapter details are in `references/coding-capabilities.md`. Load one primary method, then add only a missing capability. If a skill is not discovered by the host, read its bundled `skills/<name>/SKILL.md` directly.
 
 ## Behavior rules (R1-R8)
 

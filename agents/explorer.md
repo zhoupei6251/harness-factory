@@ -6,7 +6,7 @@
 
 **Intelligence Layer 主力使用者**：Explorer 是最应该使用 Understand-Anything 和 CodeGraph 的 Agent。
 
-**路由:** `harness-factory/core/intent-routing.md` 探查
+**路由:** `harness-factory/guides/intent-routing.md` 探查
 
 ---
 

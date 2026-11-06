@@ -16,8 +16,6 @@
     "erasableSyntaxOnly": true
   },
   "include": [
-    "core/**/*",
-    "scripts/**/*",
-    "tests/**/*"
+    "tools/**/*"
   ]
 }

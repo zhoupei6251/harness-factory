@@ -7,7 +7,7 @@ Total: 44 active + 14 archived = 58 skills
 
 | Skill | Description |
 |-------|-------------|
-| add-platform | Add a new platform adapter to harness-factory. Walks through platforms/<plat>/rules/ENTRY.md creatio |
+| add-platform | Add a new AI host adapter to harness-factory. One directory |
 | add-skill | Add a new skill to harness-factory. Walks through SKILL.md + _meta.json creation, schema validation, |
 | agent-browser | Browser automation for AI agents via inference.sh. Navigate web pages, |
 | analyze-architecture | 深入分析项目架构，回答架构相关问题。触发：询问设计原因、技术选型、模块职责、架构决策。 |

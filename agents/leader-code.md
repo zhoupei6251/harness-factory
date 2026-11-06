@@ -30,7 +30,7 @@ brainstorming → [门禁：用户确认 spec]
 ## 输入
 
 - 用户需求（直接对话，无 handoff 文件传递）
-- `harness-factory/core/intent-routing.md` 判定结果
+- `harness-factory/guides/intent-routing.md` 判定结果
 - 已批准产物
 
 ## 输出

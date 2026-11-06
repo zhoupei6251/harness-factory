@@ -6,10 +6,10 @@ Harness Factory distributes software-engineering instructions across five platfo
 
 | Layer | Responsibility |
 |-------|----------------|
-| `core/` + root `ENTRY.md` | Short shared behavior rules and on-demand governance index |
-| `capabilities/rules/{common,java,typescript}/` | Task/language-specific practices |
+| `rules/` + `guides/` + root `ENTRY.md` | Short shared behavior rules (`rules/`), on-demand governance index (`guides/`) |
+| `stacks/{common,java,typescript}/` | Task/language-specific practices |
 | `platforms/<name>/rules/ENTRY.md` | Host configuration differences only |
-| `routes/code/MEMORY.md` | Neutral project-memory initialization template |
+| `templates/code-MEMORY.md` | Neutral project-memory initialization template |
 | `skills/` | Curated core and optional legacy procedures; upstream subsets live beside their adapters, loaded on demand |
 | `references/` | Tool setup, lessons and frontend design source guidance |
 
@@ -23,11 +23,11 @@ Complex changes record the necessary scope, evidence and pass criteria once. Sha
 
 Context is loaded progressively. Setup guides, hook instructions, historical decisions and unrelated skills stay out of ordinary coding context. Frontend tasks use `references/frontend-design.md` to select an upstream reference as needed.
 
-`core/intent-routing.md` selects a bundled skill without requiring native discovery. `skills:install` optionally links 10 core skills into one or all five native host directories; all active legacy skills require explicit `--profile all`. Project scope uses `--target`, default scope is the user's home. The installer preserves user files/foreign links and never changes MCP or hook settings. `references/upstreams.lock.json` pins reviewed content files and licenses; `check:upstreams` verifies their bytes offline. Source upgrades are explicit, separate maintenance work. Graph/browser services and optional Python remain external capabilities, not npm runtime dependencies.
+`guides/intent-routing.md` selects a bundled skill without requiring native discovery. `skills:install` optionally links 10 core skills into one or all five native host directories; all active legacy skills require explicit `--profile all`. Project scope uses `--target`, default scope is the user's home. The installer preserves user files/foreign links and never changes MCP or hook settings. `references/upstreams.lock.json` pins reviewed content files and licenses; `check:upstreams` verifies their bytes offline. Source upgrades are explicit, separate maintenance work. Graph/browser services and optional Python remain external capabilities, not npm runtime dependencies.
 
 ## Bootstrap contract
 
-`scripts/bootstrap-contract.ts` lists inputs and generated files; drift checks and integration tests consume the same contract.
+`tools/scripts/bootstrap-contract.ts` lists inputs and generated files; drift checks and integration tests consume the same contract.
 
 | Canonical source | Output |
 |------------------|--------|
@@ -35,7 +35,7 @@ Context is loaded progressively. Setup guides, hook instructions, historical dec
 | Platform delta | `<configDir>/harness/ENTRY.md` |
 | Root `ENTRY.md` | `<configDir>/harness/ROOT.md` |
 | `templates/harness.template.md` + platform tokens | Three tracked `*.harness.md` artifacts |
-| `routes/code/MEMORY.md` | Root `MEMORY.md` only if missing |
+| `templates/code-MEMORY.md` | Root `MEMORY.md` only if missing |
 
 Bootstrap is deterministic local generation. External-tool diagnostics are an explicit `npm run doctor` operation, avoiding a network/package probe on each generation.
 

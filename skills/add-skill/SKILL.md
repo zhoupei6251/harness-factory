@@ -15,7 +15,7 @@ Add a new skill to `harness-factory/skills/<name>/`.
 
 ## Steps
 
-1. Create `skills/<name>/SKILL.md` with frontmatter matching `schemas/skill.schema.json`
+1. Create `skills/<name>/SKILL.md` with frontmatter matching `tools/schemas/skill.schema.json`
 2. Create `skills/<name>/_meta.json` with the same `name` / `description` / `tags`
 3. Run `npm run validate` to confirm both parse
 4. (Optional) Run `npm run bootstrap` to project the skill to platform rules dirs

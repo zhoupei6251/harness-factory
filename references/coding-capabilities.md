@@ -1,6 +1,6 @@
 # 精选代码能力
 
-Harness 保留一个默认执行流程：理解代码 → 最小实现 → 相关验证。基础技能是 Ponytail full 和 codebase-memory；任务能力按 core/intent-routing.md 选择，不在会话启动时读取所有正文。
+Harness 保留一个默认执行流程：理解代码 → 最小实现 → 相关验证。基础技能是 Ponytail full 和 codebase-memory；任务能力按 guides/intent-routing.md 选择，不在会话启动时读取所有正文。
 
 ## 本地能力与范围
 
@@ -42,7 +42,7 @@ npm run skills:install -- --platform codex --profile all --target D:/path/to/pro
 ## 外部工具
 
 - 图谱：按 references/tooling.md 配置 Codebase Memory MCP，当前会话真实调用 list_projects 才说明连通；仅未索引才索引。
-- 浏览器：优先宿主已提供的浏览器或项目已有 Playwright。需要 MCP 时使用 mcp-config/playwright.json / playwright.codex.toml 片段；它们不会被 bootstrap 或安装器自动写入全局设置。Windows JSON 片段使用 npx.cmd，其他系统改为 npx。配置后新会话实际打开一个本地页面并截图/操作，再声称可用。
+- 浏览器：优先宿主已提供的浏览器或项目已有 Playwright。需要 MCP 时使用 references/mcp/playwright.json / playwright.codex.toml 片段；它们不会被 bootstrap 或安装器自动写入全局设置。Windows JSON 片段使用 npx.cmd，其他系统改为 npx。配置后新会话实际打开一个本地页面并截图/操作，再声称可用。
 - UI 搜索：Python 3、纯标准库，离线检索。命令见 hf-ui。没装 Python 就报告未执行搜索，按本地文档或 CSV 补证；浏览器未连接就报告未做视觉验证。
 
 ## 来源、许可与更新

@@ -66,7 +66,7 @@ Use Node.js 20.9+ with the locked npm dependencies. Scripts run through tsx; no 
 
 ## Sources and generated files
 
-Edit `ENTRY.md`, `core/`, `capabilities/rules/`, `platforms/`, `templates/` and code skills. `npm run bootstrap` generates native entries and per-platform rule directories. Codex and Qoder share `AGENTS.md`, so their deltas are merged.
+Edit `ENTRY.md`, `rules/`, `guides/`, `stacks/`, `platforms/`, `templates/` and code skills. `npm run bootstrap` generates native entries and per-platform rule directories. Codex and Qoder share `AGENTS.md`, so their deltas are merged.
 
 The three `*.harness.md` files are tracked distribution artifacts; regenerate and commit them with their sources. Native entries, platform projections, dependencies and runtime scratch are gitignored. Existing project `MEMORY.md` is preserved.
 
