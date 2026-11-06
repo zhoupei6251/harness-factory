@@ -10,7 +10,8 @@ Canonical sources are edited directly; distribution artifacts are regenerated. T
 | `core/` | Eight governance documents, loaded by task |
 | `agents/<role>.md` | Role behavior contracts (canonical); target projects keep thin wrappers whose `core:` points here |
 | `capabilities/rules/` | Three verticals: common, java, typescript; patterns/security/testing/hooks guidance |
-| `platforms/<p>/rules/ENTRY.md` | Five adapters: claude, codex, trae, workbuddy, qoder |
+| `platforms/<p>/platform.json` | Capability matrix per host: configDir, nativeEntry, renderDir, skillsDir, agentsDir, agentFrontmatter. Every script reads it — no script keeps its own copy |
+| `platforms/<p>/rules/ENTRY.md` | Five adapters: claude, codex, trae, workbuddy, qoder — prose delta only |
 | `routes/code/MEMORY.md` | Neutral initialization template, not live project state |
 | `skills/<name>/SKILL.md` + `_meta.json` | Active software-engineering procedures |
 | `skills/hf-*/upstream/`, `skills/ponytail/upstream-LICENSE` | Fixed upstream subsets and licenses; local SKILL.md adapters define scope |

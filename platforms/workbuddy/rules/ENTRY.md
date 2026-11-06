@@ -8,4 +8,4 @@
 - Verify MCP once with `list_projects`; apply canonical evidence/降级 rules.
 - WorkBuddy hook approvals are host configuration, not bootstrap output.
 
-Bootstrap projects this delta to `.codebuddy/rules/ENTRY.md` and the native `.codebuddy/rules/project_rules.md`.
+Bootstrap projects this delta to `.codebuddy/harness/ENTRY.md` and the native `.codebuddy/rules/project_rules.md`.

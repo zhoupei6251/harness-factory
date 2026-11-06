@@ -11,4 +11,4 @@
 - Verify MCP once with `list_projects`; apply the canonical evidence/降级 rules in `ENTRY.md`.
 - Setup and command details belong in `references/tooling.md`, loaded on demand.
 
-Bootstrap projects this delta to `.claude/rules/ENTRY.md` and merges it into the native `CLAUDE.md`.
+Bootstrap projects this delta to `.claude/harness/ENTRY.md` and merges it into the native `CLAUDE.md`.

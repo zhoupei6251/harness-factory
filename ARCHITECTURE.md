@@ -32,8 +32,8 @@ Context is loaded progressively. Setup guides, hook instructions, historical dec
 | Canonical source | Output |
 |------------------|--------|
 | Root `ENTRY.md` + core index + platform delta | Native entry |
-| Platform delta | `<platform>/rules/ENTRY.md` |
-| Root `ENTRY.md` | `<platform>/rules/ROOT.md` |
+| Platform delta | `<configDir>/harness/ENTRY.md` |
+| Root `ENTRY.md` | `<configDir>/harness/ROOT.md` |
 | `templates/harness.template.md` + platform tokens | Three tracked `*.harness.md` artifacts |
 | `routes/code/MEMORY.md` | Root `MEMORY.md` only if missing |
 

@@ -167,17 +167,17 @@ async function main(): Promise<void> {
     }
 
     // 5. Assert the bootstrap output. Two distinct output classes:
-    //    (a) platform projection under PLATFORM_DIR[plat]/rules/ → ENTRY.md + ROOT.md
-    //    (b) native entry written to the path in PLATFORM_NATIVE_ENTRY[plat]
+    //    (a) platform projection under platforms/<p>/platform.json renderDir → ENTRY.md + ROOT.md
+    //    (b) native entry written to the path in platform.json nativeEntry
     //        (top-level CLAUDE.md/AGENTS.md for claude/codex+qoder; nested
     //        .trae/rules/project_rules.md and .codebuddy/rules/project_rules.md
     //        for trae/workbuddy, which don't have a top-level native entry file)
     const platformProjection: Array<[string, string]> = [
-      [".claude", "rules/ENTRY.md"],
-      [".codex", "rules/ENTRY.md"],
-      [".qoder", "rules/ENTRY.md"],
-      [".trae", "rules/ENTRY.md"],
-      [".codebuddy", "rules/ENTRY.md"],
+      [".claude", "harness/ENTRY.md"],
+      [".codex", "harness/ENTRY.md"],
+      [".qoder", "harness/ENTRY.md"],
+      [".trae", "harness/ENTRY.md"],
+      [".codebuddy", "harness/ENTRY.md"],
     ];
     for (const [dir, file] of platformProjection) {
       const p = join(installedHarness, dir, file);

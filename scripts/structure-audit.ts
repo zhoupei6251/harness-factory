@@ -120,16 +120,59 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
   const extra = actual.filter((p) => !expectedPlatforms.includes(p));
   if (missing.length === 0 && extra.length === 0) {
     let allHaveEntry = true;
+    let allHaveMatrix = true;
+    const matrixKeys = ["id", "configDir", "nativeEntry", "renderDir", "skillsDir", "agentsDir"];
     for (const p of expectedPlatforms) {
       if (!(await exists(resolve(ROOT, "platforms", p, "rules", "ENTRY.md")))) {
         bad(`platforms/${p}/rules/ENTRY.md missing`);
         allHaveEntry = false;
       }
+      // The platform matrix must live beside the adapter, not be re-typed in each script.
+      const matrix = resolve(ROOT, "platforms", p, "platform.json");
+      if (!(await exists(matrix))) {
+        bad(`platforms/${p}/platform.json missing`);
+        allHaveMatrix = false;
+        continue;
+      }
+      const cfg = JSON.parse(await readFile(matrix, "utf-8")) as Record<string, unknown>;
+      const absent = matrixKeys.filter((key) => !(key in cfg));
+      if (absent.length) {
+        bad(`platforms/${p}/platform.json missing key(s): ${absent.join(", ")}`);
+        allHaveMatrix = false;
+      }
+      if (cfg.id !== p) {
+        bad(`platforms/${p}/platform.json declares id=${String(cfg.id)}`);
+        allHaveMatrix = false;
+      }
     }
     if (allHaveEntry) ok(`platforms/ has exactly 5 adapters, each with rules/ENTRY.md`);
+    if (allHaveMatrix) ok(`every adapter declares its own platform.json matrix`);
   } else {
     if (missing.length) bad(`platforms/ missing adapter(s): ${missing.join(", ")}`);
     if (extra.length) bad(`platforms/ has extra adapter dir(s): ${extra.join(", ")}`);
+  }
+}
+
+// ---------- 2b. agents/ ----------
+{
+  const indexFile = resolve(ROOT, "agents", "index.json");
+  if (!(await exists(indexFile))) {
+    bad("agents/index.json missing — nothing declares what installs");
+  } else {
+    const index = JSON.parse(await readFile(indexFile, "utf-8")) as { agents?: Array<{ slug: string; skills: string[] }> };
+    if (!Array.isArray(index.agents) || index.agents.length === 0) {
+      bad("agents/index.json must carry a non-empty agents array");
+    } else {
+      const declared = index.agents.map((a) => a.slug);
+      const onDisk = (await readdir(resolve(ROOT, "agents")))
+        .filter((f) => f.endsWith(".md") && f !== "README.md")
+        .map((f) => f.slice(0, -3));
+      const orphan = onDisk.filter((slug) => !declared.includes(slug));
+      const dangling = declared.filter((slug) => !onDisk.includes(slug));
+      if (orphan.length) bad(`agents/${orphan.join(", ")}.md has no agents/index.json entry`);
+      if (dangling.length) bad(`agents/index.json lists missing contract(s): ${dangling.join(", ")}`);
+      if (!orphan.length && !dangling.length) ok(`agents/ index and contracts agree (${onDisk.length})`);
+    }
   }
 }
 

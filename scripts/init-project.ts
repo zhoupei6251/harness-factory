@@ -4,12 +4,12 @@
 import { spawnSync } from "node:child_process";
 import { join, resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { loadPlatforms } from "./platforms.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const TSX = join(ROOT, "node_modules/tsx/dist/cli.mjs");
-const HOSTS = ["claude", "codex", "trae", "workbuddy", "qoder"];
 
-function parseArgs(argv: string[]) {
+function parseArgs(argv: string[], known: string[]) {
   let target = "";
   let platform = "claude";
   let profile = "all";
@@ -34,7 +34,7 @@ function parseArgs(argv: string[]) {
     else profile = value;
   }
   if (!target) throw new Error("--target is required");
-  if (platform !== "all" && !HOSTS.includes(platform)) throw new Error(`Unknown platform: ${platform}`);
+  if (platform !== "all" && !known.includes(platform)) throw new Error(`Unknown platform: ${platform}`);
   return { target, platform, profile, dryRun, force };
 }
 
@@ -47,17 +47,23 @@ function step(name: string, script: string, args: string[]): void {
 }
 
 try {
-  const { target, platform, profile: prof, dryRun, force } = parseArgs(process.argv.slice(2));
+  const matrix = await loadPlatforms();
+  const allHosts = [...matrix.keys()].sort();
+  const agentHosts = [...matrix.values()].filter((c) => c.agentsDir !== null).map((c) => c.id).sort();
+  const { target, platform, profile: prof, dryRun, force } = parseArgs(process.argv.slice(2), allHosts);
   const flags = [dryRun ? "--dry-run" : "", force ? "--force" : ""].filter(Boolean);
-  const hosts = platform === "all" ? HOSTS : [platform];
+  const hosts = platform === "all" ? allHosts : [platform];
   console.log(`init-project: ${target} (hosts: ${hosts.join(", ")}, profile: ${prof})${dryRun ? " [preview]" : ""}`);
 
   step("entry files", "install-into-project.ts", ["--target", target, ...flags]);
   step("skills", "install-skills.ts", ["--platform", platform, "--profile", prof, "--target", target, ...flags]);
 
-  // Agents only project to hosts that have a per-agent file concept; a codex-only target skips this step.
-  if (hosts.includes("claude")) {
-    step("agents", "install-agents.ts", ["--platform", "claude", "--target", target, ...flags]);
+  // Only hosts whose platform.json declares an agentsDir get wrappers.
+  const selectedAgentHosts = hosts.filter((h) => agentHosts.includes(h));
+  if (selectedAgentHosts.length) {
+    for (const host of selectedAgentHosts) {
+      step(`agents (${host})`, "install-agents.ts", ["--platform", host, "--target", target, ...flags]);
+    }
   } else {
     console.log("\n── agents\n[skip] no selected host has a per-agent file concept");
   }

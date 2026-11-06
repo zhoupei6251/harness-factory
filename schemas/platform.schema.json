@@ -1,13 +1,16 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
   "type": "object",
-  "required": ["name", "config_root"],
+  "required": ["id", "label", "configDir", "nativeEntry", "renderDir", "skillsDir", "agentsDir", "agentFrontmatter"],
   "properties": {
-    "name": { "type": "string", "enum": ["claude", "codex", "trae", "workbuddy", "qoder"] },
-    "config_root": { "type": "string", "minLength": 1 },
-    "trust_model": { "type": "string", "enum": ["auto", "explicit", "approval"] },
-    "hooks_supported": { "type": "boolean" },
-    "mcp_supported": { "type": "boolean" }
+    "id": { "type": "string", "enum": ["claude", "codex", "trae", "workbuddy", "qoder"] },
+    "label": { "type": "string", "minLength": 1 },
+    "configDir": { "type": "string", "minLength": 1 },
+    "nativeEntry": { "type": "string", "minLength": 1 },
+    "renderDir": { "type": "string", "minLength": 1 },
+    "skillsDir": { "type": "string", "minLength": 1 },
+    "agentsDir": { "type": ["string", "null"] },
+    "agentFrontmatter": { "type": ["array", "null"], "items": { "type": "string" } }
   },
   "additionalProperties": false
 }

@@ -1,0 +1,10 @@
+{
+  "id": "qoder",
+  "label": "Qoder",
+  "configDir": ".qoder",
+  "nativeEntry": "AGENTS.md",
+  "renderDir": ".qoder/harness",
+  "skillsDir": ".qoder/skills",
+  "agentsDir": ".qoder/agents",
+  "agentFrontmatter": ["name", "description", "tools", "mcpServers"]
+}

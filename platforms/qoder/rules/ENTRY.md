@@ -9,4 +9,4 @@
 - Ponytail runs as a skill/instruction, without plugin commands or lifecycle hooks. Read its ladder; this platform difference is not a failure.
 - Verify MCP once with `list_projects`; apply canonical evidence/降级 rules. Setup details belong in `references/tooling.md`.
 
-Bootstrap projects this delta to `.qoder/rules/ENTRY.md` and merges it with Codex in the shared `AGENTS.md`.
+Bootstrap projects this delta to `.qoder/harness/ENTRY.md` and merges it with Codex in the shared `AGENTS.md`.

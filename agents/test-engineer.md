@@ -18,7 +18,7 @@
 
 - 测试代码 / 配置变更
 - 验证命令输出摘要
-- 可选：`.ai-runtime-artifacts/verifications/` 条目
+- 可选：`verifications/` 条目（入库，非运行目录）
 
 ---
 

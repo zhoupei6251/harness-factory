@@ -3,15 +3,15 @@ import { readdir, mkdir, stat, lstat, realpath, symlink } from "node:fs/promises
 import { join, resolve, dirname } from "node:path";
 import { homedir, platform as osPlatform } from "node:os";
 import { fileURLToPath } from "node:url";
+import { loadPlatforms } from "./platforms.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const SKILLS_DIR = join(ROOT, "skills");
-const TARGETS = { claude: ".claude", codex: ".agents", trae: ".trae", workbuddy: ".codebuddy", qoder: ".qoder" } as const;
-type TargetKey = keyof typeof TARGETS;
+
 const CORE = ["ponytail", "codebase-memory", "hf-debug", "hf-verify", "hf-security", "hf-design", "hf-tdd", "hf-ui", "hf-web-test", "playwright"];
 
-function parseArgs(argv: string[]) {
-  const platforms = new Set<TargetKey>();
+function parseArgs(argv: string[], known: string[]) {
+  const platforms = new Set<string>();
   let profile = "core";
   let base = homedir();
   let dryRun = false;
@@ -34,9 +34,9 @@ function parseArgs(argv: string[]) {
     }
     if (arg === "--platform") {
       if (value === "all") {
-        for (const key of Object.keys(TARGETS)) platforms.add(key as TargetKey);
-      } else if (Object.hasOwn(TARGETS, value)) {
-        platforms.add(value as TargetKey);
+        for (const key of known) platforms.add(key);
+      } else if (known.includes(value)) {
+        platforms.add(value);
       } else {
         throw new Error(`Unknown platform: ${value}`);
       }
@@ -47,7 +47,7 @@ function parseArgs(argv: string[]) {
       base = resolve(value);
     }
   }
-  return { platforms: platforms.size ? [...platforms] : Object.keys(TARGETS) as TargetKey[], profile, base, dryRun };
+  return { platforms: platforms.size ? [...platforms] : known, profile, base, dryRun };
 }
 
 async function skillNames(profile: string): Promise<string[]> {
@@ -89,13 +89,14 @@ async function installSkill(name: string, destRoot: string, dryRun: boolean): Pr
 }
 
 try {
-  const { platforms, profile, base, dryRun } = parseArgs(process.argv.slice(2));
+  const matrix = await loadPlatforms();
+  const { platforms, profile, base, dryRun } = parseArgs(process.argv.slice(2), [...matrix.keys()].sort());
   const names = await skillNames(profile);
   console.log(`${names.length} skills (${profile}); hosts: ${platforms.join(", ")}; ${dryRun ? "preview" : "install"}`);
   const counts = { installed: 0, kept: 0, conflict: 0 };
   for (const target of platforms) {
     for (const name of names) {
-      counts[await installSkill(name, join(base, TARGETS[target], "skills"), dryRun)]++;
+      counts[await installSkill(name, join(base, matrix.get(target)!.skillsDir), dryRun)]++;
     }
   }
   console.log(`${dryRun ? "Planned" : "Installed"}: ${counts.installed}; already linked: ${counts.kept}; conflicts: ${counts.conflict}. No plugins, hooks or MCP settings changed.`);

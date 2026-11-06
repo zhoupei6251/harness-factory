@@ -126,7 +126,7 @@ MCP Call: codegraph.get-callers
 
 - 根因与修复方案 → `.ai-runtime-artifacts/specs/` 或 verifications/
 - 修复 execution-log → `.ai-runtime-artifacts/execution-logs/`
-- 验证 → `.ai-runtime-artifacts/verifications/`
+- 验证 → `verifications/`（入库，非运行目录）
 
 ---
 

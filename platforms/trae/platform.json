@@ -1,0 +1,10 @@
+{
+  "id": "trae",
+  "label": "Trae",
+  "configDir": ".trae",
+  "nativeEntry": ".trae/rules/project_rules.md",
+  "renderDir": ".trae/harness",
+  "skillsDir": ".trae/skills",
+  "agentsDir": null,
+  "agentFrontmatter": null
+}

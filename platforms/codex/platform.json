@@ -1,0 +1,10 @@
+{
+  "id": "codex",
+  "label": "Codex CLI",
+  "configDir": ".codex",
+  "nativeEntry": "AGENTS.md",
+  "renderDir": ".codex/harness",
+  "skillsDir": ".agents/skills",
+  "agentsDir": null,
+  "agentFrontmatter": null
+}

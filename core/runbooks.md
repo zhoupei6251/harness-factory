@@ -23,7 +23,7 @@ Create `skills/<name>/SKILL.md` and `_meta.json`, run `npm run index` and `npm r
 
 ## Add a platform adapter
 
-Add `platforms/<name>/rules/ENTRY.md`; update the platform schema, bootstrap platform maps, structure assertions and relevant tests together. A native entry shared by two adapters must merge both deltas.
+Add `platforms/<name>/platform.json` (the capability matrix: id, configDir, nativeEntry, renderDir, skillsDir, agentsDir, agentFrontmatter) plus `platforms/<name>/rules/ENTRY.md` (the prose delta). Every script reads the matrix, so no script needs a matching edit; update the platform schema, structure assertions and relevant tests together. A native entry shared by two adapters must merge both deltas.
 
 ## Bug fix
 

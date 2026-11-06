@@ -1,0 +1,10 @@
+{
+  "id": "claude",
+  "label": "Claude Code",
+  "configDir": ".claude",
+  "nativeEntry": "CLAUDE.md",
+  "renderDir": ".claude/harness",
+  "skillsDir": ".claude/skills",
+  "agentsDir": ".claude/agents",
+  "agentFrontmatter": ["name", "description", "type", "model", "readonly", "skills"]
+}
