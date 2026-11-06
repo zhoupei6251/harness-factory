@@ -8,6 +8,7 @@ Canonical sources are edited directly; distribution artifacts are regenerated. T
 |------|---------|
 | `ENTRY.md` | Shared behavior and loading policy |
 | `core/` | Eight governance documents, loaded by task |
+| `agents/<role>.md` | Role behavior contracts (canonical); target projects keep thin wrappers whose `core:` points here |
 | `capabilities/rules/` | Three verticals: common, java, typescript; patterns/security/testing/hooks guidance |
 | `platforms/<p>/rules/ENTRY.md` | Five adapters: claude, codex, trae, workbuddy, qoder |
 | `routes/code/MEMORY.md` | Neutral initialization template, not live project state |
