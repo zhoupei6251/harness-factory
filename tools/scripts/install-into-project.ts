@@ -177,20 +177,27 @@ async function main(): Promise<void> {
   console.log(`[ok]   loaded birds-eye (${birdsEye.length} chars)${args.birdsEyeFile ? ` from ${args.birdsEyeFile}` : " from default template"}`);
 
   // Render + write
+  // A project may keep its own finished CLAUDE.md in the factory
+  // (`projects/<project-dir>/CLAUDE.md`). That copy is the durable one: the
+  // project file is gitignored, so branch switches and clones destroy it, while
+  // the factory is a separate repository that survives them.
+  const ownedDir = resolve(ROOT, "projects", basename(target));
   const templateFiles: TemplateFile[] = ["CLAUDE.md", "AGENTS.md", "GEMINI.md"];
   for (const tf of templateFiles) {
+    const owned = resolve(ownedDir, tf);
+    const useOwned = tf === "CLAUDE.md" && existsSync(owned);
     const template = await readFile(resolve(TEMPLATES_DIR, `target-${tf}`), "utf-8");
     const importLine = templateImport(tf, mode);
-    const content = render(template, birdsEye, importLine);
+    const content = useOwned ? await readFile(owned, "utf-8") : render(template, birdsEye, importLine);
     const dst = resolve(target, tf);
     const wasExisting = existsSync(dst);
     if (args.dryRun) {
-      console.log(`[dry]  ${tf} (${content.length} chars, would write)`);
+      console.log(`[dry]  ${tf} (${content.length} chars, would write${useOwned ? ", from projects/" : ""})`);
       continue;
     }
     const backup = wasExisting ? await backupIfExists(dst) : null;
     await writeFile(dst, content, "utf-8");
-    console.log(`[ok]   ${tf} (${content.length} chars)${backup ? ` [backed up to ${basename(backup)}]` : ""}`);
+    console.log(`[ok]   ${tf} (${content.length} chars${useOwned ? ` from projects/${basename(target)}/CLAUDE.md` : ""})${backup ? ` [backed up to ${basename(backup)}]` : ""}`);
   }
 
   // Git ops

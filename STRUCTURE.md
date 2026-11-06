@@ -21,6 +21,7 @@ Canonical sources are edited directly; distribution artifacts are regenerated. T
 | `references/` | Setup, lessons, and on-demand frontend design references |
 | `references/upstreams.lock.json` | Source repositories, exact revisions, original paths and content hashes |
 | `templates/` | Downstream target entries, overview template and shared harness template |
+| `projects/<name>/CLAUDE.md` | A downstream project's finished CLAUDE.md. It lives here because the project copy is gitignored and is destroyed by branch switches that still track it; `install-into-project` prefers this copy over the generic template |
 
 See `skills/INDEX.md` and `npm run stats` for live counts.
 

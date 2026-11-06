@@ -46,3 +46,6 @@ timing.json
 # diagnose-windows-sandbox-acl skill outputs (ACL backup files + JSONL reports)
 # Only created when the workspace ACL blocks write; remove freely after the run.
 .acl-reports/
+
+# 项目成品 CLAUDE.md 存这里，必须入库（上面的 CLAUDE.md 规则会误伤它）
+!projects/*/CLAUDE.md
