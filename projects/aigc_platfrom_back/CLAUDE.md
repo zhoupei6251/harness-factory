@@ -121,6 +121,9 @@ mvn compile
 
 # 跑单元测试（须显式关闭跳过）
 mvn test -DskipTests=false
+
+# 回归门禁：只跑 *GuardTest / *RegressionTest（pre-push 自动执行）
+script/bin/guard-tests.sh
 ```
 
 运行主应用：
@@ -152,6 +155,7 @@ mvn spring-boot:run
 3. **复用公共模块**：优先 `ruoyi-common` 已有能力，不重复造轮子。
 4. **Controller 不写业务**：编排与校验在 Web 层，业务在 Service。
 5. **阻塞 IO**：JDK 21 下优先虚拟线程（与 `application.yml`、`AigcTaskThreadPoolConfig` 等现有用法一致）。
+6. **防复发**：`fix` 提交必须新增或修改 `*GuardTest` / `*RegressionTest`（`@Tag("local")` 必带）；无法断言的约束登记到 **`docs/traps.md`**。改既有逻辑前先读该文件相关行。详见 `CODING_CONVENTIONS.md`「Bug 修复与防复发」。
 
 ## 文档与工具链关系
 
@@ -159,6 +163,7 @@ mvn spring-boot:run
 |------|------|
 | **`CLAUDE.md`**（本文件） | 项目级鸟瞰：结构、配置、入口索引 |
 | **`CODING_CONVENTIONS.md`** | 本仓库必须遵守的编码习惯（实现时以同模块现有类为准） |
+| **`docs/traps.md`** | 本项目「踩过一次、别改回去」的陷阱表；改既有逻辑前先读相关行 |
 | **`.cursor/skills/aigc-platform-rules/SKILL.md`** | Cursor 技能：技术栈、禁令、自检清单 |
 | **`.cursor/rules/*.mdc`** | 若存在，为编辑器按文件类型附加的规则片段 |
 
