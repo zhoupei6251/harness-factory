@@ -122,7 +122,7 @@ mvn compile
 # 跑单元测试（须显式关闭跳过）
 mvn test -DskipTests=false
 
-# 回归门禁：只跑 *GuardTest / *RegressionTest（pre-push 自动执行）
+# 回归门禁：只跑 *GuardTest / *RegressionTest（手动/CI 执行，不挂 pre-push）
 script/bin/guard-tests.sh
 ```
 
