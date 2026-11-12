@@ -185,8 +185,8 @@ mvn spring-boot:run
 
 | 用户意图 | 动作 |
 |---------|------|
-| 设计、方案、架构 | brainstorming → 写 spec → **暂停等确认** |
-| 计划、拆分任务 | writing-plans → 写 plan → **暂停等确认** |
+| 设计、方案、架构 | brainstorming → 写 spec → **暂停等确认**（用户只要方案时停在此处；同时要求实现则继续） |
+| 计划、拆分任务 | writing-plans → 写 plan → **暂停等确认**（同上） |
 | 开始实现、并行实现 | 拆 WU → 并行派发（≤5 Worker） |
 | quick-fix、小改动 | Leader 直改，不派兵 |
 | 审查、review | requesting-code-review |
@@ -196,7 +196,7 @@ mvn spring-boot:run
 
 ### 阶段门禁（不可跳过）
 
-1. **spec/plan 写完后** → 必须暂停，等用户「批准/开始实现」
+1. **用户只要求方案时** → 写完 spec/plan 即停，等「批准/开始实现」；用户同时要求实现时，同一授权覆盖取证 → 实现 → 验证，不额外索取批准
 2. **实现完成后** → 进入尾盘（测试 + 审查）
 3. **小改动** → 可直接处理，但须遵守 NEVER.md
 
@@ -225,7 +225,7 @@ mvn spring-boot:run
 ### 禁用约束
 
 - ❌ 不经设计直接实现复杂功能
-- ❌ spec/plan 未批准就实现
+- ❌ 用户只要方案时，spec/plan 未批准就实现
 - ❌ 提交未审查的代码
 - ❌ 硬编码 secrets（使用环境变量）
 - ❌ 自动运行 `mvn` / 启动项目（验证命令仅列出供用户手动执行）
@@ -234,4 +234,4 @@ mvn spring-boot:run
 
 ### 文档优先级
 
-`harness-factory/guides/routing.md` § 阶段门禁 > `harness-factory/rules/NEVER.md` > `harness-factory/ENTRY.md` > 本文件一般章节 > `CODING_CONVENTIONS.md`。
+`harness-factory/rules/NEVER.md` > `harness-factory/ENTRY.md` > 本文件一般章节 > `CODING_CONVENTIONS.md`。

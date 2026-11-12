@@ -43,10 +43,11 @@
  */
 import { readdir, readFile, stat } from "node:fs/promises";
 import type { Dirent } from "node:fs";
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { SECTION_PTR, findDanglingPointers } from "./section-pointer.ts";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -89,6 +90,8 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
   }
 }
 
+// A doc that points at `<file> § <section>` promises that section exists; see
+// section-pointer.ts for the case that motivated the check.
 // ---------- 1. rules/ + guides/ ----------
 // The split is behavioural: rules/ is read every session, guides/ is loaded on
 // demand. A document in the wrong bucket is a promise the entry file cannot keep.
@@ -406,6 +409,37 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
     ok(`no tracked files under runtime dirs (${RUNTIME_DIRS.join(", ")})`);
   } else {
     for (const p of runtimeOffenders) bad(`runtime content must not be tracked: ${p}`);
+  }
+
+  // Every `<file>.md § <section>` pointer resolves to a real heading. Scoped to
+  // the docs this factory authors: upstream mirrors and archived skills quote
+  // their own numbering, and a project's CLAUDE.md lives outside this checkout.
+  const authored = [
+    ...tracked.filter((p) => /^(rules|guides|references)\/[^/]+\.md$/.test(p)),
+    "ENTRY.md",
+  ].filter((p) => existsSync(resolve(ROOT, p)));
+  const docs = await Promise.all(
+    authored.map(async (path) => ({ path, text: await readFile(resolve(ROOT, path), "utf-8") })),
+  );
+  const dangling = findDanglingPointers(docs, (target) => {
+    try {
+      return readFileSync(resolve(ROOT, target), "utf-8");
+    } catch {
+      return null;
+    }
+  });
+  for (const d of dangling) {
+    bad(
+      d.reason === "missing-file"
+        ? `${d.doc}: section pointer names a missing file -> ${d.target}`
+        : `${d.doc}: ${d.target} has no section "${d.section}"`,
+    );
+  }
+  const total = [...docs].reduce((n, doc) => n + [...doc.text.matchAll(SECTION_PTR)].length, 0);
+  if (total === 0) {
+    ok(`no section pointers to verify in the authored docs`);
+  } else if (dangling.length === 0) {
+    ok(`every section pointer resolves (${total} across ${authored.length} authored docs)`);
   }
 }
 
