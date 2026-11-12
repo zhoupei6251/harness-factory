@@ -25,12 +25,15 @@
  *      isn't accidentally ignoring the birds-eye file).
  *   7. Run with --dry-run after the real install: the target files
  *      must be unchanged (dry-run promise).
+ *   8. Omit --birds-eye-file with a `projects/<target>/birds-eye.md`
+ *      present in the factory: that copy must be used, and an explicit
+ *      flag must still win over it.
  *
  * Stays in a fresh temp dir for the whole run. Cleans up on the way out,
  * and the cleanup path refuses to rm anything outside the temp root.
  */
 import { createHash } from "node:crypto";
-import { mkdtemp, readFile, realpath, rm, writeFile, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, readdir, realpath, rm, writeFile, stat } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { resolve, dirname, join, sep } from "node:path";
@@ -74,6 +77,11 @@ function render(template: string, birdsEye: string, importLine: string): string 
 
 function runInstall(target: string, birdsEyePath: string, extra: string[] = []): { status: number; stdout: string; stderr: string } {
   const r = spawnSync(NODE, [TSX, INSTALL_SCRIPT, "--target", target, "--birds-eye-file", birdsEyePath, ...extra], { encoding: "utf-8" });
+  return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
+}
+
+function runInstallWithoutBirdsEye(target: string): { status: number; stdout: string; stderr: string } {
+  const r = spawnSync(NODE, [TSX, INSTALL_SCRIPT, "--target", target], { encoding: "utf-8" });
   return { status: r.status ?? 1, stdout: r.stdout ?? "", stderr: r.stderr ?? "" };
 }
 
@@ -137,6 +145,8 @@ try {
   for (let i = 0; i < expectedTemplateFiles.length; i++) {
     assert(beforeReHashes[i] === afterReHashes[i], `${expectedTemplateFiles[i]} unchanged on second install with the same fixture`);
   }
+  const backupsAfterIdempotentRun = (await readdir(tempRoot)).filter((f) => f.includes(".bak-"));
+  assert(backupsAfterIdempotentRun.length === 0, "an identical re-install writes no .bak files");
 
   // Step 6: a different birds-eye MUST change the output. This catches a
   // script that ignores the --birds-eye-file argument and reads a default
@@ -152,6 +162,8 @@ try {
     afterDifferentHash !== beforeDifferentHash,
     "CLAUDE.md changes when the birds-eye fixture changes (script is not silently ignoring --birds-eye-file)",
   );
+  const backupsAfterChangedRun = (await readdir(tempRoot)).filter((f) => f.includes(".bak-"));
+  assert(backupsAfterChangedRun.length === 3, `changed entries are backed up (got ${backupsAfterChangedRun.length}, expected 3)`);
 
   // Step 7: dry-run promise.
   console.log("");
@@ -172,6 +184,40 @@ try {
       afterHash === entry.hash && after.mtimeMs === entry.mtime,
       `--dry-run did not touch ${entry.file} (bytes + mtime unchanged)`,
     );
+  }
+
+  // Step 8: without the flag, the project's own birds-eye kept in the factory
+  // is the fallback. Otherwise a routine re-install swaps a project's real
+  // overview for the neutral template.
+  console.log("");
+  console.log("# Step 8: projects/<target>/birds-eye.md fallback");
+  const ownedName = `hf-roundtrip-${process.pid}`;
+  const ownedTarget = join(tempRoot, ownedName);
+  const ownedProjectDir = resolve(ROOT, "projects", ownedName);
+  const fixtureBodyC = "# 工厂内保存的项目鸟瞰\n\n- name: harness-roundtrip-C\n- description: 未传 flag 时应读取工厂内的项目副本\n";
+  assert(!(await exists(ownedProjectDir)), `fixture project dir does not already exist (${ownedName})`);
+  await mkdir(ownedTarget, { recursive: true });
+  await mkdir(ownedProjectDir, { recursive: true });
+  await writeFile(join(ownedProjectDir, "birds-eye.md"), fixtureBodyC, "utf-8");
+  try {
+    const fallbackRun = runInstallWithoutBirdsEye(ownedTarget);
+    assert(fallbackRun.status === 0, `install without --birds-eye-file exited 0 (got ${fallbackRun.status})`);
+    const claudeTemplate = await readFile(join(TEMPLATE_DIR, "target-CLAUDE.md"), "utf-8");
+    const expectedFallback = render(claudeTemplate, fixtureBodyC, templateImport("CLAUDE.md"));
+    assert(
+      contentHash(await readFile(join(ownedTarget, "CLAUDE.md"), "utf-8")) === contentHash(expectedFallback),
+      "CLAUDE.md uses projects/<target>/birds-eye.md when the flag is omitted",
+    );
+
+    const flagRun = runInstall(ownedTarget, fixtureA);
+    assert(flagRun.status === 0, `install with explicit flag exited 0 (got ${flagRun.status})`);
+    const expectedFlag = render(claudeTemplate, fixtureBodyA, templateImport("CLAUDE.md"));
+    assert(
+      contentHash(await readFile(join(ownedTarget, "CLAUDE.md"), "utf-8")) === contentHash(expectedFlag),
+      "explicit --birds-eye-file still wins over the factory copy",
+    );
+  } finally {
+    await safeRemoveTemp(ownedProjectDir, resolve(ROOT, "projects"));
   }
 } finally {
   await safeRemoveTemp(tempRootRaw, tempRoot);

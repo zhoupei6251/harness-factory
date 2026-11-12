@@ -88,9 +88,17 @@ async function testReinstallBackup(): Promise<void> {
   const r2 = run(target, ["--birds-eye-file", birdsEye]);
   assert(r2.status === 0, "second install: exit 0");
 
-  const files = await readdir(target);
-  const bakFiles = files.filter((f) => f.includes(".bak-") && f.endsWith(".md"));
-  assert(bakFiles.length === 3, `exactly 3 backup files created (got ${bakFiles.length})`);
+  let files = await readdir(target);
+  let bakFiles = files.filter((f) => f.includes(".bak-") && f.endsWith(".md"));
+  assert(bakFiles.length === 0, `identical re-install leaves no backups (got ${bakFiles.length})`);
+
+  await writeFile(birdsEye, "# 测试项目\n\n- 名称: test\n- 定位: 第二次安装后改过的鸟瞰\n", "utf-8");
+  const r3 = run(target, ["--birds-eye-file", birdsEye]);
+  assert(r3.status === 0, "third install: exit 0");
+
+  files = await readdir(target);
+  bakFiles = files.filter((f) => f.includes(".bak-") && f.endsWith(".md"));
+  assert(bakFiles.length === 3, `changed entries are backed up (got ${bakFiles.length})`);
 
   await rm(target, { recursive: true });
   await rm(birdsEye.replace(/birds-eye\.md$/, ""), { recursive: true });

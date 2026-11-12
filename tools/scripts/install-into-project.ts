@@ -86,9 +86,12 @@ function templateImport(file: TemplateFile, mode: Mode): string {
   return mode === "self" ? "./ENTRY.md" : "harness-factory/GEMINI.harness.md";
 }
 
-async function loadBirdsEye(args: Args): Promise<string> {
-  const src = args.birdsEyeFile ?? resolve(TEMPLATES_DIR, "project-birds-eye.template.md");
-  return await readFile(src, "utf-8");
+async function loadBirdsEye(args: Args): Promise<{ text: string; src: string }> {
+  // Same precedence as the durable CLAUDE.md copy: an explicit flag wins, then
+  // the project's own birds-eye kept in the factory, then the neutral template.
+  const owned = resolve(ROOT, "projects", basename(args.target), "birds-eye.md");
+  const src = args.birdsEyeFile ?? (existsSync(owned) ? owned : resolve(TEMPLATES_DIR, "project-birds-eye.template.md"));
+  return { text: await readFile(src, "utf-8"), src };
 }
 
 function render(template: string, birdsEye: string, importLine: string): string {
@@ -97,8 +100,10 @@ function render(template: string, birdsEye: string, importLine: string): string 
     .replace(/\$\{HARNESS_FACTORY_IMPORT\}/g, importLine);
 }
 
-async function backupIfExists(dst: string): Promise<string | null> {
+/** Returns a backup path only when the incoming bytes differ; a repeat install is not a reason to grow the directory. */
+async function backupIfExists(dst: string, next: string): Promise<string | null> {
   if (!existsSync(dst)) return null;
+  if ((await readFile(dst, "utf-8")) === next) return null;
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   const backup = `${dst}.bak-${stamp}.md`;
   await copyFile(dst, backup);
@@ -176,7 +181,7 @@ async function main(): Promise<void> {
 
   // Load birds-eye
   const birdsEye = await loadBirdsEye(args);
-  console.log(`[ok]   loaded birds-eye (${birdsEye.length} chars)${args.birdsEyeFile ? ` from ${args.birdsEyeFile}` : " from default template"}`);
+  console.log(`[ok]   loaded birds-eye (${birdsEye.text.length} chars) from ${birdsEye.src}`);
 
   // A declared project receives only the entries its declared platforms read,
   // so the platform matrix stays the single source of truth here too.
@@ -202,14 +207,13 @@ async function main(): Promise<void> {
     const useOwned = tf === "CLAUDE.md" && existsSync(owned);
     const template = await readFile(resolve(TEMPLATES_DIR, `target-${tf}`), "utf-8");
     const importLine = templateImport(tf, mode);
-    const content = useOwned ? await readFile(owned, "utf-8") : render(template, birdsEye, importLine);
+    const content = useOwned ? await readFile(owned, "utf-8") : render(template, birdsEye.text, importLine);
     const dst = resolve(target, tf);
-    const wasExisting = existsSync(dst);
     if (args.dryRun) {
       console.log(`[dry]  ${tf} (${content.length} chars, would write${useOwned ? ", from projects/" : ""})`);
       continue;
     }
-    const backup = wasExisting ? await backupIfExists(dst) : null;
+    const backup = await backupIfExists(dst, content);
     await writeFile(dst, content, "utf-8");
     console.log(`[ok]   ${tf} (${content.length} chars${useOwned ? ` from projects/${basename(target)}/CLAUDE.md` : ""})${backup ? ` [backed up to ${basename(backup)}]` : ""}`);
   }
