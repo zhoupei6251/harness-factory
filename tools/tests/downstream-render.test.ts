@@ -169,9 +169,9 @@ async function main(): Promise<void> {
     // 5. Assert the bootstrap output. Two distinct output classes:
     //    (a) platform projection under platforms/<p>/platform.json renderDir → ENTRY.md + ROOT.md
     //    (b) native entry written to the path in platform.json nativeEntry
-    //        (top-level CLAUDE.md/AGENTS.md for claude/codex+qoder; nested
-    //        .trae/rules/project_rules.md and .codebuddy/rules/project_rules.md
-    //        for trae/workbuddy, which don't have a top-level native entry file)
+    //        (top-level CLAUDE.md for claude, AGENTS.md for codex + qoder + workbuddy;
+    //        nested .trae/rules/project_rules.md for trae, the only host whose
+    //        rules file is neither AGENTS.md nor CLAUDE.md)
     const platformProjection: Array<[string, string]> = [
       [".claude", "harness/ENTRY.md"],
       [".codex", "harness/ENTRY.md"],
@@ -189,9 +189,8 @@ async function main(): Promise<void> {
     }
     const nativeEntries: Array<[string, string]> = [
       ["CLAUDE.md", "claude native entry (top-level)"],
-      ["AGENTS.md", "codex + qoder merged native entry (top-level)"],
+      ["AGENTS.md", "codex + qoder + workbuddy merged native entry (top-level)"],
       [".trae/rules/project_rules.md", "trae native entry (nested)"],
-      [".codebuddy/rules/project_rules.md", "workbuddy native entry (nested)"],
     ];
     for (const [rel, label] of nativeEntries) {
       const p = join(installedHarness, rel);

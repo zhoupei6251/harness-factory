@@ -13,7 +13,7 @@ Harness Factory distributes software-engineering instructions across five platfo
 | `skills/` | Curated core and optional legacy procedures; upstream subsets live beside their adapters, loaded on demand |
 | `references/` | Tool setup, lessons and frontend design source guidance |
 
-Claude, Codex, Trae, WorkBuddy and Qoder are the adapters. Codex and Qoder share the native `AGENTS.md`; generation merges their deltas. Gemini's distributable harness remains for the existing downstream installer contract, without adding a sixth bootstrap adapter.
+Claude, Codex, Trae, WorkBuddy and Qoder are the adapters. Codex, Qoder and WorkBuddy share the native `AGENTS.md`; generation merges their deltas. Gemini's distributable harness remains for the existing downstream installer contract, without adding a sixth bootstrap adapter.
 
 ## Execution design
 

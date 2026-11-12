@@ -2,7 +2,7 @@
   "id": "workbuddy",
   "label": "WorkBuddy",
   "configDir": ".codebuddy",
-  "nativeEntry": ".codebuddy/rules/project_rules.md",
+  "nativeEntry": "AGENTS.md",
   "renderDir": ".codebuddy/harness",
   "skillsDir": ".codebuddy/skills",
   "agentsDir": ".codebuddy/agents",

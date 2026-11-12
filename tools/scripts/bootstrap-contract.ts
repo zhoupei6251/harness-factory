@@ -6,7 +6,7 @@
  * Why this module exists: check-bootstrap.ts and the two integration tests each
  * kept their own copy of that list. The copy in check-bootstrap.ts drifted to
  * paths bootstrap never writes (`.claude/CLAUDE.md`, `.codex/AGENTS.md`,
- * `.qoder/AGENTS.md`, `.codebuddy/AGENTS.md`, `GEMINI.md`), so 5 of its 12 checks
+ * `.qoder/AGENTS.md`, `GEMINI.md`), so 5 of its 12 checks
  * `[skip]`-ed permanently while the script still printed "No bootstrap drift
  * detected." One list, three consumers.
  */
@@ -24,7 +24,6 @@ export const GENERATED_FILES = [
   "AGENTS.md",
   "CLAUDE.md",
   ".trae/rules/project_rules.md",
-  ".codebuddy/rules/project_rules.md",
   ".claude/harness/ENTRY.md",
   ".claude/harness/ROOT.md",
   ".codex/harness/ENTRY.md",

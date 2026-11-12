@@ -46,7 +46,7 @@ skills:
 | `type` / `model` / `readonly` | 直接写入包装 frontmatter |
 | `skills` | 该角色默认加载的 skill 名，可为空数组 |
 
-平台限制：只有具备"每角色一个文件"概念的宿主才生成包装（当前仅 claude）。Codex / Qoder 走 `AGENTS.md` + `.agents/skills/`，对 `--platform codex` 会直接报错而不是静默跳过。
+平台限制：只有具备"每角色一个文件"概念的宿主才生成包装（当前 claude / qoder / workbuddy）。Codex 走 `AGENTS.md` + `.agents/skills/`，对 `--platform codex` 会直接报错而不是静默跳过。
 
 ## 新增一个角色
 

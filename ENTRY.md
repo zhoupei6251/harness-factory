@@ -60,7 +60,7 @@ Stale/missing graph coverage requires checking current source, not pretending th
 | Claude Code | `~/.claude/` | `platforms/claude/` |
 | Codex | `AGENTS.md` + `~/.codex/`; skills in `.agents/skills/` | `platforms/codex/` |
 | Trae | `~/.trae/` | `platforms/trae/` |
-| WorkBuddy | `~/.codebuddy/` | `platforms/workbuddy/` |
+| WorkBuddy | `AGENTS.md` + `.codebuddy/` (skills/agents); user `~/.workbuddy/` | `platforms/workbuddy/` |
 | Qoder | `AGENTS.md` + `~/.qoder/` + `~/.qoder-cn/` | `platforms/qoder/` |
 
 ## Workflow (this repository only)

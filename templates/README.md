@@ -4,17 +4,18 @@
 
 1. Clone or link this repository at `<project>/harness-factory/`; keep that directory name.
 2. Run `npx tsx harness-factory/tools/scripts/install-into-project.ts --target .` from the project root.
+   The birds-eye comes from `--birds-eye-file` when given, else from `harness-factory/projects/<project-dir>/birds-eye.md` when that copy exists, else from the neutral template.
 3. The installer backs up existing entries and renders the project overview. Review the resulting local files and start a new agent session.
 
 | Template | Output |
 |----------|--------|
 | `target-CLAUDE.md` | Project `CLAUDE.md` |
-| `target-AGENTS.md` | Project `AGENTS.md` for Codex/Qoder |
+| `target-AGENTS.md` | Project `AGENTS.md` for Codex/Qoder/WorkBuddy |
 | `target-GEMINI.md` | Project `GEMINI.md` |
 | `project-birds-eye.template.md` | Default overview; replace with `--birds-eye-file <path>` |
 | `harness.template.md` | Repository `CLAUDE.harness.md`, `AGENTS.harness.md`, `GEMINI.harness.md` through bootstrap |
 
-The target templates contain `${PROJECT_BIRDS_EYE}` and `${HARNESS_FACTORY_IMPORT}`. Other-project mode points at `harness-factory/*.harness.md`; self mode uses this repository's `ENTRY.md`. Codex/Gemini use conditional text instructions and Claude uses an `@import`.
+The target templates contain `${PROJECT_BIRDS_EYE}` and `${HARNESS_FACTORY_IMPORT}`. Other-project mode points at `harness-factory/*.harness.md`; self mode uses this repository's `ENTRY.md`. Codex/Qoder/WorkBuddy/Gemini use conditional text instructions and Claude uses an `@import`.
 
 ## Maintain the shared harness
 

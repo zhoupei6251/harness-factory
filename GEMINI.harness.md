@@ -57,7 +57,8 @@
 
 **跨端协作**（多端同时工作）：
 - Claude Code: 项目根 `CLAUDE.md` 的 `@harness-factory/CLAUDE.harness.md`
-- Codex / Qoder / Trae / WorkBuddy: 项目根 `AGENTS.md` 条件读 `harness-factory/AGENTS.harness.md`
+- Codex / Qoder / WorkBuddy: 项目根 `AGENTS.md` 条件读 `harness-factory/AGENTS.harness.md`
+- Trae: 项目根 `.trae/rules/project_rules.md` 条件读 `harness-factory/AGENTS.harness.md`
 - Gemini: 项目根 `GEMINI.md` 条件读 `harness-factory/GEMINI.harness.md`（本文件）
 
 ## §5 验证

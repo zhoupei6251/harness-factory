@@ -158,7 +158,6 @@ try {
     "CLAUDE.md",
     "AGENTS.md",
     ".trae/rules/project_rules.md",
-    ".codebuddy/rules/project_rules.md",
   ];
   const ENTRY_MARKERS = ["Tooling (required", "降级", "Tooling（本端接入）"];
   for (const entry of NATIVE_ENTRIES) {
@@ -172,10 +171,10 @@ try {
     }
   }
 
-  // AGENTS.md is shared by codex and qoder: both deltas must survive the merge,
-  // and the qoder delta must not be overwritten by a later single-platform run.
+  // AGENTS.md is shared by codex, qoder and workbuddy: every delta must survive
+  // the merge, and no single-platform run may overwrite the others.
   const agents = await readFile(resolve(tempRoot, "AGENTS.md"), "utf-8");
-  for (const delta of ["Codex platform rules", "Qoder platform rules"]) {
+  for (const delta of ["Codex platform rules", "Qoder platform rules", "WorkBuddy platform rules"]) {
     if (agents.includes(delta)) {
       console.log(`[ok]   AGENTS.md merges the ${delta.toLowerCase()}`);
     } else {

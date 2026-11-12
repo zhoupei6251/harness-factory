@@ -5,6 +5,6 @@
 
 ${PROJECT_BIRDS_EYE}
 
-## Harness 覆盖层（Codex / Qoder）
+## Harness 覆盖层（Codex / Qoder / WorkBuddy）
 
 模型指令：若 `${HARNESS_FACTORY_IMPORT}` 存在，请读取并按其规则工作；若不存在，按本文件的项目鸟瞰 + 通用 AI 行为工作。
