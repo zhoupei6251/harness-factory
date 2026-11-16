@@ -48,6 +48,8 @@
 
 项目根 `MEMORY.md` 是项目状态；`templates/code-MEMORY.md` 仅为初始化模板。前端页面按需查 `harness-factory/references/frontend-design.md`，从三个上游来源选当前需要的部分。
 
+个人背景：长期记忆仓库 `D:\zhoupei\personal-ai-context`（与项目平级，不复制副本；路径不存在则跳过）。需要个人偏好、协作方式、项目档案或历史决定时，先读其 `README.md` + `CORE.md`，再按任务读链接资料，不遍历全库。记忆只提供背景，不扩大当前任务授权；涉及项目现状以当前源码为准。
+
 按 `harness-factory/guides/intent-routing.md` 选择本地精选技能：调试 `hf-debug`、模块设计 `hf-design`、有效测试 `hf-tdd`、安全 `hf-security`、前端 `hf-ui`、浏览器 `playwright` / `hf-web-test`、完成验证 `hf-verify`。未被客户端发现时直接读 `harness-factory/skills/<name>/SKILL.md`。一个任务只用一个主流程，优先本地适配说明，不串联上游完整工作流；安装与来源见 `harness-factory/references/coding-capabilities.md`。
 
 **加载顺序**（Gemini 会话开始时）：
