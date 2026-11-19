@@ -11,7 +11,7 @@ const home = join(sandbox, "home");
 const target = join(sandbox, "project");
 const env = { ...process.env, USERPROFILE: home, HOME: home };
 const core = ["codebase-memory", "hf-debug", "hf-design", "hf-security", "hf-tdd", "hf-ui", "hf-verify", "hf-web-test", "playwright", "ponytail"].sort();
-const hosts = [".claude", ".agents", ".trae", ".codebuddy", ".qoder"];
+const hosts = [".claude", ".agents", ".trae", ".codebuddy", ".qoder", ".dsh"];
 
 function run(args: string[]) {
   return spawnSync(process.execPath, [join(root, "node_modules/tsx/dist/cli.mjs"), join(root, "tools/scripts/install-skills.ts"), ...args], {
@@ -61,7 +61,7 @@ try {
   for (const args of [["--wat"], ["--platform"], ["--platform", "bad"], ["--profile", "bad"], ["--target"], ["--target", "--dry-run"]]) {
     assert.equal(run(args).status, 1, `reject ${args.join(" ")}`);
   }
-  console.log("Skill installer passed: five hosts, profiles, preview, idempotence, conflicts and invalid input.");
+  console.log("Skill installer passed: six hosts, profiles, preview, idempotence, conflicts and invalid input.");
 } finally {
   // sandbox is the exact mkdtemp-created test root; never traverse a caller-supplied path.
   await rm(sandbox, { recursive: true, force: true });

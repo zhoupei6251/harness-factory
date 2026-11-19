@@ -34,6 +34,8 @@ export const GENERATED_FILES = [
   ".trae/harness/ROOT.md",
   ".codebuddy/harness/ENTRY.md",
   ".codebuddy/harness/ROOT.md",
+  ".dsh/harness/ENTRY.md",
+  ".dsh/harness/ROOT.md",
   "CLAUDE.harness.md",
   "AGENTS.harness.md",
   "GEMINI.harness.md",
@@ -42,7 +44,7 @@ export const GENERATED_FILES = [
 /** Project state, initialized once from templates/code-MEMORY.md and then preserved. */
 export const ROUTE_MEMORY = "MEMORY.md";
 
-const OWNED_TOP_DIRS = new Set([".claude", ".codex", ".qoder", ".trae", ".codebuddy", ".ai-runtime-artifacts"]);
+const OWNED_TOP_DIRS = new Set([".claude", ".codex", ".qoder", ".trae", ".codebuddy", ".dsh", ".ai-runtime-artifacts"]);
 
 /**
  * Is this repo-root-relative path owned by bootstrap (generated output or the

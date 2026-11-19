@@ -10,12 +10,12 @@
 | Template | Output |
 |----------|--------|
 | `target-CLAUDE.md` | Project `CLAUDE.md` |
-| `target-AGENTS.md` | Project `AGENTS.md` for Codex/Qoder/WorkBuddy |
+| `target-AGENTS.md` | Project `AGENTS.md` for Codex/Qoder/WorkBuddy/DeepSeek Harness |
 | `target-GEMINI.md` | Project `GEMINI.md` |
 | `project-birds-eye.template.md` | Default overview; replace with `--birds-eye-file <path>` |
 | `harness.template.md` | Repository `CLAUDE.harness.md`, `AGENTS.harness.md`, `GEMINI.harness.md` through bootstrap |
 
-The target templates contain `${PROJECT_BIRDS_EYE}` and `${HARNESS_FACTORY_IMPORT}`. Other-project mode points at `harness-factory/*.harness.md`; self mode uses this repository's `ENTRY.md`. Codex/Qoder/WorkBuddy/Gemini use conditional text instructions and Claude uses an `@import`.
+The target templates contain `${PROJECT_BIRDS_EYE}` and `${HARNESS_FACTORY_IMPORT}`. Other-project mode points at `harness-factory/*.harness.md`; self mode uses this repository's `ENTRY.md`. Codex/Qoder/WorkBuddy/DeepSeek Harness/Gemini use conditional text instructions and Claude uses an `@import`.
 
 ## Maintain the shared harness
 

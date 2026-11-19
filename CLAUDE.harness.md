@@ -13,7 +13,7 @@
 
 - 普通任务：简短说明目标，主 Agent 直接处理，无强制文档、worktree 或子 Agent。
 - 复杂任务：一份简短计划包含范围、证据和通过标准；按依赖分步实施，需要时安排独立审查。
-- 只有缺失决定实质影响行为/范围，或操作尚未获授权时才询问。提交和 push 遵守项目及用户授权。
+- 只有缺失决定实质影响行为/范围时才询问。宿主审批策略决定受限操作能否执行：`ask` 下只对具体受限操作申请审批；`never` 下每次审批都会 `rejected`，不要索取、不要换工具或路径重试，停下并报告被阻断的动作。普通提问不等于宿主审批。提交和 push 遵守项目及用户授权。
 
 ## §2 按风险分级
 
@@ -52,9 +52,9 @@
 2. `<cwd>/CLAUDE.md`（项目根，**含本文件的 @import**）
 3. `~/.claude/rules/`（用户级 skill 自动发现）
 
-**5 端对应入口**（多端协作时各自加载）：
+**6 端对应入口**（多端协作时各自加载）：
 - Claude Code: 项目根 `CLAUDE.md` 的 `@harness-factory/CLAUDE.harness.md`
-- Codex / Qoder / WorkBuddy: 项目根 `AGENTS.md` 的条件读 `harness-factory/AGENTS.harness.md`（若存在）
+- Codex / Qoder / WorkBuddy / DeepSeek Harness: 项目根 `AGENTS.md` 的条件读 `harness-factory/AGENTS.harness.md`（若存在）
 - Trae: 项目根 `.trae/rules/project_rules.md` 的条件读 `harness-factory/AGENTS.harness.md`（若存在）
 - Gemini: 项目根 `GEMINI.md` 的条件读 `harness-factory/GEMINI.harness.md`（若存在）
 

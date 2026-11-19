@@ -1,0 +1,10 @@
+{
+  "id": "dsh",
+  "label": "DeepSeek Harness",
+  "configDir": ".dsh",
+  "nativeEntry": "AGENTS.md",
+  "renderDir": ".dsh/harness",
+  "skillsDir": ".dsh/skills",
+  "agentsDir": null,
+  "agentFrontmatter": null
+}

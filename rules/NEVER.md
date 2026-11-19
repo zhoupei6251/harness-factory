@@ -13,6 +13,8 @@
 | over-abstract on first use | Reuse existing code; add abstraction when repetition warrants it |
 | multi-line if without braces | Always brace |
 | auto git push | Require explicit user authorization |
+| retry an approval or sandbox denial through another tool/path | Treat the denial as final; report the blocked action and remaining work |
+| treat your own question as host approval | Only the host's approval outcome authorizes a gated action |
 | fix without a regression check | Add or update a test that fails on the old bug and passes now |
 | claiming independent review of your own work | Use a separate reviewer when independent review is required |
 | claiming checks passed without running them | Report the actual command, result and any limits |

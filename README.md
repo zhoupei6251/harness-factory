@@ -1,6 +1,6 @@
 # Harness Factory
 
-Code-only rules and tools for Claude Code, Codex, Trae, WorkBuddy and Qoder. The default workflow is: understand the relevant code, make the smallest complete change, run the checks that matter.
+Code-only rules and tools for Claude Code, Codex, Trae, WorkBuddy, Qoder and DeepSeek Harness. The default workflow is: understand the relevant code, make the smallest complete change, run the checks that matter.
 
 ## Quick start
 
@@ -18,9 +18,9 @@ Bootstrap is local and does not probe external tools or the network. Run `npm ru
 The default profile links 10 skills: Ponytail, Codebase Memory, debugging, verification, security, module design, effective tests, UI design, Web testing and Playwright. Local adapters use selected content from Superpowers, ECC, Matt Pocock Skills, Impeccable, Taste, UI UX Pro Max and Anthropic Skills. Original reference files, data, licenses and fixed revisions ship with the repository; ordinary tasks load only the matching skill. Full frameworks, hook runtimes and automatic updates are not part of this profile.
 
 ```powershell
-# Preview project-local installation for all five hosts
+# Preview project-local installation for all six hosts
 npm run skills:install -- --target D:/path/to/project --dry-run
-# Install for the host you use; omit --platform for all five
+# Install for the host you use; omit --platform for all six
 npm run skills:install -- --platform codex --target D:/path/to/project
 ```
 
@@ -57,7 +57,7 @@ For frontend pages, [references/frontend-design.md](references/frontend-design.m
 | `npm run check-bootstrap` | Compare generated entries with fresh output in isolation |
 | `npm run index` | Regenerate `skills/INDEX.md` |
 | `npm run stats` | Live repository counts and Git state |
-| `npm run skills:install -- --platform codex` | Link 10 core skills; optional --target, --profile all and --dry-run; five hosts supported |
+| `npm run skills:install -- --platform codex` | Link 10 core skills; optional --target, --profile all and --dry-run; six hosts supported |
 | `npm run check:upstreams` | Verify bundled source hashes and license records offline |
 | `npm run hooks:install` | Install the pre-commit bootstrap drift gate once per clone |
 | `npm test` | Full repository governance/bootstrap/install checks |
@@ -66,7 +66,7 @@ Use Node.js 20.9+ with the locked npm dependencies. Scripts run through tsx; no 
 
 ## Sources and generated files
 
-Edit `ENTRY.md`, `rules/`, `guides/`, `stacks/`, `platforms/`, `templates/` and code skills. `npm run bootstrap` generates native entries and per-platform rule directories. Codex and Qoder share `AGENTS.md`, so their deltas are merged.
+Edit `ENTRY.md`, `rules/`, `guides/`, `stacks/`, `platforms/`, `templates/` and code skills. `npm run bootstrap` generates native entries and per-platform rule directories. Codex, Qoder, WorkBuddy and DeepSeek Harness share `AGENTS.md`, so their deltas are merged.
 
 The three `*.harness.md` files are tracked distribution artifacts; regenerate and commit them with their sources. Native entries, platform projections, dependencies and runtime scratch are gitignored. Existing project `MEMORY.md` is preserved.
 

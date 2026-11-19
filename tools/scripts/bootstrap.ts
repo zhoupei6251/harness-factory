@@ -42,33 +42,34 @@ const HARNESS_DELTAS: Record<"CLAUDE" | "AGENTS" | "GEMINI", HarnessDelta> = {
       "3. `~/.claude/rules/`（用户级 skill 自动发现）",
     ].join("\n"),
     cross_end: [
-      "**5 端对应入口**（多端协作时各自加载）：",
+      "**6 端对应入口**（多端协作时各自加载）：",
       "- Claude Code: 项目根 `CLAUDE.md` 的 `@harness-factory/CLAUDE.harness.md`",
-      "- Codex / Qoder / WorkBuddy: 项目根 `AGENTS.md` 的条件读 `harness-factory/AGENTS.harness.md`（若存在）",
+      "- Codex / Qoder / WorkBuddy / DeepSeek Harness: 项目根 `AGENTS.md` 的条件读 `harness-factory/AGENTS.harness.md`（若存在）",
       "- Trae: 项目根 `.trae/rules/project_rules.md` 的条件读 `harness-factory/AGENTS.harness.md`（若存在）",
       "- Gemini: 项目根 `GEMINI.md` 的条件读 `harness-factory/GEMINI.harness.md`（若存在）",
     ].join("\n"),
   },
   AGENTS: {
-    title: "AGENTS.harness.md — harness-factory 可分发 harness 规则（Codex / Qoder / WorkBuddy 端）",
+    title: "AGENTS.harness.md — harness-factory 可分发 harness 规则（Codex / Qoder / WorkBuddy / DeepSeek Harness 端）",
     intro: [
       "> 本文件由 `harness-factory/tools/scripts/install-into-project.ts` 在 other 模式下被目标项目 `AGENTS.md` 条件读取。  ",
       "> 模型指令：若你正在阅读的目标项目 `AGENTS.md` 含「请读取 `harness-factory/AGENTS.harness.md`」指令，请按本文件规则工作。  ",
       "> 与其他平台共用同一代码工作流。",
     ].join("\n"),
     section_0: [
-      "## §0 Codex / Qoder / WorkBuddy 加载约定",
+      "## §0 Codex / Qoder / WorkBuddy / DeepSeek Harness 加载约定",
       "",
       "- Codex: 本机存在 `~/.codex/AGENTS.md` 优先；项目根 `AGENTS.md` 为入口",
       "- Qoder: 与 Codex 共用 `AGENTS.md` 入口（qoder 不区分）",
       "- WorkBuddy: 与 Codex / Qoder 共用 `AGENTS.md` 入口（官方兼容 `CODEBUDDY.md`、`.codebuddy/CODEBUDDY.md`、`AGENTS.md`）；代码开发的项目级配置在 `.codebuddy/`（`skills/`、`agents/`），`.workbuddy/` 只是 Agent 工作态",
       "- WorkBuddy 除 `AGENTS.md` 外还会自动注入 `.codebuddy/rules/`；同一份项目鸟瞰只写一处，不要两个目录各抄一份",
+      "- DeepSeek Harness: 从项目根到工作目录逐级读 `AGENTS.md`（同目录 `CLAUDE.md` 也读，内容相同时只注入一次）；项目技能在 `.dsh/skills/`，审批策略 `never` 下审批一律 `rejected`",
       "- 入口文件按其文字指令条件读取 `harness-factory/AGENTS.harness.md`（即本文件）；不存在则 fallback 到 `AGENTS.md` 自身内容",
       "- 已加载的规则不重复读取；子目录规则按改动范围加载。",
     ].join("\n"),
     load_order: [
-      "**加载顺序**（Codex/Qoder/WorkBuddy 会话开始时）：",
-      "1. 用户全局：Codex `~/.codex/AGENTS.md`、WorkBuddy `~/.codebuddy/`",
+      "**加载顺序**（Codex/Qoder/WorkBuddy/DeepSeek Harness 会话开始时）：",
+      "1. 用户全局：Codex `~/.codex/AGENTS.md`、WorkBuddy `~/.codebuddy/`、DeepSeek Harness `~/.dsh/AGENTS.md` 与 `~/.agents/AGENTS.md`",
       "2. `<cwd>/AGENTS.md`（项目根，**含条件读取 `harness-factory/AGENTS.harness.md` 的指令**）",
       "3. 子目录按需加载",
     ].join("\n"),
@@ -76,6 +77,7 @@ const HARNESS_DELTAS: Record<"CLAUDE" | "AGENTS" | "GEMINI", HarnessDelta> = {
       "**跨端协作**（多端同时工作）：",
       "- Claude Code: 项目根 `CLAUDE.md` 的 `@harness-factory/CLAUDE.harness.md`",
       "- Codex / Qoder / WorkBuddy: 项目根 `AGENTS.md` 条件读 `harness-factory/AGENTS.harness.md`（本文件）",
+      "- DeepSeek Harness: 项目根 `AGENTS.md` 条件读 `harness-factory/AGENTS.harness.md`（本文件；同目录 `CLAUDE.md` 也会被读取）",
       "- Trae: 项目根 `.trae/rules/project_rules.md` 条件读 `harness-factory/AGENTS.harness.md`",
       "- Gemini: 项目根 `GEMINI.md` 条件读 `harness-factory/GEMINI.harness.md`",
     ].join("\n"),
@@ -104,6 +106,7 @@ const HARNESS_DELTAS: Record<"CLAUDE" | "AGENTS" | "GEMINI", HarnessDelta> = {
       "**跨端协作**（多端同时工作）：",
       "- Claude Code: 项目根 `CLAUDE.md` 的 `@harness-factory/CLAUDE.harness.md`",
       "- Codex / Qoder / WorkBuddy: 项目根 `AGENTS.md` 条件读 `harness-factory/AGENTS.harness.md`",
+      "- DeepSeek Harness: 项目根 `AGENTS.md` 条件读 `harness-factory/AGENTS.harness.md`（同目录 `CLAUDE.md` 也会被读取）",
       "- Trae: 项目根 `.trae/rules/project_rules.md` 条件读 `harness-factory/AGENTS.harness.md`",
       "- Gemini: 项目根 `GEMINI.md` 条件读 `harness-factory/GEMINI.harness.md`（本文件）",
     ].join("\n"),
@@ -131,7 +134,7 @@ function parseArgs(argv: string[], known: string[]): { platform: string | "all";
         process.exit(1);
       }
     } else if (argv[i] === "-h" || argv[i] === "--help") {
-      console.log("Usage: bootstrap.ts [--platform claude|codex|trae|workbuddy|qoder|all] [--route code]");
+      console.log("Usage: bootstrap.ts [--platform claude|codex|trae|workbuddy|qoder|dsh|all] [--route code]");
       process.exit(0);
     } else {
       console.error(`Unknown or incomplete argument: ${argv[i]}`);
@@ -183,7 +186,7 @@ async function projectNativeEntry(plats: string[], configs: Map<string, Platform
   console.log(`[ok] ${plats.join(" + ")}: native entry ${entryPath}`);
 }
 
-/** Platforms sharing one native entry file (codex + qoder on AGENTS.md) are merged. */
+/** Platforms sharing one native entry file (codex + qoder + workbuddy + dsh on AGENTS.md) are merged. */
 function groupByNativeEntry(plats: string[], configs: Map<string, PlatformConfig>): string[][] {
   const byEntry = new Map<string, string[]>();
   for (const plat of plats) {
@@ -248,7 +251,7 @@ const { platform, route } = parseArgs(process.argv.slice(2), PLATFORMS);
 const selected: string[] = platform === "all" ? PLATFORMS : [platform];
 for (const p of selected) await projectPlatform(p, configs.get(p)!);
 // Always write the full group sharing a native entry, so `--platform codex`
-// cannot clobber the qoder delta merged into the same AGENTS.md.
+// cannot clobber another delta merged into the same AGENTS.md.
 for (const group of groupByNativeEntry(PLATFORMS, configs)) {
   if (group.some((p) => selected.includes(p))) await projectNativeEntry(group, configs);
 }

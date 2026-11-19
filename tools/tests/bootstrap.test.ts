@@ -56,6 +56,7 @@ const ROOT_MUST_SURVIVE = [
   ".trae",
   ".codebuddy",
   ".qoder",
+  ".dsh",
   ".ai-runtime-artifacts",
 ];
 
@@ -171,10 +172,10 @@ try {
     }
   }
 
-  // AGENTS.md is shared by codex, qoder and workbuddy: every delta must survive
+  // AGENTS.md is shared by codex, qoder, workbuddy and dsh: every delta must survive
   // the merge, and no single-platform run may overwrite the others.
   const agents = await readFile(resolve(tempRoot, "AGENTS.md"), "utf-8");
-  for (const delta of ["Codex platform rules", "Qoder platform rules", "WorkBuddy platform rules"]) {
+  for (const delta of ["Codex platform rules", "Qoder platform rules", "WorkBuddy platform rules", "DeepSeek Harness (DSH) platform rules"]) {
     if (agents.includes(delta)) {
       console.log(`[ok]   AGENTS.md merges the ${delta.toLowerCase()}`);
     } else {

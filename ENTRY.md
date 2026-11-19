@@ -1,6 +1,6 @@
 ---
 name: harness-factory
-description: "Code-only Harness rules for Claude / Codex / Trae / WorkBuddy / Qoder."
+description: "Code-only Harness rules for Claude / Codex / Trae / WorkBuddy / Qoder / DeepSeek Harness."
 tags: [Rules, Runbook]
 ---
 
@@ -36,7 +36,8 @@ Code is the only route. Keep the default path short: understand, implement, veri
 - A request to implement, fix or optimize authorizes work through relevant verification. Do not require a separate spec/plan approval for the same scope.
 - Routine changes: brief intent, targeted evidence, direct implementation and relevant checks. No mandatory plan file, worktree, subagent or verification document.
 - Complex or risky changes: keep one concise plan/evidence record, split independent work when useful, and request independent review for material risks.
-- Ask only when a missing decision changes scope/behavior or the next action needs authorization. A request for a plan alone does not authorize implementation.
+- Ask only when a missing decision changes scope/behavior. A request for a plan alone does not authorize implementation.
+- Host approval policy decides gated actions, not your wording. Under `ask`, request approval only for the exact action; under `never`, every approval request resolves `rejected` — do not ask, do not retry the same action through another tool or path, and stop with the blocked action reported. A plain user question is not host approval.
 - Batch independent reads/checks. Run relevant tests after a coherent edit, not whole-project checks after every file. Repeat only after changes or failures that justify it.
 
 ## Tooling (required — 代码域强制)
@@ -63,6 +64,7 @@ Stale/missing graph coverage requires checking current source, not pretending th
 | Trae | `~/.trae/` | `platforms/trae/` |
 | WorkBuddy | `AGENTS.md` + `.codebuddy/` (skills/agents); user `~/.workbuddy/` | `platforms/workbuddy/` |
 | Qoder | `AGENTS.md` + `~/.qoder/` + `~/.qoder-cn/` | `platforms/qoder/` |
+| DeepSeek Harness | `AGENTS.md` (also reads `CLAUDE.md`); skills in `.dsh/skills/` | `platforms/dsh/` |
 
 ## Workflow (this repository only)
 

@@ -11,7 +11,7 @@
  *      (intent-routing / karpathy-guidelines / NEVER / principles / routing /
  *      runbooks / tags-index + ENTRY.md itself, which the index table leaves
  *      implicit).
- *   2. platforms/ has exactly 5 adapters, each with platforms/<p>/rules/ENTRY.md.
+ *   2. platforms/ has exactly 6 adapters, each with platforms/<p>/rules/ENTRY.md.
  *   3. routes/ has only code, with templates/code-MEMORY.md.
  *   4. stacks/ has the 3 verticals java / typescript / common,
  *      each with hooks.md / patterns.md / security.md / testing.md.
@@ -115,7 +115,7 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
 
 // ---------- 2. platforms/ adapters ----------
 {
-  const expectedPlatforms = ["claude", "codex", "qoder", "trae", "workbuddy"];
+  const expectedPlatforms = ["claude", "codex", "dsh", "qoder", "trae", "workbuddy"];
   const actual = await listDirs("platforms");
   const missing = expectedPlatforms.filter((p) => !actual.includes(p));
   const extra = actual.filter((p) => !expectedPlatforms.includes(p));
@@ -146,7 +146,7 @@ async function listFiles(rel: string, suffix?: string): Promise<string[]> {
         allHaveMatrix = false;
       }
     }
-    if (allHaveEntry) ok(`platforms/ has exactly 5 adapters, each with rules/ENTRY.md`);
+    if (allHaveEntry) ok(`platforms/ has exactly ${expectedPlatforms.length} adapters, each with rules/ENTRY.md`);
     if (allHaveMatrix) ok(`every adapter declares its own platform.json matrix`);
   } else {
     if (missing.length) bad(`platforms/ missing adapter(s): ${missing.join(", ")}`);

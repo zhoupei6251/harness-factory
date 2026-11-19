@@ -2,7 +2,7 @@
 
 ## 入口（本端读哪个文件）
 
-- WorkBuddy 兼容 `CODEBUDDY.md`、`.codebuddy/CODEBUDDY.md`、`AGENTS.md` 与用户级 `~/.codebuddy/`；本项目统一走项目根 `AGENTS.md`，与 Codex / Qoder 共用同一入口，三端 delta 合并进同一个文件。
+- WorkBuddy 兼容 `CODEBUDDY.md`、`.codebuddy/CODEBUDDY.md`、`AGENTS.md` 与用户级 `~/.codebuddy/`；本项目统一走项目根 `AGENTS.md`，与 Codex / Qoder / DeepSeek Harness 共用同一入口，四端 delta 合并进同一个文件。
 - 因此不要再把同一份项目鸟瞰写进 `.codebuddy/rules/`：`AGENTS.md` 与项目规则目录都会自动注入，双写等于同一份上下文注入两遍。
 - `.codebuddy/` 是代码开发的项目级配置根（`rules/`、`agents/`、`skills/`、`commands/`、`CODEBUDDY.md`），可随仓库提交；`.workbuddy/` 是 Agent 工作态（记忆/会话数据），不入库，两者不要混用。
 

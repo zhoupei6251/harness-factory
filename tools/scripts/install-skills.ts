@@ -19,7 +19,7 @@ function parseArgs(argv: string[], known: string[]) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--help" || arg === "-h") {
-      console.log("Usage: install-skills.ts [--platform all|claude|codex|trae|workbuddy|qoder] [--profile core|all] [--target <project>] [--dry-run]\nDefault: 10 core skills, all five hosts, user home. --target uses project-local native skill directories.");
+      console.log("Usage: install-skills.ts [--platform all|claude|codex|dsh|trae|workbuddy|qoder] [--profile core|all] [--target <project>] [--dry-run]\nDefault: 10 core skills, all six hosts, user home. --target uses project-local native skill directories.");
       process.exit(0);
     }
     if (arg === "--dry-run") {

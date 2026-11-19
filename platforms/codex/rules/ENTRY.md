@@ -8,4 +8,4 @@
 - Verify MCP once with `list_projects`; apply the canonical evidence/降级 rules in `ENTRY.md`.
 - Setup details: `references/tooling.md` on demand.
 
-Bootstrap projects this delta to `.codex/harness/ENTRY.md`. Codex, Qoder and WorkBuddy share `AGENTS.md`; every delta must survive generation.
+Bootstrap projects this delta to `.codex/harness/ENTRY.md`. Codex, Qoder, WorkBuddy and DeepSeek Harness share `AGENTS.md`; every delta must survive generation.

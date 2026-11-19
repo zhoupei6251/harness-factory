@@ -11,7 +11,7 @@ Canonical sources are edited directly; distribution artifacts are regenerated. T
 | `agents/<role>.md` | Role behavior contracts (canonical); target projects keep thin wrappers whose `core:` points here |
 | `stacks/` | Three verticals: common, java, typescript; patterns/security/testing/hooks guidance |
 | `platforms/<p>/platform.json` | Capability matrix per host: configDir, nativeEntry, renderDir, skillsDir, agentsDir, agentFrontmatter. Every script reads it — no script keeps its own copy |
-| `platforms/<p>/rules/ENTRY.md` | Five adapters: claude, codex, trae, workbuddy, qoder — prose delta only |
+| `platforms/<p>/rules/ENTRY.md` | Six adapters: claude, codex, dsh, trae, workbuddy, qoder — prose delta only |
 | `templates/code-MEMORY.md` | Neutral initialization template, not live project state |
 | `skills/<name>/SKILL.md` + `_meta.json` | Active software-engineering procedures |
 | `skills/hf-*/upstream/`, `skills/ponytail/upstream-LICENSE` | Fixed upstream subsets and licenses; local SKILL.md adapters define scope |
@@ -43,7 +43,7 @@ There is no product frontend or media renderer in this repository. Frontend work
 |------|-----------|
 | `CLAUDE.harness.md`, `AGENTS.harness.md`, `GEMINI.harness.md` | Generated from `templates/harness.template.md`; tracked for downstream use |
 | `CLAUDE.md`, `AGENTS.md` | Generated native entries; gitignored |
-| `.claude/`, `.codex/`, `.trae/`, `.codebuddy/`, `.qoder/` | Generated platform projections; gitignored |
+| `.claude/`, `.codex/`, `.trae/`, `.codebuddy/`, `.qoder/`, `.dsh/` | Generated platform projections; gitignored |
 | Root `MEMORY.md` | Mutable project state, initialized only if absent; gitignored |
 | `.ai-runtime-artifacts/` | Code task scratch/runtime; gitignored |
 | `node_modules/` | npm-managed dependencies; gitignored |
