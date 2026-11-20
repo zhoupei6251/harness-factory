@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * skills-archive-review.ts — phase-6 cull candidate report.
+ * skills-archive-review.md.ts — phase-6 cull candidate report.
  *
  * What it does: for every entry under skills/archive/, count how many
  * non-archive tracked files in the repository mention the skill's name
@@ -21,7 +21,7 @@
  * to stdout, sorted by reference count ascending. The user pipes it
  * wherever it belongs (verifications/, or a tracking doc).
  *
- * Re-run: `npx tsx scripts/skills-archive-review.ts`. Not wired into
+ * Re-run: `npx tsx scripts/skills-archive-review.md.ts`. Not wired into
  * `npm test` on purpose: the count is an observation, not an invariant.
  * A skill with zero references today may gain one tomorrow; a hard gate
  * would silently break that.

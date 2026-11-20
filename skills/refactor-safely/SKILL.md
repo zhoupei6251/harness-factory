@@ -10,7 +10,7 @@ tags:
 - refactor
 - safe
 domain: code
-category: code.review
+category: code.review.md
 ---
 # 安全重构（Refactor Safely）
 

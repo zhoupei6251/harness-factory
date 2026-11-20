@@ -19,6 +19,7 @@ Playwright 为可选浏览器服务：优先已有浏览器或测试能力；需
 |------|--------|----------------|------|
 | **codebase-memory-mcp** | 代码知识图谱 MCP 服务：tree-sitter（162 语言）+ Hybrid LSP，持久化 SQLite 图谱 | 10 个 active skills 依赖它（`query-symbol`、`get-callers`、`get-callees`、`analyze-impact`、`query-knowledge-graph`、`index-project`、`understand-project`、`analyze-architecture`、`lsp-query`、`ripgrep-search`）；为 R1「Read before write」提供改动前证据 | [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) |
 | **ponytail** | 生成前按不写 → 复用 → 标准库 → 平台原生能力 → 已有依赖 → 一行 → 最小实现选择 | 对应 R2 / R8；默认 `full`。安装 skill 不代表已启用插件或 lifecycle hooks | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT） |
+| **RTK（可选）** | 压缩受支持的 shell 命令输出；Claude / Codex 原生 PreToolUse Hook | 每用户安装一次，所有项目共用；不替代图谱取证和验证，不改变项目命令授权 | [rtk-ai/rtk](https://github.com/rtk-ai/rtk)；安装、许可证和恢复方式见 [rtk.md](rtk.md) |
 
 ---
 

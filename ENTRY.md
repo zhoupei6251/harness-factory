@@ -51,6 +51,8 @@ Read installed `codebase-memory` and `ponytail` skills once on first coding work
 
 `npm run skills:install -- --platform <host> --target <project>` links the 10-skill core profile into native project directories. Omit `--target` for user-level installation; `--profile all` opts into the legacy catalog. Preview with `--dry-run`. Installation never enables plugins, hooks or MCP servers. Pinned source integrity: `npm run check:upstreams` (offline).
 
+RTK is optional shared shell-output tooling. When installed, use its native Claude/Codex hooks or supported `rtk` commands; keep graph queries first, preserve command permissions and project restrictions, and recover raw output when exact evidence is needed. Install once per user, not per project: [references/rtk.md](references/rtk.md).
+
 When graph tools are unavailable, use source reads and targeted searches and state:
 `[codebase-memory-mcp 不可用，已降级] 原因：<实际错误>；替代手段：<源码读取与调用追踪>`。
 Stale/missing graph coverage requires checking current source, not pretending the graph is complete. Setup details: [references/tooling.md](references/tooling.md).

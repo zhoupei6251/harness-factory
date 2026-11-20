@@ -14,7 +14,7 @@ tags:
 - simplify
 - quality
 domain: code
-category: code.review
+category: code.review.md
 ---
 # Simplify Code
 

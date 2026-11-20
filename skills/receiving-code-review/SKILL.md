@@ -1,13 +1,13 @@
 ---
-name: receiving-code-review
+name: receiving-code-review.md
 description: 根据独立审查者的反馈修改代码。
 version: 1.0.0
-when_to_use: 调用 receiving-code-review 时
+when_to_use: 调用 receiving-code-review.md 时
 status: peripheral
 tags:
 - shared
 domain: code
-category: code.review
+category: code.review.md
 ---
 # Receiving Code Review
 

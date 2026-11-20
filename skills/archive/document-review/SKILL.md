@@ -1,14 +1,14 @@
 ---
-name: document-review
-description: Systematic document review with type-specific rules. **Environment preparation**
+name: document-review.md
+description: Systematic document review.md with type-specific rules. **Environment preparation**
   is a first-class check for design and plan documents.
 version: 1.0.0
-when_to_use: 调用 document-review 时
+when_to_use: 调用 document-review.md 时
 status: peripheral
 tags:
 - shared
 domain: code
-category: code.review
+category: code.review.md
 ---
 ---
 name: document-review

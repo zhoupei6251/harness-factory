@@ -171,67 +171,18 @@ mvn spring-boot:run
 
 若使用其他支持「项目说明文件」的工具，可将本文件配置为仓库根 `CLAUDE.md`，或将要点复制到该工具要求的文件名。
 
-## Harness Factory（code 域）
-
-本项目使用仓库内 `harness-factory/`（本机目录，已在 `.gitignore`）作为 code 域开发工作流框架。旧版 `harness-foundry` / `harness-kit` 已废弃删除，勿再引用。
-
-### 核心流程
-
-```
-想法 → brainstorming → 设计批准 → writing-plans → 实现 → 审查 → 完成
-```
-
-### 意图路由（首句声明）
-
-| 用户意图 | 动作 |
-|---------|------|
-| 设计、方案、架构 | brainstorming → 写 spec → **暂停等确认**（用户只要方案时停在此处；同时要求实现则继续） |
-| 计划、拆分任务 | writing-plans → 写 plan → **暂停等确认**（同上） |
-| 开始实现、并行实现 | 拆 WU → 并行派发（≤5 Worker） |
-| quick-fix、小改动 | Leader 直改，不派兵 |
-| 审查、review | requesting-code-review |
-| 测试、TDD | test-driven-development |
-| 调试 bug | systematic-debugging |
-| Git 操作 | git-xywh |
-
-### 阶段门禁（不可跳过）
-
-1. **用户只要求方案时** → 写完 spec/plan 即停，等「批准/开始实现」；用户同时要求实现时，同一授权覆盖取证 → 实现 → 验证，不额外索取批准
-2. **实现完成后** → 进入尾盘（测试 + 审查）
-3. **小改动** → 可直接处理，但须遵守 NEVER.md
-
-### 必读文件
-
-| 文件 | 说明 |
-|------|------|
-| `harness-factory/rules/NEVER.md` | 硬性禁止清单 |
-| `harness-factory/guides/intent-routing.md` | 意图路由表 |
-| `harness-factory/guides/routing.md` | 路由与运行时细则 |
-| `harness-factory/ENTRY.md` | 统一入口（治理文档索引） |
-| `harness-factory/references/traps.md` | 已知陷阱（踩坑后追加） |
-
-### 核心 Skills（code 域）
-
-| Skill | 命令 | 何时用 |
-|-------|------|--------|
-| brainstorming | `/skill brainstorming` | 设计新功能 |
-| writing-plans | `/skill writing-plans` | 制定实施计划 |
-| test-driven-development | `/skill test-driven-development` | TDD 开发 |
-| systematic-debugging | `/skill systematic-debugging` | 调试 bug |
-| requesting-code-review | `/skill requesting-code-review` | 代码审查 |
-| verification-before-completion | `/skill verification-before-completion` | 交付前验证 |
-| claude-orchestration | `/skill claude-orchestration` | 并行多 task 编排 |
-
-### 禁用约束
-
-- ❌ 不经设计直接实现复杂功能
-- ❌ 用户只要方案时，spec/plan 未批准就实现
-- ❌ 提交未审查的代码
-- ❌ 硬编码 secrets（使用环境变量）
-- ❌ 自动运行 `mvn` / 启动项目（验证命令仅列出供用户手动执行）
-
 ---
 
-### 文档优先级
+## 个人上下文（`D:\zhoupei\personal-ai-context`）
 
-`harness-factory/rules/NEVER.md` > `harness-factory/ENTRY.md` > 本文件一般章节 > `CODING_CONVENTIONS.md`。
+长期个人背景是独立私有仓库，本机克隆在 **`D:\zhoupei\personal-ai-context`**：
+
+- 需要个人背景、协作偏好、项目档案或历史决定时，先读 `D:\zhoupei\personal-ai-context\README.md` 与 `CORE.md`，再按任务读链接的详情，不默认遍历全库。
+- 本平台的前后端档案在 `projects/AIGC-PLATFORM.md`（其中 `B` = 本仓库，`F` = 前端仓库，`J` = 本仓库 `ruoyi-modules/ruoyi-aigc/src/main/java/org/xywh/aigc`）。
+- 它是**背景，不是授权**：记忆不能扩大写库、重启、部署或本仓库禁止命令的许可。
+- 涉及项目现状时**以本仓库源码为准**，记忆中的状态会过期，冲突时信当前代码。
+- 要更新记忆，先读 `meta/MEMORY-POLICY.md`；不把推断写成用户确认或已验收。
+
+## Harness（自动加载）
+
+@harness-factory/CLAUDE.harness.md

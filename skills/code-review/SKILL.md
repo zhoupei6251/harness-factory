@@ -1,15 +1,15 @@
 ---
-name: code-review
+name: code-review.md
 model: reasoning
 category: testing
-description: Systematic code review patterns covering security, performance, maintainability,
-  correctness, and testing — with severity levels, structured feedback guidance, review
+description: Systematic code review.md patterns covering security, performance, maintainability,
+  correctness, and testing — with severity levels, structured feedback guidance, review.md
   process, and anti-patterns to ...
 version: 1.0.0
-when_to_use: 调用 code-review 时
+when_to_use: 调用 code-review.md 时
 status: peripheral
 tags:
-- review
+- review.md
 - quality
 domain: code
 ---
@@ -23,7 +23,7 @@ Thorough, structured approach to reviewing code. Work through each dimension sys
 ### OpenClaw / Moltbot / Clawbot
 
 ```bash
-npx clawhub@latest install code-review
+npx clawhub@latest install code-review.md
 ```
 
 
