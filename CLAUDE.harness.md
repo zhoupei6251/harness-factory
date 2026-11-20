@@ -5,8 +5,6 @@
 > 本文件由 `harness-factory/tools/scripts/install-into-project.ts` 在 other 模式下被目标项目 `@harness-factory/CLAUDE.harness.md` 引用。  
 > 代码任务按风险加载规则、取证、实现和验证。
 
-
-
 ## §1 默认执行
 
 仅处理代码任务。用户要求实现、修复、优化时，直接完成取证 → 最小改动 → 相关验证；同一授权范围内不再索取 spec/plan 批准。用户只要求方案时才停在方案。

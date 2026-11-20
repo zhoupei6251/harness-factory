@@ -124,6 +124,11 @@ try {
     await cp(src, resolve(tempRoot, input), { recursive: true });
   }
 
+  // Exercise a Windows checkout even when this test runs on Linux.
+  const harnessTemplate = resolve(tempRoot, "templates", "harness.template.md");
+  const template = await readFile(harnessTemplate, "utf-8");
+  await writeFile(harnessTemplate, template.replace(/\r?\n/g, "\r\n"), "utf-8");
+
   // bootstrap.ts derives its ROOT from its own file location, so the copy inside
   // the temp root projects every artifact there and never touches the repository.
   const result = spawnSync(
@@ -152,6 +157,14 @@ try {
       console.log(`[FAIL] ${e} missing in temp root`);
       fail = 1;
     }
+  }
+
+  const claudeHarness = await readFile(resolve(tempRoot, "CLAUDE.harness.md"), "utf-8");
+  if (/\r|\n{3,}/.test(claudeHarness)) {
+    console.log("[FAIL] CRLF template produced mixed line endings or extra blank lines in CLAUDE.harness.md");
+    fail = 1;
+  } else {
+    console.log("[ok]   CRLF template produces canonical LF output in CLAUDE.harness.md");
   }
 
   // Required-tooling clauses and coding boundaries must survive generation.
