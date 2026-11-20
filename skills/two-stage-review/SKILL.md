@@ -1,8 +1,8 @@
 ---
-name: two-stage-review.md
+name: two-stage-review
 description: 对复杂或高风险代码变更，从需求合规和代码质量两个维度进行一次独立审查。
 version: 1.0.0
-when_to_use: 调用 two-stage-review.md 时
+when_to_use: 调用 two-stage-review 时
 status: peripheral
 tags:
 - shared

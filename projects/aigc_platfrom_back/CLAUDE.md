@@ -185,4 +185,6 @@ mvn spring-boot:run
 
 ## Harness（自动加载）
 
+仅在用户明确要求时运行 Maven 或启动应用。其余情况下列出验证命令和未验证项。
+
 @harness-factory/CLAUDE.harness.md

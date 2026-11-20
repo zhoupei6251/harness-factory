@@ -1,14 +1,14 @@
 ---
-name: requesting-code-review.md
-description: Request an independent review.md of substantial or high-risk code changes, or when the user asks for review.md.
+name: requesting-code-review
+description: Request an independent review of substantial or high-risk code changes, or when the user asks for review.
 version: 1.0.0
-when_to_use: 调用 requesting-code-review.md 时
+when_to_use: 调用 requesting-code-review 时
 status: peripheral
 tags:
-- review.md
+- review
 - workflow
 domain: code
-category: code.review.md
+category: code.review
 ---
 
 # Requesting Code Review

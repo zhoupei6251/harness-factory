@@ -97,7 +97,7 @@ for (const name of names) {
 
 console.log("");
 if (fail === 0) {
-  console.log("Hooks installed. Pre-commit gate: `npm run check-bootstrap`.");
+  console.log("Hooks installed. Pre-commit checks shared links, skill contracts, pinned sources and bootstrap drift.");
   console.log("Re-run after editing anything under tools/hooks/.");
 } else {
   console.log(`install-hooks FAILED (${fail} issue(s)).`);

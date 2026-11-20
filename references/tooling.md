@@ -19,7 +19,7 @@ Playwright 为可选浏览器服务：优先已有浏览器或测试能力；需
 |------|--------|----------------|------|
 | **codebase-memory-mcp** | 代码知识图谱 MCP 服务：tree-sitter（162 语言）+ Hybrid LSP，持久化 SQLite 图谱 | 10 个 active skills 依赖它（`query-symbol`、`get-callers`、`get-callees`、`analyze-impact`、`query-knowledge-graph`、`index-project`、`understand-project`、`analyze-architecture`、`lsp-query`、`ripgrep-search`）；为 R1「Read before write」提供改动前证据 | [DeusData/codebase-memory-mcp](https://github.com/DeusData/codebase-memory-mcp) |
 | **ponytail** | 生成前按不写 → 复用 → 标准库 → 平台原生能力 → 已有依赖 → 一行 → 最小实现选择 | 对应 R2 / R8；默认 `full`。安装 skill 不代表已启用插件或 lifecycle hooks | [DietrichGebert/ponytail](https://github.com/DietrichGebert/ponytail)（MIT） |
-| **RTK（可选）** | 压缩受支持的 shell 命令输出；Claude / Codex 原生 PreToolUse Hook | 每用户安装一次，所有项目共用；不替代图谱取证和验证，不改变项目命令授权 | [rtk-ai/rtk](https://github.com/rtk-ai/rtk)；安装、许可证和恢复方式见 [rtk.md](rtk.md) |
+| **RTK（可选）** | 压缩受支持的 shell 命令输出；Claude / Codex 原生 PreToolUse Hook | 每用户安装一次，所有项目共用，项目命令授权照常适用 | [RTK 接入与恢复](#rtk) |
 
 ---
 
@@ -147,6 +147,12 @@ curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/i
 安装后新开会话，执行 `/ponytail-help` 有输出即成功；生成代码时观察是否先走决策阶梯。
 
 ---
+
+## RTK
+
+按上游指南为当前用户安装 CLI，在 PATH 中运行 `rtk --version` 确认安装。需要自动压缩时，按宿主的官方接入方式配置全局 Hook，并在宿主中确认所需的 Hook 信任。Harness 的 bootstrap 不修改用户配置。 [上游安装指南](https://github.com/rtk-ai/rtk/blob/develop/INSTALL.md) · [许可证](https://github.com/rtk-ai/rtk#license)
+
+压缩输出可能省略证据。核对完整 diff、测试结果或精确行号时，使用原命令或 `rtk bypass <command> [args...]`。图谱查询继续走原有 MCP 或 CLI。卸载时按上游指南移除对应宿主的 RTK Hook。
 
 ## 与本仓库治理的关系
 

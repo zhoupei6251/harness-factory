@@ -36,7 +36,7 @@
 - Files created/modified:
   <!-- 
     WHAT: Which files you created or changed.
-    WHY: Quick reference for what was touched. Helps with debugging and review.md.
+    WHY: Quick reference for what was touched. Helps with debugging and review.
     EXAMPLE:
       - todo.py (created)
       - todos.json (created by app)

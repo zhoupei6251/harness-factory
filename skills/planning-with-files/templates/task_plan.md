@@ -75,7 +75,7 @@ Phase 1
 
 ### Phase 5: Delivery
 <!-- 
-  WHAT: Final review.md and handoff to user.
+  WHAT: Final review and handoff to user.
   WHY: Ensures nothing is forgotten and deliverables are complete.
 -->
 - [ ] Review all output files

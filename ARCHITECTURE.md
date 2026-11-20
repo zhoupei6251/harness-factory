@@ -43,6 +43,6 @@ Bootstrap is deterministic local generation. External-tool diagnostics are an ex
 
 ## Verification
 
-`npm test` runs the current governance, type and installation/generator checks. The installer tests exercise exact rendering, idempotence, backup/dry-run behavior and source-repository isolation. The pre-commit hook checks generated-file drift.
+`npm test` runs the current governance, type and installation/generator checks. The installer tests exercise exact rendering, idempotence, backup/dry-run behavior and source-repository isolation. The pre-commit hook checks staged links in the shared entry docs, skill contracts, pinned upstream files and generated-file drift.
 
 Live counts belong to `npm run stats`; do not hand-maintain snapshots here. Source enumeration uses Git-tracked paths and does not walk local outputs.

@@ -10,7 +10,7 @@ status: peripheral
 tags:
 - code
 domain: code
-category: code.review.md
+category: code.review
 ---
 This skill guides creation of distinctive, production-grade frontend interfaces that avoid generic "AI slop" aesthetics. Implement real working code with exceptional attention to aesthetic details and creative choices.
 

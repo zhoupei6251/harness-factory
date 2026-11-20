@@ -123,7 +123,7 @@ curl -s "https://api.github.com/repos/OWNER/REPO" | jq '{stars: .stargazers_coun
 # List skill files
 curl -s "https://api.github.com/repos/OWNER/REPO/contents/skills/SKILL_NAME" | jq '.[].name'
 
-# Fetch and review.md SKILL.md
+# Fetch and review SKILL.md
 curl -s "https://raw.githubusercontent.com/OWNER/REPO/main/skills/SKILL_NAME/SKILL.md"
 ```
 

@@ -3,6 +3,7 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { resolve, dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { execFileSync } from "node:child_process";
+import { findMissingDocLinks } from "./section-pointer.ts";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, "../..");
@@ -12,6 +13,7 @@ const SKILLS_DIR = resolve(ROOT, "skills");
 // Runtime dirs are ignorable by contract (see guides/routing.md). Anything tracked
 // under one is an ad-hoc `git add -f` rescue that the next clone will lose.
 const RUNTIME_DIRS = [".ai-runtime-artifacts"];
+const SHARED_DOCS = ["README.md", "ENTRY.md", "references/tooling.md"];
 
 function trackedFiles(): string[] {
   return execFileSync("git", ["ls-files"], { cwd: ROOT, encoding: "utf-8" })
@@ -27,6 +29,23 @@ async function validateRuntimeDirs(): Promise<void> {
     for (const p of offenders) console.log(`[FAIL] runtime content must not be tracked: ${p}`);
     fail = 1;
   }
+}
+
+async function validateSharedDocLinks(): Promise<void> {
+  const tracked = new Set(trackedFiles());
+  const staged = process.argv.includes("--staged-links");
+  let broken = false;
+  for (const path of SHARED_DOCS) {
+    const text = staged
+      ? execFileSync("git", ["show", `:${path}`], { cwd: ROOT, encoding: "utf-8" })
+      : await readFile(join(ROOT, path), "utf-8");
+    for (const target of findMissingDocLinks(path, text, tracked)) {
+      console.log(`[FAIL] ${path}: shared documentation link is not tracked -> ${target}`);
+      broken = true;
+    }
+  }
+  if (broken) fail = 1;
+  else console.log("[ok]   shared documentation links point to tracked files");
 }
 
 // Evidence pointers are live: a tracked doc naming an evidence file is a promise
@@ -158,6 +177,7 @@ await validateSkills();
 await validateArchiveSkills();
 await validateRuntimeDirs();
 await validateEvidence();
+await validateSharedDocLinks();
 
 if (fail === 0) {
   console.log("");

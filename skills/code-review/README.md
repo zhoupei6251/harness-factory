@@ -31,7 +31,7 @@ npx add https://github.com/wpank/ai/tree/main/skills/testing/code-review
 ### OpenClaw / Moltbot / Clawbot
 
 ```bash
-npx clawhub@latest install code-review.md
+npx clawhub@latest install code-review
 ```
 
 ### Manual Installation
@@ -42,14 +42,14 @@ From your project root:
 
 ```bash
 mkdir -p .cursor/skills
-cp -r ~/.ai-skills/skills/testing/code-review.md .cursor/skills/code-review.md
+cp -r ~/.ai-skills/skills/testing/code-review .cursor/skills/code-review
 ```
 
 #### Cursor (global)
 
 ```bash
 mkdir -p ~/.cursor/skills
-cp -r ~/.ai-skills/skills/testing/code-review.md ~/.cursor/skills/code-review.md
+cp -r ~/.ai-skills/skills/testing/code-review ~/.cursor/skills/code-review
 ```
 
 #### Claude Code (per-project)
@@ -58,14 +58,14 @@ From your project root:
 
 ```bash
 mkdir -p .claude/skills
-cp -r ~/.ai-skills/skills/testing/code-review.md .claude/skills/code-review.md
+cp -r ~/.ai-skills/skills/testing/code-review .claude/skills/code-review
 ```
 
 #### Claude Code (global)
 
 ```bash
 mkdir -p ~/.claude/skills
-cp -r ~/.ai-skills/skills/testing/code-review.md ~/.claude/skills/code-review.md
+cp -r ~/.ai-skills/skills/testing/code-review ~/.claude/skills/code-review
 ```
 
 ## Related Skills

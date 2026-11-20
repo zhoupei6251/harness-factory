@@ -9,7 +9,7 @@
 // whole repo at import time, and this repo carries no section pointer today, so
 // an end-to-end test would prove nothing.
 import assert from "node:assert/strict";
-import { SECTION_PTR, findDanglingPointers, hasSection } from "../scripts/section-pointer.ts";
+import { SECTION_PTR, findDanglingPointers, findMissingDocLinks, hasSection } from "../scripts/section-pointer.ts";
 
 // Matching a heading must tolerate the hash level and the spacing the docs use.
 assert.ok(hasSection("# routing\n\n## 阶段门禁（不可跳过）\n", "阶段门禁"), "CJK section matches");
@@ -43,5 +43,16 @@ assert.deepEqual(found[1], {
 // same regex, so a doc that stops matching cannot look clean by being skipped.
 assert.deepEqual(findDanglingPointers([docs[0]], read), []);
 assert.equal([...docs[1].text.matchAll(SECTION_PTR)].length, 2);
+
+// A guide present only on the author's machine must not satisfy a shared link.
+const tracked = new Set(["ENTRY.md", "references/tooling.md", "README.md"]);
+assert.deepEqual(
+  findMissingDocLinks("ENTRY.md", "[RTK](references/rtk.md) [tooling](references/tooling.md#rtk)", tracked),
+  ["references/rtk.md"],
+);
+assert.deepEqual(
+  findMissingDocLinks("references/tooling.md", "[home](../README.md#setup) [upstream](https://example.com/help.md) [RTK](#rtk)", tracked),
+  [],
+);
 
 console.log("section-pointer: all assertions passed");

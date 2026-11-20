@@ -35,13 +35,13 @@ try {
   await symlink(outside, join(project, ".claude", "skills", "foreign-skill"), platform() === "win32" ? "junction" : "dir");
 
   // 2. A declaration narrows the set to exactly what it names.
-  await writeDeclaration({ platforms: ["claude"], skills: ["ponytail", "code-review.md"], agents: [] });
+  await writeDeclaration({ platforms: ["claude"], skills: ["ponytail", "code-review"], agents: [] });
   const narrowed = run("install-skills.ts", ["--target", project]);
   assert.equal(narrowed.status, 0, narrowed.stderr);
   assert.match(narrowed.stdout, /pruned:/, "declaration mode reports pruning");
 
   const after = (await readdir(join(project, ".claude", "skills"))).sort();
-  assert.deepEqual(after, ["code-review.md", "foreign-skill", "my-own-skill", "ponytail"].sort(),
+  assert.deepEqual(after, ["code-review", "foreign-skill", "my-own-skill", "ponytail"].sort(),
     "only declared links remain; foreign link and real dir survive");
 
   // 3. A typo fails loudly instead of silently installing nothing.

@@ -1,3 +1,5 @@
+tools/hooks/* text eol=lf
+
 # Keep pinned upstream hashes identical across Windows and Unix checkouts.
 skills/**/upstream/** text eol=lf
 skills/ponytail/SKILL.md text eol=lf

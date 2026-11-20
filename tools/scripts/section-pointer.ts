@@ -1,4 +1,6 @@
 #!/usr/bin/env node
+import { posix } from "node:path";
+
 // section-pointer.ts — does a doc that says `<file>.md § <section>` name a
 // heading that exists?
 //
@@ -16,6 +18,17 @@
 // Trailing sentence punctuation is part of the prose, not the section name:
 // "see `x.md` § Gate." names "Gate". A backtick or `>` ends the pointer too.
 export const SECTION_PTR = /`([A-Za-z0-9._/-]+\.md)`\s*§\s*([^\s`>,.;:!?)]+)/g;
+
+/** Resolve relative Markdown links against the tracked checkout. */
+export function findMissingDocLinks(path: string, text: string, tracked: ReadonlySet<string>): string[] {
+  const missing = new Set<string>();
+  for (const [, target] of text.matchAll(/\]\(([^()<>#\s]+\.md)(?:#[^()<>\s]*)?\)/g)) {
+    if (target.startsWith("/") || /^[a-z][a-z0-9+.-]*:/i.test(target)) continue;
+    const resolved = posix.join(posix.dirname(path), target);
+    if (!tracked.has(resolved)) missing.add(resolved);
+  }
+  return [...missing];
+}
 
 /** True when a heading in `text` carries `section`, ignoring hashes and whitespace. */
 export function hasSection(text: string, section: string): boolean {

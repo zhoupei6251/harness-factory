@@ -59,7 +59,7 @@ For frontend pages, [references/frontend-design.md](references/frontend-design.m
 | `npm run stats` | Live repository counts and Git state |
 | `npm run skills:install -- --platform codex` | Link 10 core skills; optional --target, --profile all and --dry-run; six hosts supported |
 | `npm run check:upstreams` | Verify bundled source hashes and license records offline |
-| `npm run hooks:install` | Install the pre-commit bootstrap drift gate once per clone |
+| `npm run hooks:install` | Install the pre-commit checks for shared links, skill contracts, pinned sources and bootstrap drift |
 | `npm test` | Full repository governance/bootstrap/install checks |
 
 Use Node.js 20.9+ with the locked npm dependencies. Scripts run through tsx; no application build step is needed.

@@ -24,7 +24,7 @@ triggers:
 - sanitize
 - validate input
 role: specialist
-scope: review.md
+scope: review
 output-format: structured
 when_to_use: 调用 security-auditor 时
 status: peripheral
